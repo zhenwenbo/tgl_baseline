@@ -1,0 +1,12 @@
+yes here.
+Epoch 0:
+平均每个batch用时0.00000s, 预计epoch时间: 0.000s
+	total time:13.22s prep time:5.45s sample time:1.25s mfgs time:0.90s gen_flags time:0.26s load_data time:0.93s gen_plan time:0.11s up_indicators time:0.40s up_buffs time:0.07s up_mail time:1.54s
+model time: 3.7731292247772217, loss time: 3.878634214401245
+	train loss:1083230.4184  val ap:0.710569  val auc:0.755272 val time:2.10s
+Epoch 1:
+平均每个batch用时0.00000s, 预计epoch时间: 0.000s
+	total time:12.39s prep time:5.36s sample time:1.28s mfgs time:0.81s gen_flags time:0.26s load_data time:0.94s gen_plan time:0.11s up_indicators time:0.41s up_buffs time:0.07s up_mail time:1.49s
+model time: 2.94462251663208, loss time: 3.9569170475006104
+	train loss:893182.8196  val ap:0.720298  val auc:0.769753 val time:2.09s
+Loading model at epoch 0...

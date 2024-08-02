@@ -1,0 +1,285 @@
+already part feat
+Epoch 0:
+IO load: 0.000s presample and analyze: 0.000s 预采样: 0.000s, 预采样负采样:0.000s
+cur batch: 0, start pre sample and analyze...
+memory info time:0.7283670902252197
+平均每个batch用时0.00000s, 预计epoch时间: 0.000s
+run batch0total time: 0.00s,presample: 0.00s, sample: 0.00s, gen block: 0.00s, feat input: 0.00s, model run: 0.00s, loss and opt: 0.00s, update mem: 0.00s
+feat_buffer time: IO load: 0.378s presample and analyze: 1.340s 预采样: 0.000s, 预采样负采样:0.248s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 300, start pre sample and analyze...
+memory info time:0.7388508319854736
+prefetch over..
+cur batch: 600, start pre sample and analyze...
+memory info time:0.745521068572998
+prefetch over..
+cur batch: 900, start pre sample and analyze...
+memory info time:0.7731974124908447
+prefetch over..
+平均每个batch用时0.03606s, 预计epoch时间: 801.349s
+run batch1000total time: 36.06s,presample: 5.01s, sample: 0.92s, gen block: 3.70s, feat input: 2.54s, model run: 8.41s, loss and opt: 10.79s, update mem: 3.09s
+feat_buffer time: IO load: 1.105s presample and analyze: 3.598s 预采样: 0.000s, 预采样负采样:0.499s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 1200, start pre sample and analyze...
+memory info time:0.7863118648529053
+prefetch over..
+cur batch: 1500, start pre sample and analyze...
+memory info time:0.7970609664916992
+prefetch over..
+cur batch: 1800, start pre sample and analyze...
+memory info time:0.8190412521362305
+prefetch over..
+平均每个batch用时0.03293s, 预计epoch时间: 731.725s
+run batch2000total time: 68.98s,presample: 8.54s, sample: 1.82s, gen block: 7.52s, feat input: 5.15s, model run: 14.91s, loss and opt: 21.77s, update mem: 6.20s
+feat_buffer time: IO load: 1.915s presample and analyze: 6.001s 预采样: 0.000s, 预采样负采样:0.601s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 2100, start pre sample and analyze...
+memory info time:0.8317582607269287
+prefetch over..
+cur batch: 2400, start pre sample and analyze...
+memory info time:0.8383913040161133
+prefetch over..
+cur batch: 2700, start pre sample and analyze...
+memory info time:0.8645439147949219
+prefetch over..
+cur batch: 3000, start pre sample and analyze...
+memory info time:0.863844633102417
+平均每个batch用时0.03369s, 预计epoch时间: 748.791s
+run batch3000total time: 102.67s,presample: 12.32s, sample: 2.72s, gen block: 11.30s, feat input: 7.71s, model run: 21.47s, loss and opt: 33.15s, update mem: 9.38s
+feat_buffer time: IO load: 3.116s presample and analyze: 9.400s 预采样: 0.000s, 预采样负采样:0.709s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 3300, start pre sample and analyze...
+memory info time:0.872046709060669
+prefetch over..
+cur batch: 3600, start pre sample and analyze...
+memory info time:0.8738057613372803
+prefetch over..
+cur batch: 3900, start pre sample and analyze...
+memory info time:0.8652241230010986
+prefetch over..
+平均每个batch用时0.03544s, 预计epoch时间: 787.690s
+run batch4000total time: 138.11s,presample: 17.51s, sample: 3.63s, gen block: 15.10s, feat input: 10.32s, model run: 28.15s, loss and opt: 44.61s, update mem: 12.66s
+feat_buffer time: IO load: 4.055s presample and analyze: 12.011s 预采样: 0.000s, 预采样负采样:0.869s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 4200, start pre sample and analyze...
+memory info time:0.8772032260894775
+prefetch over..
+cur batch: 4500, start pre sample and analyze...
+memory info time:0.8815627098083496
+prefetch over..
+cur batch: 4800, start pre sample and analyze...
+memory info time:0.8845868110656738
+prefetch over..
+平均每个batch用时0.03411s, 预计epoch时间: 757.966s
+run batch5000total time: 172.22s,presample: 21.78s, sample: 4.54s, gen block: 18.92s, feat input: 13.10s, model run: 34.57s, loss and opt: 55.89s, update mem: 15.76s
+feat_buffer time: IO load: 5.320s presample and analyze: 14.655s 预采样: 0.000s, 预采样负采样:0.992s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 5100, start pre sample and analyze...
+memory info time:0.8711631298065186
+prefetch over..
+cur batch: 5400, start pre sample and analyze...
+memory info time:0.8927185535430908
+prefetch over..
+cur batch: 5700, start pre sample and analyze...
+memory info time:0.8836312294006348
+prefetch over..
+cur batch: 6000, start pre sample and analyze...
+memory info time:0.9204020500183105
+平均每个batch用时0.03418s, 预计epoch时间: 759.624s
+run batch6000total time: 206.40s,presample: 25.82s, sample: 5.45s, gen block: 22.70s, feat input: 15.72s, model run: 41.36s, loss and opt: 66.96s, update mem: 19.02s
+feat_buffer time: IO load: 6.665s presample and analyze: 18.224s 预采样: 0.000s, 预采样负采样:1.116s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 6300, start pre sample and analyze...
+memory info time:0.9201433658599854
+prefetch over..
+cur batch: 6600, start pre sample and analyze...
+memory info time:0.9648361206054688
+prefetch over..
+cur batch: 6900, start pre sample and analyze...
+memory info time:0.9298975467681885
+prefetch over..
+平均每个batch用时0.03592s, 预计epoch时间: 798.187s
+run batch7000total time: 242.31s,presample: 31.56s, sample: 6.50s, gen block: 26.57s, feat input: 18.48s, model run: 47.93s, loss and opt: 78.22s, update mem: 22.17s
+feat_buffer time: IO load: 7.781s presample and analyze: 21.039s 预采样: 0.000s, 预采样负采样:1.304s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 7200, start pre sample and analyze...
+memory info time:0.9649035930633545
+prefetch over..
+cur batch: 7500, start pre sample and analyze...
+memory info time:0.9408245086669922
+prefetch over..
+cur batch: 7800, start pre sample and analyze...
+memory info time:1.0030608177185059
+prefetch over..
+平均每个batch用时0.03514s, 预计epoch时间: 780.956s
+run batch8000total time: 277.45s,presample: 36.28s, sample: 7.46s, gen block: 30.38s, feat input: 21.13s, model run: 54.74s, loss and opt: 89.70s, update mem: 25.34s
+feat_buffer time: IO load: 9.136s presample and analyze: 23.948s 预采样: 0.000s, 预采样负采样:1.460s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 8100, start pre sample and analyze...
+memory info time:0.9767208099365234
+prefetch over..
+cur batch: 8400, start pre sample and analyze...
+memory info time:1.018155574798584
+prefetch over..
+cur batch: 8700, start pre sample and analyze...
+memory info time:0.9940879344940186
+prefetch over..
+cur batch: 9000, start pre sample and analyze...
+memory info time:1.0009520053863525
+平均每个batch用时0.03504s, 预计epoch时间: 778.767s
+run batch9000total time: 312.49s,presample: 40.90s, sample: 8.40s, gen block: 34.34s, feat input: 23.76s, model run: 61.26s, loss and opt: 101.37s, update mem: 28.53s
+feat_buffer time: IO load: 10.681s presample and analyze: 27.938s 预采样: 0.000s, 预采样负采样:1.627s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 9300, start pre sample and analyze...
+memory info time:1.049452543258667
+prefetch over..
+cur batch: 9600, start pre sample and analyze...
+memory info time:1.0449881553649902
+prefetch over..
+cur batch: 9900, start pre sample and analyze...
+memory info time:1.0177514553070068
+prefetch over..
+平均每个batch用时0.03785s, 预计epoch时间: 841.233s
+run batch10000total time: 350.34s,presample: 47.50s, sample: 9.52s, gen block: 38.28s, feat input: 26.53s, model run: 68.43s, loss and opt: 112.91s, update mem: 31.72s
+feat_buffer time: IO load: 12.115s presample and analyze: 31.051s 预采样: 0.000s, 预采样负采样:1.872s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 10200, start pre sample and analyze...
+memory info time:1.0145118236541748
+prefetch over..
+cur batch: 10500, start pre sample and analyze...
+memory info time:1.014528512954712
+prefetch over..
+cur batch: 10800, start pre sample and analyze...
+memory info time:1.012986660003662
+prefetch over..
+平均每个batch用时0.03217s, 预计epoch时间: 714.916s
+run batch11000total time: 382.51s,presample: 52.19s, sample: 10.35s, gen block: 41.86s, feat input: 28.99s, model run: 74.45s, loss and opt: 123.14s, update mem: 34.72s
+feat_buffer time: IO load: 13.288s presample and analyze: 34.093s 预采样: 0.000s, 预采样负采样:2.066s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 11100, start pre sample and analyze...
+memory info time:1.0060615539550781
+prefetch over..
+cur batch: 11400, start pre sample and analyze...
+memory info time:0.9992861747741699
+prefetch over..
+cur batch: 11700, start pre sample and analyze...
+memory info time:0.9961678981781006
+prefetch over..
+cur batch: 12000, start pre sample and analyze...
+memory info time:1.7166273593902588
+平均每个batch用时0.03415s, 预计epoch时间: 759.055s
+run batch12000total time: 416.67s,presample: 57.12s, sample: 11.23s, gen block: 45.66s, feat input: 31.61s, model run: 81.02s, loss and opt: 133.64s, update mem: 37.92s
+feat_buffer time: IO load: 15.189s presample and analyze: 38.812s 预采样: 0.000s, 预采样负采样:2.272s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 12300, start pre sample and analyze...
+memory info time:1.0231900215148926
+prefetch over..
+cur batch: 12600, start pre sample and analyze...
+memory info time:1.0540401935577393
+prefetch over..
+cur batch: 12900, start pre sample and analyze...
+memory info time:1.0606729984283447
+prefetch over..
+平均每个batch用时0.03877s, 预计epoch时间: 861.554s
+run batch13000total time: 455.43s,presample: 64.37s, sample: 12.16s, gen block: 49.76s, feat input: 34.29s, model run: 87.80s, loss and opt: 145.49s, update mem: 41.52s
+feat_buffer time: IO load: 16.437s presample and analyze: 41.950s 预采样: 0.000s, 预采样负采样:2.561s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 13200, start pre sample and analyze...
+memory info time:1.059476613998413
+prefetch over..
+cur batch: 13500, start pre sample and analyze...
+memory info time:1.064298152923584
+prefetch over..
+cur batch: 13800, start pre sample and analyze...
+memory info time:1.0868151187896729
+prefetch over..
+平均每个batch用时0.03599s, 预计epoch时间: 799.825s
+run batch14000total time: 491.42s,presample: 69.71s, sample: 13.11s, gen block: 53.79s, feat input: 37.00s, model run: 94.59s, loss and opt: 156.82s, update mem: 44.83s
+feat_buffer time: IO load: 18.056s presample and analyze: 45.161s 预采样: 0.000s, 预采样负采样:2.785s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 14100, start pre sample and analyze...
+memory info time:1.0815167427062988
+prefetch over..
+cur batch: 14400, start pre sample and analyze...
+memory info time:1.07794189453125
+prefetch over..
+cur batch: 14700, start pre sample and analyze...
+memory info time:1.0993669033050537
+prefetch over..
+cur batch: 15000, start pre sample and analyze...
+memory info time:1.1230881214141846
+平均每个batch用时0.03679s, 预计epoch时间: 817.597s
+run batch15000total time: 528.21s,presample: 75.05s, sample: 14.04s, gen block: 57.89s, feat input: 39.70s, model run: 101.31s, loss and opt: 168.85s, update mem: 48.22s
+feat_buffer time: IO load: 20.061s presample and analyze: 49.544s 预采样: 0.000s, 预采样负采样:3.022s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 15300, start pre sample and analyze...
+memory info time:1.1107428073883057
+prefetch over..
+cur batch: 15600, start pre sample and analyze...
+memory info time:1.1058471202850342
+prefetch over..
+cur batch: 15900, start pre sample and analyze...
+memory info time:1.1298291683197021
+prefetch over..
+平均每个batch用时0.03981s, 预计epoch时间: 884.655s
+run batch16000total time: 568.01s,presample: 82.52s, sample: 14.98s, gen block: 61.91s, feat input: 42.44s, model run: 108.87s, loss and opt: 180.95s, update mem: 51.54s
+feat_buffer time: IO load: 21.806s presample and analyze: 52.890s 预采样: 0.000s, 预采样负采样:3.353s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 16200, start pre sample and analyze...
+memory info time:1.1306641101837158
+prefetch over..
+cur batch: 16500, start pre sample and analyze...
+memory info time:1.1843478679656982
+prefetch over..
+cur batch: 16800, start pre sample and analyze...
+memory info time:1.1585490703582764
+prefetch over..
+平均每个batch用时0.03703s, 预计epoch时间: 822.978s
+run batch17000total time: 605.04s,presample: 88.11s, sample: 15.92s, gen block: 66.01s, feat input: 45.16s, model run: 115.61s, loss and opt: 192.65s, update mem: 55.18s
+feat_buffer time: IO load: 23.352s presample and analyze: 56.364s 预采样: 0.000s, 预采样负采样:3.619s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 17100, start pre sample and analyze...
+memory info time:1.1519944667816162
+prefetch over..
+cur batch: 17400, start pre sample and analyze...
+memory info time:1.1674377918243408
+prefetch over..
+cur batch: 17700, start pre sample and analyze...
+memory info time:1.165329933166504
+prefetch over..
+cur batch: 18000, start pre sample and analyze...
+memory info time:1.143596887588501
+平均每个batch用时0.03639s, 预计epoch时间: 808.685s
+run batch18000total time: 641.43s,presample: 93.98s, sample: 16.83s, gen block: 70.08s, feat input: 48.04s, model run: 122.18s, loss and opt: 204.00s, update mem: 58.40s
+feat_buffer time: IO load: 25.705s presample and analyze: 60.993s 预采样: 0.000s, 预采样负采样:3.898s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 18300, start pre sample and analyze...
+memory info time:1.1438000202178955
+prefetch over..
+cur batch: 18600, start pre sample and analyze...
+memory info time:1.1479101181030273
+prefetch over..
+cur batch: 18900, start pre sample and analyze...
+memory info time:1.1597602367401123
+prefetch over..
+平均每个batch用时0.04024s, 预计epoch时间: 894.290s
+run batch19000total time: 681.67s,presample: 101.77s, sample: 17.78s, gen block: 74.24s, feat input: 51.03s, model run: 129.18s, loss and opt: 215.98s, update mem: 61.97s
+feat_buffer time: IO load: 27.573s presample and analyze: 64.445s 预采样: 0.000s, 预采样负采样:4.290s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 19200, start pre sample and analyze...
+memory info time:1.190408706665039
+prefetch over..
+cur batch: 19500, start pre sample and analyze...
+memory info time:1.1674137115478516
+爆显存prefetch over..
+cur batch: 19800, start pre sample and analyze...
+memory info time:1.1930112838745117
+prefetch over..
+平均每个batch用时0.03627s, 预计epoch时间: 806.140s
+run batch20000total time: 717.94s,presample: 107.42s, sample: 18.69s, gen block: 78.06s, feat input: 53.66s, model run: 135.74s, loss and opt: 227.74s, update mem: 65.38s
+feat_buffer time: IO load: 29.081s presample and analyze: 67.996s 预采样: 0.000s, 预采样负采样:4.593s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+cur batch: 20100, start pre sample and analyze...
+memory info time:1.2083170413970947
+prefetch over..
+cur batch: 20400, start pre sample and analyze...
+memory info time:1.1975831985473633
+prefetch over..
+cur batch: 20700, start pre sample and analyze...
+memory info time:1.1960413455963135
+prefetch over..
+cur batch: 21000, start pre sample and analyze...
+memory info time:1.2169580459594727
+平均每个batch用时0.03688s, 预计epoch时间: 819.675s
+run batch21000total time: 754.82s,presample: 113.43s, sample: 19.61s, gen block: 82.02s, feat input: 56.31s, model run: 142.65s, loss and opt: 239.21s, update mem: 68.58s
+feat_buffer time: IO load: 31.430s presample and analyze: 72.815s 预采样: 0.000s, 预采样负采样:4.902s              记忆刷入和更新:0.265s 纯刷入时间:0.000s 负采样分析: 0.097s
+prefetch over..
+cur batch: 21300, start pre sample and analyze...
+memory info time:1.25254225730896
+prefetch over..

@@ -1,0 +1,41 @@
+Sent: init_feats
+Received: None
+already part feat
+Epoch 0:
+IO load: 0.000s presample and analyze: 0.000s 预采样: 0.000s, 预采样负采样:0.000s
+cur batch: 0, start pre sample and analyze...
+第一个块的加载时间: 3.402s
+cur batch: 300, start pre sample and analyze...
+total loop use time: 14.6334
+run batch452total time: 14.56s,presample: 3.50s, sample: 0.26s, gen block: 1.07s, feat input: 0.64s, model run: 2.69s, loss and opt: 4.43s, update mem: 1.69s
+Epoch 1:
+IO load: 1.623s presample and analyze: 1.873s 预采样: 0.000s, 预采样负采样:0.354s
+cur batch: 0, start pre sample and analyze...
+第一个块的加载时间: 1.521s
+cur batch: 300, start pre sample and analyze...
+total loop use time: 11.8580
+run batch452total time: 11.79s,presample: 1.62s, sample: 0.26s, gen block: 1.07s, feat input: 0.64s, model run: 1.84s, loss and opt: 4.35s, update mem: 1.71s
+Epoch 2:
+IO load: 1.366s presample and analyze: 0.247s 预采样: 0.000s, 预采样负采样:0.200s
+cur batch: 0, start pre sample and analyze...
+第一个块的加载时间: 1.511s
+cur batch: 300, start pre sample and analyze...
+total loop use time: 11.8069
+run batch452total time: 11.75s,presample: 1.60s, sample: 0.26s, gen block: 1.06s, feat input: 0.63s, model run: 1.80s, loss and opt: 4.39s, update mem: 1.72s
+Epoch 3:
+IO load: 1.355s presample and analyze: 0.247s 预采样: 0.000s, 预采样负采样:0.198s
+cur batch: 0, start pre sample and analyze...
+第一个块的加载时间: 1.548s
+cur batch: 300, start pre sample and analyze...
+total loop use time: 11.8226
+run batch452total time: 11.76s,presample: 1.64s, sample: 0.26s, gen block: 1.05s, feat input: 0.62s, model run: 1.78s, loss and opt: 4.39s, update mem: 1.74s
+Epoch 4:
+IO load: 1.391s presample and analyze: 0.249s 预采样: 0.000s, 预采样负采样:0.200s
+cur batch: 0, start pre sample and analyze...
+第一个块的加载时间: 1.528s
+cur batch: 300, start pre sample and analyze...
+total loop use time: 11.7531
+run batch452total time: 11.69s,presample: 1.62s, sample: 0.26s, gen block: 1.04s, feat input: 0.62s, model run: 1.78s, loss and opt: 4.35s, update mem: 1.74s
+Loading model at epoch 0...
+训练完成，退出子进程
+[W CudaIPCTypes.cpp:15] Producer process has been terminated before all shared CUDA tensors released. See Note [Sharing CUDA tensors]

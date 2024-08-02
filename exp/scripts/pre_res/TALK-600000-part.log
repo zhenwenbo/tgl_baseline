@@ -1,0 +1,11 @@
+feat memory: 5.750GB
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 0 batchsize: 600000 用时:0.7161822s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 1 batchsize: 600000 用时:0.8252008s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 2 batchsize: 600000 用时:0.9290874s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 3 batchsize: 600000 用时:0.9399557s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 4 batchsize: 600000 用时:1.0089691s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 5 batchsize: 600000 用时:1.0397203s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 6 batchsize: 600000 用时:1.0956993s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 7 batchsize: 600000 用时:1.0713842s
+torch.Size([1200000])单层单block采样 + 转换block + 存储block数据 batch: 8 batchsize: 600000 用时:1.0980601s
+torch.Size([166394])单层单block采样 + 转换block + 存储block数据 batch: 9 batchsize: 600000 用时:0.2963758s

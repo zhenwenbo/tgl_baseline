@@ -1,0 +1,11 @@
+DySAT_pytorch/
+EvolveGCN/
+roland/
+pygt/
+Orca/
+WinGNN/
+TimeSGN/
+models/
+intervals/
+build/
+__pycache__/

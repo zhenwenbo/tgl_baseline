@@ -1,0 +1,7 @@
+Epoch 0:
+	train loss:1085004.8513  val ap:0.713584  val auc:0.754488
+	total time:28.46s sample time:0.12s prep time:18.59s
+Epoch 1:
+	train loss:891424.2742  val ap:0.723990  val auc:0.769617
+	total time:27.74s sample time:0.12s prep time:18.75s
+Loading model at epoch 0...
