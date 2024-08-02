@@ -3,10 +3,11 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
+parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--rand_edge_features', type=int, default=0, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=0, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -180,6 +181,7 @@ for e in range(train_param['epoch']):
     time_prep = 0
     time_tot = 0
     total_loss = 0
+    time_per_batch = 0
     # training
     model.train()
     if sampler is not None:
@@ -187,7 +189,7 @@ for e in range(train_param['epoch']):
     if mailbox is not None:
         mailbox.reset()
         model.memory_updater.last_updated_nid = None
-    for _, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
+    for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
         t_tot_s = time.time()
         root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
         ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
@@ -200,12 +202,17 @@ for e in range(train_param['epoch']):
             ret = sampler.get_ret()
             time_sample += ret[0].sample_time()
 
+        if (args.data in ['GDELT', 'STACK', 'TALK'] and batch_num % 1000 == 0):
+            print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+            time_per_batch = 0
 
         t_prep_s = time.time()
         if gnn_param['arch'] != 'identity':
             mfgs = to_dgl_blocks(ret, sample_param['history'])
         else:
             mfgs = node_to_dgl_blocks(root_nodes, ts)
+
+        # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
         mfgs = prepare_input(mfgs, node_feats, edge_feats, combine_first=combine_first)
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0])
@@ -234,6 +241,10 @@ for e in range(train_param['epoch']):
 
 
         time_tot += time.time() - t_tot_s
+        time_per_batch += time.time() - t_tot_s
+
+    if (not args.model_eval):
+        continue
     ap, auc = eval('val')
     if e > 2 and ap > best_ap:
         best_e = e
@@ -242,6 +253,8 @@ for e in range(train_param['epoch']):
     print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
     print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
+if (not args.model_eval):
+    exit(-1)
 print('Loading model at epoch {}...'.format(best_e))
 model.load_state_dict(torch.load(path_saver))
 model.eval()

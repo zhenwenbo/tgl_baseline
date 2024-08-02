@@ -1,1 +1,0 @@
-训练配置: {'use_valid_edge': False, 'use_ayscn_prefetch': True, 'pre_sample_size': 600000, 'part_neg_sample': False}

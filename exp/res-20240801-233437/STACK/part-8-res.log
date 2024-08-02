@@ -1,7 +1,0 @@
-usage: train.py [-h] [--data DATA] [--config CONFIG] [--gpu GPU]
-                [--model_name MODEL_NAME] [--use_inductive] [--no_emb_buffer]
-                [--train_conf TRAIN_CONF] [--dis_threshold DIS_THRESHOLD]
-                [--rand_edge_features RAND_EDGE_FEATURES]
-                [--rand_node_features RAND_NODE_FEATURES]
-                [--eval_neg_samples EVAL_NEG_SAMPLES]
-train.py: error: unrecognized arguments: --pre_sample_size=600000

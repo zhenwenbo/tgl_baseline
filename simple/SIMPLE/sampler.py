@@ -5,6 +5,14 @@ import time
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+
+import sys
+import os
+
+root_dir = '/home/guorui/workspace/dgnn/simple'
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+
 from SIMPLE.sampler_core import ParallelSampler, TemporalGraphBlock
 
 class NegLinkSampler:

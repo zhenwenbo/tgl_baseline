@@ -6,8 +6,8 @@ if MODULE_PATH not in sys.path:
 	sys.path.append(MODULE_PATH)
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1-pre.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
@@ -259,6 +259,8 @@ for e in range(train_param['epoch']):
                 mfgs = to_dgl_blocks(ret, sample_param['history'])
             else:
                 mfgs = to_dgl_blocks_orca(ret)
+        # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
+
         t1 = time.time()    
         node_idx = mfgs[0][0].srcdata['ID'].long() #拿到第0层的idx，采样特性中，第0层的数据包含后面所有层的数据
         if gnn_param['arch'] != 'identity':
@@ -287,6 +289,7 @@ for e in range(train_param['epoch']):
             else:
                 edge_gpu_mask, edge_gpu_local_ids, edge_cpu_ids = \
                 gen_flag_and_mask(edge_idx, gpu_flag_e, gpu_map_e, plan_edge) 
+        # print(f"node缓存命中率: {torch.sum(node_gpu_mask).item() / node_gpu_mask.shape[0] * 100:.2f}%, edge 缓存命中率: {torch.sum(edge_gpu_mask) / edge_gpu_mask.shape[0] * 100:.2f}%")
         t2 = time.time()
         #load batch data.
         if gnn_param['arch'] != 'identity':

@@ -9,3 +9,4 @@ models/
 intervals/
 build/
 __pycache__/
+*.log

@@ -6,9 +6,10 @@ if MODULE_PATH not in sys.path:
 	sys.path.append(MODULE_PATH)
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
+parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=100, help='use random node featrues')
@@ -235,6 +236,7 @@ for e in range(train_param['epoch']):
     #iterate over batches
 
     time_per_batch = 0
+    aver_node_num, aver_edge_num, aver_node_hit, aver_edge_hit = 0,0,0,0
     for batch_num, rows in df[:train_edge_end].groupby(group_indexes):  
         t_tot_s = time.time()
         #load target data.
@@ -259,6 +261,11 @@ for e in range(train_param['epoch']):
                 mfgs = to_dgl_blocks(ret, sample_param['history'])
             else:
                 mfgs = to_dgl_blocks_orca(ret)
+        node_num = mfgs[0][0].num_nodes()
+        edge_num = mfgs[0][0].num_edges()
+        # aver_node_num = (aver_node_num * batch_num + node_num)
+        # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
+
         t1 = time.time()    
         node_idx = mfgs[0][0].srcdata['ID'].long() #拿到第0层的idx，采样特性中，第0层的数据包含后面所有层的数据
         if gnn_param['arch'] != 'identity':
@@ -272,9 +279,12 @@ for e in range(train_param['epoch']):
         else:
             edge_idx = []
            
+        node_hit = 0
         if  nfeat_buffs is not None or (mailbox is not None and mailbox.mailbox_buffs):
             node_gpu_mask, node_gpu_local_ids, node_cpu_ids = \
             gen_flag_and_mask(node_idx, gpu_flag_n, gpu_map_n, plan_node)
+
+            node_hit = torch.sum(node_gpu_mask).item() / node_gpu_mask.shape[0] * 100
         if efeat_buffs is not None:
             if gnn_param['layer'] > 1:
                 if not emb_reuse:
@@ -284,9 +294,22 @@ for e in range(train_param['epoch']):
                 else:
                     edge_gpu_mask, edge_gpu_local_ids, edge_cpu_ids = \
                     gen_flag_and_mask(edge_idx, gpu_flag_e, gpu_map_e, plan_edge) 
+                
+                mask = edge_gpu_mask[0]
             else:
                 edge_gpu_mask, edge_gpu_local_ids, edge_cpu_ids = \
                 gen_flag_and_mask(edge_idx, gpu_flag_e, gpu_map_e, plan_edge) 
+
+                mask = edge_gpu_mask
+            
+            
+            edge_hit = torch.sum(mask) / mask.shape[0] * 100
+        # print(f"node缓存命中率: {torch.sum(node_gpu_mask).item() / node_gpu_mask.shape[0] * 100:.2f}%, edge 缓存命中率: {torch.sum(edge_gpu_mask) / edge_gpu_mask.shape[0] * 100:.2f}%")
+        
+        
+
+        aver_node_hit = (aver_node_hit * batch_num + node_hit) / (batch_num + 1)
+        aver_edge_hit = (aver_edge_hit * batch_num + edge_hit).item() / (batch_num + 1)
         t2 = time.time()
         #load batch data.
         if gnn_param['arch'] != 'identity':
@@ -401,10 +424,13 @@ for e in range(train_param['epoch']):
         time_per_batch += t_end - t_tot_s
     
     print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s mfgs time:{:.2f}s gen_flags time:{:.2f}s load_data time:{:.2f}s gen_plan time:{:.2f}s up_indicators time:{:.2f}s up_buffs time:{:.2f}s up_mail time:{:.2f}s'.format(time_tot, time_prep, time_sample, time_mfgs, time_gen_flags, time_load_data, time_gen_plan, time_up_indicators, time_up_buffs, time_up_mail))
-    print(f"model time: {time_model}, loss time: {time_loss}")
+    print(f"model time: {time_model}, loss time: {time_loss} aver_node_hit: {aver_node_hit:.2f}%, aver_edge_hit: {aver_edge_hit:.2f}% ")
     t0 = time.time()
     if gpu_flag_n is not None:
         mailbox.offload_for_eval(gpu_flag_n, gpu_map_n)
+    
+    if (not args.model_eval):
+        continue
     ap, auc = eval('val')
     t1 = time.time()
     if e > 2 and ap > best_ap:
@@ -413,6 +439,9 @@ for e in range(train_param['epoch']):
         torch.save(model.state_dict(), path_saver)
     print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f} val time:{:.2f}s'.format(total_loss, ap, auc, t1-t0))
 
+if (not args.model_eval):
+    exit(-1)
+    
 print('Loading model at epoch {}...'.format(best_e))
 model.load_state_dict(torch.load(path_saver))
 t0 = time.time()

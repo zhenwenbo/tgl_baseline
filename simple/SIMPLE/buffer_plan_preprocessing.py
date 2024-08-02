@@ -9,7 +9,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default = 'LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default = '../config/TGN-1.yml')
+parser.add_argument('--config', type=str, help='path to config file', default = '/home/guorui/workspace/dgnn/simple/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--dim_edge_feat', type=int, default=128, help='dim of edge feat')
@@ -27,7 +27,6 @@ import time
 import random
 import dgl
 import numpy as np
-from trainer import *
 from sampler import *
 from data_processing import *
 import time
@@ -43,8 +42,8 @@ def static_data_placement(weight_node, weight_edge, threshold, data_name):
     limit_node, limit_edge = int(threshold*len(weight_node)), int(threshold*len(weight_edge))
     plan_node = np.argsort(weight_node)[::-1][:limit_node]
     plan_edge = np.argsort(weight_edge)[::-1][:limit_edge]
-    np.save('../intervals/'+data_name+'_static_node.npy', plan_node)
-    np.save('../intervals/'+data_name+'_static_edge.npy', plan_edge)
+    np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_static_node.npy', plan_node)
+    np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_static_edge.npy', plan_edge)
     
 def gen_intervals(uni_list, count_list, num_data):
     #initialize
@@ -179,13 +178,13 @@ def alloc_budget(vols, mems, dims, limit, data_name, layer, mailbox_size, thresh
     for i in np.nonzero(store_flag==True)[0]:
         print('Type-{} data needs to be dynamically placed.'.format(i)) #TYPE-0: node; TYPE-1: edge.
     if layer > 1 and threshold == 0.1:
-        np.save('../intervals/'+data_name+'_'+str(layer)+'_budget.npy', budget)
+        np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_'+str(layer)+'_budget.npy', budget)
     if layer >1 and threshold != 0.1:
-        np.save('../intervals/'+data_name+'_'+str(layer)+'_'+str(threshold)+'_budget.npy', budget)
+        np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_'+str(layer)+'_'+str(threshold)+'_budget.npy', budget)
     if layer == 1 and mailbox_size == 1:
-        np.save('../intervals/'+data_name+'_budget.npy', budget)
+        np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_budget.npy', budget)
     if layer == 1 and mailbox_size > 1:
-        np.save('../intervals/'+data_name+'_budget_apan.npy', budget)
+        np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_budget_apan.npy', budget)
     return budget, store_flag
 
 def data_placement_single(uni_list, count_list, num_data, num_batch, limit, name, data_name, layer, mailbox_size, threshold):
@@ -220,9 +219,9 @@ def data_placement_single(uni_list, count_list, num_data, num_batch, limit, name
     
     # save the selected intervals: start_batch_ids, end_batch_ids, mapped_data_ids
     # 已经根据start时间顺序排序
-    np.save('../intervals/'+data_name+'_start_'+name+'_'+str(layer)+'.npy', start)
-    np.save('../intervals/'+data_name+'_end_'+name+'_'+str(layer)+'.npy', end)
-    np.save('../intervals/'+data_name+'_ids_'+name+'_'+str(layer)+'.npy', IDs)
+    np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+name+'_'+str(layer)+'.npy', start)
+    np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+name+'_'+str(layer)+'.npy', end)
+    np.save('/home/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+name+'_'+str(layer)+'.npy', IDs)
     t6 = time.time()
     print('Saving intervals takes:{:.2f}s'.format(t6-t5))    
     

@@ -7,7 +7,7 @@ sampling:
     prop_time: False
     history: 1
     duration: 0
-    num_thread: 8
+    num_thread: 32
 memory: 
   - type: 'node'
     dim_time: 100
@@ -24,7 +24,7 @@ gnn:
     dim_time: 100
     dim_out: 100
 train:
-  - epoch: 2
+  - epoch: 10
     batch_size: 2000
     # reorder: 16
     lr: 0.0001

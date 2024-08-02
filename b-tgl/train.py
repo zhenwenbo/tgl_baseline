@@ -2,11 +2,12 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
+parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--train_conf', type=str, default='basic_conf', help='name of stored model')
@@ -433,6 +434,7 @@ if __name__ == '__main__':
                 else:
                     mfgs = node_to_dgl_blocks(root_nodes, ts)  
             # emptyCache()
+            # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
             time_gen_dgl += time.time() - t_gen_dgl_s
             #对依赖进行分析
             # node_num = rows.src.values.shape[0]
@@ -504,6 +506,8 @@ if __name__ == '__main__':
         feat_buffer.mode = 'val'
         feat_buffer.refresh_memory()
 
+        if (not args.model_eval):
+            continue
         eval_time_s = time.time()
         ap, auc = eval('val')
         
@@ -517,24 +521,25 @@ if __name__ == '__main__':
 
         if (emb_buffer and emb_buffer.use_buffer):
             emb_buffer.reset_time()
-    print('Loading model at epoch {}...'.format(best_e))
-    model.load_state_dict(torch.load(path_saver))
-    model.eval()
 
+    
+    if (args.model_eval):
+        print('Loading model at epoch {}...'.format(best_e))
+        model.load_state_dict(torch.load(path_saver))
+        model.eval()
 
-    #TODO 下面是test
-    if sampler is not None:
-        sampler.reset()
-    if mailbox is not None:
-        mailbox.reset()
-        model.memory_updater.last_updated_nid = None
-        eval('train')
-        eval('val')
-    ap, auc = eval('test')
-    if args.eval_neg_samples > 1:
-        print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
-    else:
-        print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
+        if sampler is not None:
+            sampler.reset()
+        if mailbox is not None:
+            mailbox.reset()
+            model.memory_updater.last_updated_nid = None
+            eval('train')
+            eval('val')
+        ap, auc = eval('test')
+        if args.eval_neg_samples > 1:
+            print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
+        else:
+            print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
 
     print(f"训练完成，退出子进程")
     if (use_ayscn_prefetch):
