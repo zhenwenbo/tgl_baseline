@@ -243,14 +243,13 @@ for e in range(train_param['epoch']):
         time_tot += time.time() - t_tot_s
         time_per_batch += time.time() - t_tot_s
 
-    if (not args.model_eval):
-        continue
-    ap, auc = eval('val')
-    if e > 2 and ap > best_ap:
-        best_e = e
-        best_ap = ap
-        torch.save(model.state_dict(), path_saver)
-    print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
+    if (args.model_eval):
+        ap, auc = eval('val')
+        if e > 2 and ap > best_ap:
+            best_e = e
+            best_ap = ap
+            torch.save(model.state_dict(), path_saver)
+        print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
     print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
 if (not args.model_eval):

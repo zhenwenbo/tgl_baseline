@@ -150,21 +150,28 @@ class Pre_fetch:
         # print(f"子进程...")
         #TODO 这里暂时不考虑任何增量策略
         # print(f"子线程prefetch")
+        t0 = time.time()
         neg_nodes, neg_eids = neg_info
-        neg_nodes, _ = torch.sort(neg_nodes)
-        neg_eids, _ = torch.sort(neg_eids)
-
         neg_nodes,neg_eids = neg_nodes.cpu(),neg_eids.cpu()
+        # neg_nodes, _ = torch.sort(neg_nodes)
+        # neg_eids, _ = torch.sort(neg_eids)
+
         part_node_map = part_node_map.cpu()
         path, batch_size, fan_nums = conf
+        t1 = time.time() - t0
+        t0 = time.time()
 
         pos_edge_feats = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt')
         pos_edge_map = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map.pt')
         pos_node_feats = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt')
         pos_node_map = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map.pt')
+        t2 = time.time() - t0
+        t0 = time.time()
         if (self.use_valid_edge):
             self.update_valid_edge(block_num)
 
+        t3 = time.time() - t0
+        t0 = time.time()
         # table1 = torch.zeros_like(neg_nodes) - 1
         # table2 = torch.zeros_like(pos_node_map) - 1
         # dgl.findSameNode(neg_nodes, pos_node_map, table1, table2)
@@ -188,16 +195,23 @@ class Pre_fetch:
         dis_ind = torch.isin(neg_eids, pos_edge_map, assume_unique=True,invert=True)
         dis_neg_eids = neg_eids[dis_ind]
         # print(f"neg_nodes: {neg_nodes.shape[0]}, neg_eids: {neg_eids.shape[0]}, dis_neg_nodes: {dis_neg_nodes.shape[0]},dis_neg_eids: {dis_neg_eids.shape[0]}")
+        t4 = time.time() - t0
+        t0 = time.time()
 
         if (self.use_valid_edge):
             dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
         else:
             dis_neg_eids_feat = self.edge_feats[dis_neg_eids.to(torch.int64)]
 
+        t5 = time.time() - t0
+        t0 = time.time()
+
         pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
         pos_edge_map,indices = torch.sort(pos_edge_map)
         edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
         edge_feats = edge_feats[indices]
+        t6 = time.time() - t0
+        t0 = time.time()
 
         #此时获得了下一个块的所有nodes eids node_feats edge_feats
         #分别为 pos_node_map pos_edge_map node_feats edge_feats
@@ -205,11 +219,13 @@ class Pre_fetch:
         if (memory_info):
             #当前正在异步运行块i，需要将块(i-1)的memory信息传入并做刷入，
             part_memory_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = memory_info
-            part_map = part_memory_map.cpu().clone().long()
-            self.memory[part_map] = part_memory.cpu().clone()
-            self.memory_ts[part_map] = part_memory_ts.cpu().clone()
-            self.mailbox[part_map] = part_mailbox.cpu().clone()
-            self.mailbox_ts[part_map] = part_mailbox_ts.cpu().clone()
+            part_map = part_memory_map.cpu().long()
+            self.memory[part_map] = part_memory.cpu()
+            self.memory_ts[part_map] = part_memory_ts.cpu()
+            self.mailbox[part_map] = part_mailbox.cpu()
+            self.mailbox_ts[part_map] = part_mailbox_ts.cpu()
+        t7 = time.time() - t0
+        t0 = time.time()
 
         nodes = pos_node_map.long()
         part_memory = self.memory[nodes]
@@ -222,6 +238,8 @@ class Pre_fetch:
         
         pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map) #mask形式的
         cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu())
+        t8 = time.time() - t0
+        t0 = time.time()
 
         # print(f"pre fetch over...")
         if (pos_node_map.shape[0] > self.part_node_map.shape[0]):
@@ -230,15 +248,19 @@ class Pre_fetch:
         if (pos_edge_map.shape[0] > self.part_edge_map.shape[0]):
             self.prefetch_conn.send('edge extension')
             self.prefetch_conn.recv()
-
+        t9 = time.time() - t0
+        t0 = time.time()
         self.prefetch_after([pos_node_map, node_feats, pos_edge_map, edge_feats, part_memory,\
                               part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes])
         # self.preFetchDataCache.put({'node_info': [pos_node_map, node_feats], 'edge_info': [pos_edge_map, edge_feats],\
         #                              'memory_info': [part_memory, part_memory_ts, part_mailbox, part_mailbox_ts],\
         #                                 'memory_update_info': [pre_same_nodes, cur_same_nodes]})
-
+        t10 = time.time() - t0
+        t0 = time.time()
         #nodes做sort + unique找出最终的indices
 
+        # print(f" {t1:.2f}s\n {t2:.2f}s\n {t3:.2f}s\n {t4:.2f}s\n {t5:.2f}s\n {t6:.2f}s\n {t7:.2f}s\n {t8:.2f}s\n {t9:.2f}s\n {t10:.2f}s\n")
+        # print(f"pre fetch over...")
 
     def run(self):
         while True:

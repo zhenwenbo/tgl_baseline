@@ -86,28 +86,41 @@ for d in "${ds[@]}"; do
 
   mkdir -p "../res-pre-${timestamp}/${d}"
 
-#   nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/scripts/pre_res/${d}-${block_size}-expire.log &
+#   nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/pre_res/${d}-${block_size}-expire.log &
 #   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/scripts/pre_res/${d}-${block_size}-expire-mem.log"
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/pre_res/${d}-${block_size}-expire-mem.log"
 #   monitor_memory_usage $pid
 #   wait
 
 
-  nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/scripts/res-pre-${timestamp}/${d}/b-${block_size}-part.log &
+  nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-part.log &
   pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/scripts/res-pre-${timestamp}/${d}/b-${block_size}-part-mem.log"
+  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-part-mem.log"
   monitor_memory_usage $pid
   wait
+
+
+
 
   threshold=0.1
   if [ "$d" == "GDELT" ]; then
-    threshold=0.08
+    threshold=0.05
   fi
 
-  nohup python /home/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/home/guorui/workspace/dgnn/simple/config/TGN-2.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/scripts/res-pre-${timestamp}/${d}/simple-${threshold}.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/scripts/res-pre-${timestamp}/${d}/simple-${threshold}-mem.log"
-  monitor_memory_usage $pid
-  wait
+#   nohup python /home/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/home/guorui/workspace/dgnn/simple/config/TGN-2.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-1-${threshold}.log &
+#   pid=$!
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-1-${threshold}-mem.log"
+#   monitor_memory_usage $pid
+#   wait
+
+#   nohup python /home/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/home/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-2-${threshold}.log &
+#   pid=$!
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-2-${threshold}-mem.log"
+#   monitor_memory_usage $pid
+#   wait
+
+
 
 done
+
+# python /home/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data='GDELT' --config="/home/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=0.8

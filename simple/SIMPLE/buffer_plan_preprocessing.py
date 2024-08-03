@@ -20,6 +20,22 @@ parser.add_argument('--mode',type=str, default='seq', help='placement strategy f
 parser.add_argument('--strategy',type=str, default='interval', help='data placement strategy. Candidate: interval, static.')
 args=parser.parse_args()
 
+
+if (args.data == 'LASTFM'):
+    args.dim_edge_feat = 100
+    args.dim_node_feat = 100
+elif (args.data == 'TALK'):
+    args.dim_edge_feat = 172
+    args.dim_node_feat = 172
+elif (args.data == 'STACK'):
+    args.dim_edge_feat = 172
+    args.dim_node_feat = 172
+elif (args.data == 'GDELT'):
+    args.dim_edge_feat = 182 #TODO 为什么下载下来的数据集的edge feat是182呢？
+    args.dim_node_feat = 413
+else:
+    raise RuntimeError("have not this dataset config!")
+    
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 import torch
