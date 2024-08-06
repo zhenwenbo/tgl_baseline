@@ -21,30 +21,28 @@ from config.train_conf import *
 class TrainNegLinkSampler:
 
     # 做block分区，每个分区中有block num个负节点，每次sample都是一次block级的采样
-    def __init__(self, num_nodes, k = 8):
+    def __init__(self, num_nodes, num_edges, k = 8):
 
         config = GlobalConfig()
-        block_num = config.pre_sample_size
+        block_size = config.pre_sample_size
+        block_num = math.ceil(num_edges/ block_size)
+
+        block_neg = torch.randint(0, num_nodes, (num_edges,))
 
         self.part = []
         nodes = torch.randperm(num_nodes, dtype = torch.int32)
         
-        per_node_num = block_num
+        per_node_num = block_size
         left, right = 0, 0
         self.k = k
-        while right <= nodes.shape[0]:
-            right += per_node_num
-            if (right > nodes.shape[0]):
-                nodes1 = torch.randperm(num_nodes, dtype = torch.int32)
-                cur_nodes = torch.cat((nodes[left:right], nodes1[:right - nodes.shape[0]]))
-            else:
-                cur_nodes = nodes[left:right]
-            
-            self.part.append(cur_nodes)
-            left = right
+        
+        for i in range(block_num):
+            self.part.append(block_neg[i * block_size: min((i+1) * block_size, block_neg.shape[0])])
+
         self.num_nodes = num_nodes
 
         self.ptr = 0
+
         
 
     def sample(self, n, i = 0, cur_batch = 0):

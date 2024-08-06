@@ -248,10 +248,10 @@ class Feat_buffer:
         #     if (dis_ind.shape[0] + torch.sum(real_box != self.part_mailbox[table2]) + torch.sum(real_mem != self.part_memory[table2]) > 0):
         #         raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
 
-        b.srcdata['mem'] = self.part_memory[table2]
-        b.srcdata['mem_ts'] = self.part_memory_ts[table2]
-        b.srcdata['mem_input'] = self.part_mailbox[table2].reshape(b.srcdata['ID'].shape[0], -1)
-        b.srcdata['mail_ts'] = self.part_mailbox_ts[table2]
+        b.srcdata['mem'] = self.part_memory[table2].cuda()
+        b.srcdata['mem_ts'] = self.part_memory_ts[table2].cuda()
+        b.srcdata['mem_input'] = self.part_mailbox[table2].reshape(b.srcdata['ID'].shape[0], -1).cuda()
+        b.srcdata['mail_ts'] = self.part_mailbox_ts[table2].cuda()
 
 
     #TODO 下一个预采样时需要将mem数据刷入回去
@@ -288,7 +288,7 @@ class Feat_buffer:
                 raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
 
         #table2[i]表示
-        return res
+        return res.cuda()
 
     def get_n_feat(self, nid):
         start = time.time()
@@ -305,7 +305,7 @@ class Feat_buffer:
                 raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
         
         # print(f"get_n_feat时间{time.time() - start:.8f}")
-        return res
+        return res.cuda()
 
     def pre_fetch(self, block_num, memory_info):
         #1.预采样下一个块的负节点的neg_nodes和neg_eids
@@ -396,11 +396,14 @@ class Feat_buffer:
         
         print(f'test over..')
 
-    def move_to_gpu(self, datas, flag=False):
+    def move_to_gpu(self, datas, flag=False, use_pin = False):
         res = []
         for data in datas:
             try:
-                data = data.cuda()
+                if (use_pin):
+                    data = data.pin_memory()
+                else:
+                    data = data.cuda()
                 res.append(data)
             except RuntimeError as e:
                 if (flag):
@@ -408,7 +411,7 @@ class Feat_buffer:
                     exit(-1)
                 print(f"显存OOM, 尝试清除cache")
                 emptyCache()
-                res.append(self.move_to_gpu([data], flag=True)[0])
+                res.append(self.move_to_gpu([data], flag=True, use_pin=use_pin)[0])
 
         return res
 
@@ -419,12 +422,15 @@ class Feat_buffer:
         edge_num = self.shared_ret_len[2]
         pre_num = self.shared_ret_len[-2]
         cur_num = self.shared_ret_len[-1]
+        use_pin = self.config.use_pin_memory
 
         self.part_edge_map, self.part_edge_feats = self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]
-        self.part_edge_map, self.part_edge_feats = self.move_to_gpu([self.part_edge_map, self.part_edge_feats])
+        self.part_edge_map = self.move_to_gpu([self.part_edge_map])[0]
+        self.part_edge_feats = self.move_to_gpu([self.part_edge_feats], use_pin=use_pin)[0]
 
         self.part_node_map, self.part_node_feats = self.share_part_node_map[:node_num], self.share_part_node_feats[:node_num]
-        self.part_node_map, self.part_node_feats = self.move_to_gpu([self.part_node_map, self.part_node_feats])
+        self.part_node_map = self.move_to_gpu([self.part_node_map])[0]
+        self.part_node_feats = self.move_to_gpu([self.part_node_feats], use_pin = use_pin)[0]
 
 
         self.part_memory_map = self.part_node_map
@@ -471,7 +477,10 @@ class Feat_buffer:
                     #第一个块使用同步加载
                     time_first = time.time()
                     time_load_s = time.time()
-                    self.load_part(cur_batch // self.batch_num)
+                    if (self.config.use_pin_memory):
+                        self.load_part_pin(cur_batch // self.batch_num)
+                    else:
+                        self.load_part(cur_batch // self.batch_num)
                     self.time_load += time.time() - time_load_s
 
                     time_ana_s = time.time()
@@ -519,6 +528,13 @@ class Feat_buffer:
         self.part_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').cuda()
         self.part_edge_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
         self.part_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').cuda()
+        self.part_node_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
+
+    def load_part_pin(self, part_num):
+        path = self.path
+        self.part_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').pin_memory()
+        self.part_edge_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
+        self.part_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').pin_memory()
         self.part_node_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
 
     def pre_sample(self):
@@ -609,10 +625,16 @@ class Feat_buffer:
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
-        self.part_memory = self.select_index('memory',nodes).cuda()
-        self.part_memory_ts = self.select_index('memory_ts',nodes).cuda()
-        self.part_mailbox = self.select_index('mailbox',nodes).cuda()
-        self.part_mailbox_ts = self.select_index('mailbox_ts',nodes).cuda()
+        if (self.config.use_pin_memory and False):
+            self.part_memory = self.select_index('memory',nodes).pin_memory()
+            self.part_memory_ts = self.select_index('memory_ts',nodes).pin_memory()
+            self.part_mailbox = self.select_index('mailbox',nodes).pin_memory()
+            self.part_mailbox_ts = self.select_index('mailbox_ts',nodes).pin_memory()
+        else:
+            self.part_memory = self.select_index('memory',nodes).cuda()
+            self.part_memory_ts = self.select_index('memory_ts',nodes).cuda()
+            self.part_mailbox = self.select_index('mailbox',nodes).cuda()
+            self.part_mailbox_ts = self.select_index('mailbox_ts',nodes).cuda()
 
         self.part_memory_map = nodes.to(torch.int32).cuda()
         self.time_exec_mem += time.time() - time_exec_mem_s
@@ -647,6 +669,8 @@ class Feat_buffer:
         dis_ind = table1 == -1
         dis_neg_nodes = neg_nodes[dis_ind]
         dis_neg_nodes_feat = self.select_index('node_feats', dis_neg_nodes.to(torch.int64)).cuda()
+        if (self.config.use_pin_memory):
+            dis_neg_nodes_feat = dis_neg_nodes_feat.cpu().pin_memory()
 
         self.part_node_map = torch.cat((self.part_node_map, dis_neg_nodes))
         self.part_node_map,indices = torch.sort(self.part_node_map)
@@ -661,6 +685,8 @@ class Feat_buffer:
         dis_ind = table1 == -1
         dis_neg_eids = neg_eids[dis_ind]
         dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.to(torch.int64)).cuda()
+        if (self.config.use_pin_memory):
+            dis_neg_eids_feat = dis_neg_eids_feat.cpu().pin_memory()
 
         
         self.part_edge_map = torch.cat((self.part_edge_map, dis_neg_eids))
