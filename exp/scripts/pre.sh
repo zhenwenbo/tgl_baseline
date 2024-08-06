@@ -76,7 +76,7 @@ monitor_memory_usage() {
 
 ds=("LASTFM" "TALK" "STACK" "GDELT")
 
-block_size=600000
+block_size=300000
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-pre-${timestamp}"
 
@@ -86,11 +86,11 @@ for d in "${ds[@]}"; do
 
   mkdir -p "../res-pre-${timestamp}/${d}"
 
-#   nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/pre_res/${d}-${block_size}-expire.log &
-#   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/pre_res/${d}-${block_size}-expire-mem.log"
-#   monitor_memory_usage $pid
-#   wait
+  nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire.log &
+  pid=$!
+  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire-mem.log"
+  monitor_memory_usage $pid
+  wait
 
 
   nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-part.log &

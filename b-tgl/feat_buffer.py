@@ -78,7 +78,8 @@ class Feat_buffer:
 
         self.share_edge_num = 3000000 #TODO 动态扩容share tensor
         if (d == 'STACK'):
-            self.share_edge_num = 4000000 #TODO 动态扩容share tensor
+            self.share_edge_num = 40000000 #TODO 动态扩容share tensor
+            self.share_node_num = 10000000
 
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
@@ -395,6 +396,23 @@ class Feat_buffer:
         
         print(f'test over..')
 
+    def move_to_gpu(self, datas, flag=False):
+        res = []
+        for data in datas:
+            try:
+                data = data.cuda()
+                res.append(data)
+            except RuntimeError as e:
+                if (flag):
+                    print(f"清除Cache仍然无法分配显存...")
+                    exit(-1)
+                print(f"显存OOM, 尝试清除cache")
+                emptyCache()
+                res.append(self.move_to_gpu([data], flag=True)[0])
+
+        return res
+
+
     def prefetch_after(self):
 
         node_num = self.shared_ret_len[0]
@@ -402,17 +420,19 @@ class Feat_buffer:
         pre_num = self.shared_ret_len[-2]
         cur_num = self.shared_ret_len[-1]
 
-        self.part_node_map, self.part_node_feats = self.share_part_node_map[:node_num], self.share_part_node_feats[:node_num]
-        self.part_node_map, self.part_node_feats = self.part_node_map.cuda(), self.part_node_feats.cuda()
-
         self.part_edge_map, self.part_edge_feats = self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]
-        self.part_edge_map, self.part_edge_feats = self.part_edge_map.cuda(), self.part_edge_feats.cuda()
+        self.part_edge_map, self.part_edge_feats = self.move_to_gpu([self.part_edge_map, self.part_edge_feats])
+
+        self.part_node_map, self.part_node_feats = self.share_part_node_map[:node_num], self.share_part_node_feats[:node_num]
+        self.part_node_map, self.part_node_feats = self.move_to_gpu([self.part_node_map, self.part_node_feats])
+
 
         self.part_memory_map = self.part_node_map
 
         part_memory, part_memory_ts, part_mailbox, part_mailbox_ts \
             = self.share_part_memory[:node_num], self.share_part_memory_ts[:node_num], self.share_part_mailbox[:node_num], self.share_part_mailbox_ts[:node_num]
-        part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = part_memory.cuda(), part_memory_ts.cuda(), part_mailbox.cuda(), part_mailbox_ts.cuda()
+        
+        part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = self.move_to_gpu([part_memory, part_memory_ts, part_mailbox, part_mailbox_ts])
         
         pre_same_nodes, cur_same_node = self.share_pre_same_nodes[:pre_num], self.share_cur_same_nodes[:cur_num]
         pre_same_nodes, cur_same_node = pre_same_nodes.cuda(), cur_same_node.cuda()

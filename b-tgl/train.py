@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -23,6 +23,7 @@ config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
 args.pre_sample_size = config.pre_sample_size
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 print(f"训练配置: {config.config_data}")
 import torch
