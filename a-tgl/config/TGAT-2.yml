@@ -7,7 +7,7 @@ sampling:
     prop_time: False
     history: 1
     duration: 0
-    num_thread: 32
+    num_thread: 8
 memory: 
   - type: 'none'
     dim_out: 0
@@ -18,9 +18,9 @@ gnn:
     dim_time: 100
     dim_out: 100
 train:
-  - epoch: 100
-    batch_size: 600
+  - epoch: 10
+    batch_size: 2000
     lr: 0.0001
     dropout: 0.1
     att_dropout: 0.1
-    all_on_gpu: True
+    all_on_gpu: False

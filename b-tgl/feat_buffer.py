@@ -27,6 +27,7 @@ class Feat_buffer:
 
         self.node_feat_dim, self.edge_feat_dim = feat_dim
         self.memory_param = memory_param
+        self.use_memory = memory_param['type'] != 'none'
         
 
         self.batch_size = batch_size #预采样做分析的batch_size
@@ -118,8 +119,7 @@ class Feat_buffer:
         edge_num = self.share_edge_num
         node_feat_dim = self.node_feat_dim
         edge_feat_dim = self.edge_feat_dim
-        mem_dim = self.memory_param['dim_out']
-        mailbox_size = self.memory_param['mailbox_size']
+        
 
         part_node_map = torch.zeros(node_num, dtype = torch.int32).share_memory_()
         node_feats = torch.zeros((node_num, node_feat_dim), dtype = torch.float32).share_memory_()
@@ -127,10 +127,18 @@ class Feat_buffer:
         part_edge_map = torch.zeros(edge_num, dtype = torch.int32).share_memory_()
         edge_feats = torch.zeros((edge_num, edge_feat_dim), dtype = torch.float32).share_memory_()
 
-        part_memory = torch.zeros((node_num, mem_dim), dtype = torch.float32).share_memory_()
-        part_memory_ts = torch.zeros(node_num, dtype = torch.float32).share_memory_()
-        part_mailbox = torch.zeros((node_num, mailbox_size, 2 * mem_dim + edge_feat_dim), dtype = torch.float32).share_memory_()
-        part_mailbox_ts = torch.zeros((node_num, mailbox_size), dtype = torch.float32).share_memory_()
+        if (self.use_memory):
+            mem_dim = self.memory_param['dim_out']
+            mailbox_size = self.memory_param['mailbox_size']
+            part_memory = torch.zeros((node_num, mem_dim), dtype = torch.float32).share_memory_()
+            part_memory_ts = torch.zeros(node_num, dtype = torch.float32).share_memory_()
+            part_mailbox = torch.zeros((node_num, mailbox_size, 2 * mem_dim + edge_feat_dim), dtype = torch.float32).share_memory_()
+            part_mailbox_ts = torch.zeros((node_num, mailbox_size), dtype = torch.float32).share_memory_()
+        else:
+            part_memory = None
+            part_memory_ts = None
+            part_mailbox = None
+            part_mailbox_ts = None
 
         pre_same_nodes = torch.zeros(node_num, dtype = torch.bool).share_memory_()
         cur_same_nodes = torch.zeros(node_num, dtype = torch.bool).share_memory_()
@@ -435,20 +443,21 @@ class Feat_buffer:
 
         self.part_memory_map = self.part_node_map
 
-        part_memory, part_memory_ts, part_mailbox, part_mailbox_ts \
-            = self.share_part_memory[:node_num], self.share_part_memory_ts[:node_num], self.share_part_mailbox[:node_num], self.share_part_mailbox_ts[:node_num]
+        if (self.use_memory):
+            part_memory, part_memory_ts, part_mailbox, part_mailbox_ts \
+                = self.share_part_memory[:node_num], self.share_part_memory_ts[:node_num], self.share_part_mailbox[:node_num], self.share_part_mailbox_ts[:node_num]
+            
+            part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = self.move_to_gpu([part_memory, part_memory_ts, part_mailbox, part_mailbox_ts])
         
-        part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = self.move_to_gpu([part_memory, part_memory_ts, part_mailbox, part_mailbox_ts])
-        
-        pre_same_nodes, cur_same_node = self.share_pre_same_nodes[:pre_num], self.share_cur_same_nodes[:cur_num]
-        pre_same_nodes, cur_same_node = pre_same_nodes.cuda(), cur_same_node.cuda()
+            pre_same_nodes, cur_same_node = self.share_pre_same_nodes[:pre_num], self.share_cur_same_nodes[:cur_num]
+            pre_same_nodes, cur_same_node = pre_same_nodes.cuda(), cur_same_node.cuda()
 
-        part_memory[cur_same_node] = self.part_memory[pre_same_nodes]
-        part_memory_ts[cur_same_node] = self.part_memory_ts[pre_same_nodes]
-        part_mailbox[cur_same_node] = self.part_mailbox[pre_same_nodes]
-        part_mailbox_ts[cur_same_node] = self.part_mailbox_ts[pre_same_nodes]
+            part_memory[cur_same_node] = self.part_memory[pre_same_nodes]
+            part_memory_ts[cur_same_node] = self.part_memory_ts[pre_same_nodes]
+            part_mailbox[cur_same_node] = self.part_mailbox[pre_same_nodes]
+            part_mailbox_ts[cur_same_node] = self.part_mailbox_ts[pre_same_nodes]
 
-        self.part_memory, self.part_memory_ts,self.part_mailbox,self.part_mailbox_ts = part_memory,part_memory_ts,part_mailbox,part_mailbox_ts
+            self.part_memory, self.part_memory_ts,self.part_mailbox,self.part_mailbox_ts = part_memory,part_memory_ts,part_mailbox,part_mailbox_ts
         
 
     def run_batch(self, cur_batch):
@@ -608,6 +617,9 @@ class Feat_buffer:
 
     def refresh_memory(self):
         time_refresh_s = time.time()
+        if (not self.use_memory):
+            return
+        
         if (self.part_memory) != None:
             part_map = self.part_memory_map.long()
             self.update_index('memory', part_map, self.part_memory.cpu())
@@ -704,10 +716,10 @@ class Feat_buffer:
         # print(f"nodes和map的差别： {torch.sum(nodes != self.part_node_map)}")
         nodes = self.part_node_map.long()
         
+        if (self.use_memory):
+            self.analyze_mem(nodes)
 
-        self.analyze_mem(nodes)
 
-                                                   
     
     def gen_part(self):
         #当分区feat不存在的时候做输出

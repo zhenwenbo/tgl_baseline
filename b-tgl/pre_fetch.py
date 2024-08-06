@@ -4,7 +4,7 @@ import random
 import torch
 import dgl
 import os
-from utils import load_feat
+from utils import load_feat, emptyCache
 from config.train_conf import *
 
 class Pre_fetch:
@@ -42,10 +42,12 @@ class Pre_fetch:
         self.part_node_feats[:self.shared_ret_len[1]] = prefetch_res[1]
         self.part_edge_map[:self.shared_ret_len[2]] = prefetch_res[2]
         self.part_edge_feats[:self.shared_ret_len[3]] = prefetch_res[3]
-        self.part_memory[:self.shared_ret_len[4]] = prefetch_res[4]
-        self.part_memory_ts[:self.shared_ret_len[5]] = prefetch_res[5]
-        self.part_mailbox[:self.shared_ret_len[6]] = prefetch_res[6]
-        self.part_mailbox_ts[:self.shared_ret_len[7]] = prefetch_res[7]
+
+        if (hasattr(self, 'memory')):
+            self.part_memory[:self.shared_ret_len[4]] = prefetch_res[4]
+            self.part_memory_ts[:self.shared_ret_len[5]] = prefetch_res[5]
+            self.part_mailbox[:self.shared_ret_len[6]] = prefetch_res[6]
+            self.part_mailbox_ts[:self.shared_ret_len[7]] = prefetch_res[7]
         self.pre_same_nodes[:self.shared_ret_len[8]] = prefetch_res[8]
         self.cur_same_nodes[:self.shared_ret_len[9]] = prefetch_res[9]
 
@@ -157,6 +159,19 @@ class Pre_fetch:
         # neg_eids, _ = torch.sort(neg_eids)
 
         part_node_map = part_node_map.cpu()
+
+        if (memory_info and memory_info[1] is not None):
+            #当前正在异步运行块i，需要将块(i-1)的memory信息传入并做刷入，
+            part_memory_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = memory_info
+            part_map = part_memory_map.cpu().long()
+            self.memory[part_map] = part_memory.cpu()
+            self.memory_ts[part_map] = part_memory_ts.cpu()
+            self.mailbox[part_map] = part_mailbox.cpu()
+            self.mailbox_ts[part_map] = part_mailbox_ts.cpu()
+        
+            del part_memory_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, neg_info
+            # emptyCache()
+        
         path, batch_size, fan_nums = conf
         t1 = time.time() - t0
         t0 = time.time()
@@ -216,22 +231,21 @@ class Pre_fetch:
         #此时获得了下一个块的所有nodes eids node_feats edge_feats
         #分别为 pos_node_map pos_edge_map node_feats edge_feats
         #还需要获得下一个块的所有node_memory信息
-        if (memory_info):
-            #当前正在异步运行块i，需要将块(i-1)的memory信息传入并做刷入，
-            part_memory_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = memory_info
-            part_map = part_memory_map.cpu().long()
-            self.memory[part_map] = part_memory.cpu()
-            self.memory_ts[part_map] = part_memory_ts.cpu()
-            self.mailbox[part_map] = part_mailbox.cpu()
-            self.mailbox_ts[part_map] = part_mailbox_ts.cpu()
+        
         t7 = time.time() - t0
         t0 = time.time()
 
         nodes = pos_node_map.long()
-        part_memory = self.memory[nodes]
-        part_memory_ts = self.memory_ts[nodes]
-        part_mailbox = self.mailbox[nodes]
-        part_mailbox_ts = self.mailbox_ts[nodes]
+        if (hasattr(self, 'memory')):
+            part_memory = self.memory[nodes]
+            part_memory_ts = self.memory_ts[nodes]
+            part_mailbox = self.mailbox[nodes]
+            part_mailbox_ts = self.mailbox_ts[nodes]
+        else:
+            part_memory = torch.empty(0)
+            part_memory_ts = torch.empty(0)
+            part_mailbox = torch.empty(0)
+            part_mailbox_ts = torch.empty(0)
         #此处要返回的memory信息不包括当前执行块的，因此需要在后面处理加上当前处理块后的最新memory信息
         #即当前异步处理的块的memory结果会实时更新到self.memory中，这里返回的下一个块需要用到的memory需要在下一个块开始之前和self.memory结合
         #因此这里预先判断：当前异步处理的块中出现的节点哪些在下一个块也出现了，即self.part_node_map(当前块)和pos_node_map(下一个块)的关系

@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -22,6 +22,9 @@ GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
 args.pre_sample_size = config.pre_sample_size
+
+if (hasattr(config, 'model')):
+    args.config = f'/raid/guorui/workspace/dgnn/b-tgl/config/{config.model}-{config.layer}.yml'
 
 if (config.model_eval):
     args.model_eval = True
@@ -470,7 +473,7 @@ if __name__ == '__main__':
             time_opt_s = time.time()
             loss = creterion(pred_pos, torch.ones_like(pred_pos))
             loss += creterion(pred_neg, torch.zeros_like(pred_neg))
-            total_loss += float(loss) * train_param['batch_size']
+            total_loss += float(loss.item()) * train_param['batch_size']
             # print(f"one loop time2.1: {time.time() - loopTime:.4f}")
             loss.backward()
             optimizer.step()
