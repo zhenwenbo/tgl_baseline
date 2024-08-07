@@ -433,6 +433,8 @@ class Feat_buffer:
         cur_num = self.shared_ret_len[-1]
         use_pin = hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory
 
+        allo1 = cuda_GB()
+
         self.part_edge_map, self.part_edge_feats = self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]
         self.part_edge_map = self.move_to_gpu([self.part_edge_map])[0]
         self.part_edge_feats = self.move_to_gpu([self.part_edge_feats], use_pin=use_pin)[0]
@@ -459,7 +461,9 @@ class Feat_buffer:
             part_mailbox_ts[cur_same_node] = self.part_mailbox_ts[pre_same_nodes]
 
             self.part_memory, self.part_memory_ts,self.part_mailbox,self.part_mailbox_ts = part_memory,part_memory_ts,part_mailbox,part_mailbox_ts
-        
+
+        allo2 = cuda_GB()
+        # print(f"prefetch_after: {allo1} -> {allo2}")
 
     def run_batch(self, cur_batch):
         #主程序正准备执行batch i的时候，判断是否需要预取IO

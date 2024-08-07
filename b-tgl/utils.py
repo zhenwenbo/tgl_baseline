@@ -7,6 +7,9 @@ import pandas as pd
 import numpy as np
 import gc
 
+def cuda_GB():
+    return f"{torch.cuda.memory_allocated() / 1024**3:.4f}GB"
+
 def model_structure(model):
     blank = ' '
     print('-' * 90)

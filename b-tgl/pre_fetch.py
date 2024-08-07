@@ -35,9 +35,11 @@ class Pre_fetch:
     def prefetch_after(self, prefetch_res):
         node_info = prefetch_res
         
+        total_allo = 0
         for i, tensor in enumerate(prefetch_res):
             self.shared_ret_len[i] = tensor.shape[0]
-        
+            total_allo += tensor.reshape(-1).shape[0]
+
         self.part_node_map[:self.shared_ret_len[0]] = prefetch_res[0]
         self.part_node_feats[:self.shared_ret_len[1]] = prefetch_res[1]
         self.part_edge_map[:self.shared_ret_len[2]] = prefetch_res[2]
@@ -51,6 +53,7 @@ class Pre_fetch:
         self.pre_same_nodes[:self.shared_ret_len[8]] = prefetch_res[8]
         self.cur_same_nodes[:self.shared_ret_len[9]] = prefetch_res[9]
 
+        # print(f"pre_fetch处理后cuda需要新增 {total_allo * 4 / 1024**3:.4f}GB显存 边数为: {self.shared_ret_len[2]} 节点数为{self.shared_ret_len[0]}")
 
     def select_index(self, name, indices):
         # print(f"子程序 select {name}")
