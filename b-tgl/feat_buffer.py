@@ -487,7 +487,7 @@ class Feat_buffer:
                     #第一个块使用同步加载
                     time_first = time.time()
                     time_load_s = time.time()
-                    if (hasattr(self.config, 'use_pin_memory')):
+                    if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
                         self.load_part_pin(cur_batch // self.batch_num)
                     else:
                         self.load_part(cur_batch // self.batch_num)
@@ -638,7 +638,7 @@ class Feat_buffer:
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
-        if (hasattr(self.config, 'use_pin_memory') and False):
+        if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory and False):
             self.part_memory = self.select_index('memory',nodes).pin_memory()
             self.part_memory_ts = self.select_index('memory_ts',nodes).pin_memory()
             self.part_mailbox = self.select_index('mailbox',nodes).pin_memory()
