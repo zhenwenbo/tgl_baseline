@@ -491,7 +491,8 @@ if __name__ == '__main__':
 
                 block = None
                 if memory_param['deliver_to'] == 'neighbors':
-                    block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                    # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                    block = mfgs[0][0]
 
                 time_upd_s = time.time()
                 mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
