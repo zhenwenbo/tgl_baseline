@@ -161,7 +161,8 @@ class Feat_buffer:
         self.shared_ret_len = shared_ret_len
 
         #TODO 这里预先开辟1GB内存的 共享内存用于select_index
-        self.share_tmp_tensor = torch.zeros(300000000).share_memory_()
+        #TODO 为APAN的mailbox，这里提高10倍给mailbox用
+        self.share_tmp_tensor = torch.zeros(3000000000).share_memory_()
         shared_tensor = (*shared_tensor, self.share_tmp_tensor)
 
         self.prefetch_conn.send(('init_share_tensor', (shared_tensor,)))
@@ -430,7 +431,7 @@ class Feat_buffer:
         edge_num = self.shared_ret_len[2]
         pre_num = self.shared_ret_len[-2]
         cur_num = self.shared_ret_len[-1]
-        use_pin = self.config.use_pin_memory
+        use_pin = hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory
 
         self.part_edge_map, self.part_edge_feats = self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]
         self.part_edge_map = self.move_to_gpu([self.part_edge_map])[0]
@@ -486,7 +487,7 @@ class Feat_buffer:
                     #第一个块使用同步加载
                     time_first = time.time()
                     time_load_s = time.time()
-                    if (self.config.use_pin_memory):
+                    if (hasattr(self.config, 'use_pin_memory')):
                         self.load_part_pin(cur_batch // self.batch_num)
                     else:
                         self.load_part(cur_batch // self.batch_num)
@@ -637,7 +638,7 @@ class Feat_buffer:
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
-        if (self.config.use_pin_memory and False):
+        if (hasattr(self.config, 'use_pin_memory') and False):
             self.part_memory = self.select_index('memory',nodes).pin_memory()
             self.part_memory_ts = self.select_index('memory_ts',nodes).pin_memory()
             self.part_mailbox = self.select_index('mailbox',nodes).pin_memory()
@@ -681,7 +682,7 @@ class Feat_buffer:
         dis_ind = table1 == -1
         dis_neg_nodes = neg_nodes[dis_ind]
         dis_neg_nodes_feat = self.select_index('node_feats', dis_neg_nodes.to(torch.int64)).cuda()
-        if (self.config.use_pin_memory):
+        if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
             dis_neg_nodes_feat = dis_neg_nodes_feat.cpu().pin_memory()
 
         self.part_node_map = torch.cat((self.part_node_map, dis_neg_nodes))
@@ -697,7 +698,7 @@ class Feat_buffer:
         dis_ind = table1 == -1
         dis_neg_eids = neg_eids[dis_ind]
         dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.to(torch.int64)).cuda()
-        if (self.config.use_pin_memory):
+        if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
             dis_neg_eids_feat = dis_neg_eids_feat.cpu().pin_memory()
 
         
