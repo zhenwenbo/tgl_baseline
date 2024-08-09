@@ -50,8 +50,9 @@ class Pre_fetch:
             self.part_memory_ts[:self.shared_ret_len[5]] = prefetch_res[5]
             self.part_mailbox[:self.shared_ret_len[6]] = prefetch_res[6]
             self.part_mailbox_ts[:self.shared_ret_len[7]] = prefetch_res[7]
-        self.pre_same_nodes[:self.shared_ret_len[8]] = prefetch_res[8]
-        self.cur_same_nodes[:self.shared_ret_len[9]] = prefetch_res[9]
+
+            self.pre_same_nodes[:self.shared_ret_len[8]] = prefetch_res[8]
+            self.cur_same_nodes[:self.shared_ret_len[9]] = prefetch_res[9]
 
         print(f"pre_fetch处理后cuda需要新增 {total_allo * 4 / 1024**3:.4f}GB显存 边数为: {self.shared_ret_len[2]} 节点数为{self.shared_ret_len[0]}")
 
@@ -244,17 +245,21 @@ class Pre_fetch:
             part_memory_ts = self.memory_ts[nodes]
             part_mailbox = self.mailbox[nodes]
             part_mailbox_ts = self.mailbox_ts[nodes]
+
+            #此处要返回的memory信息不包括当前执行块的，因此需要在后面处理加上当前处理块后的最新memory信息
+            #即当前异步处理的块的memory结果会实时更新到self.memory中，这里返回的下一个块需要用到的memory需要在下一个块开始之前和self.memory结合
+            #因此这里预先判断：当前异步处理的块中出现的节点哪些在下一个块也出现了，即self.part_node_map(当前块)和pos_node_map(下一个块)的关系
+            
+            pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map) #mask形式的
+            cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu())
         else:
             part_memory = torch.empty(0)
             part_memory_ts = torch.empty(0)
             part_mailbox = torch.empty(0)
             part_mailbox_ts = torch.empty(0)
-        #此处要返回的memory信息不包括当前执行块的，因此需要在后面处理加上当前处理块后的最新memory信息
-        #即当前异步处理的块的memory结果会实时更新到self.memory中，这里返回的下一个块需要用到的memory需要在下一个块开始之前和self.memory结合
-        #因此这里预先判断：当前异步处理的块中出现的节点哪些在下一个块也出现了，即self.part_node_map(当前块)和pos_node_map(下一个块)的关系
+            pre_same_nodes = torch.empty(0)
+            cur_same_nodes = torch.empty(0)
         
-        pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map) #mask形式的
-        cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu())
         t8 = time.time() - t0
         t0 = time.time()
 
