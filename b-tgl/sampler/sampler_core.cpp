@@ -308,7 +308,7 @@ class ParallelSampler
                         
                         double t_sample_s = omp_get_wtime();
                         if ((recent) || (e_search - s_search < neighs))
-                        {                            
+                        {
                             // no sampling, pick recent neighbors
                             int cur_nei = neighs;
                             for (EdgeIDType k = e_search; k >= s_search && cur_nei > 0; k--)
