@@ -1,3 +1,31 @@
+index:0 node:0 bound:0 comparing 1 with 2
+选择ptr, offset:0,2
+index:0 node:0 bound:1 comparing 2 with 2
+选择ptr, offset:0,2
+index:1 node:2 bound:2 comparing 3 with 5
+选择ptr, offset:0,5
+index:1 node:2 bound:3 comparing 4 with 5
+选择ptr, offset:0,5
+index:1 node:2 bound:4 comparing 5 with 5
+选择ptr, offset:0,5
+index:1 node:2 bound:5 comparing 6 with 5
+选择ptr, offset:0,5
+index:2 node:2 bound:4 comparing 5 with 6
+选择ptr, offset:0,6
+index:2 node:2 bound:5 comparing 6 with 6
+选择ptr, offset:0,6
+start: [0 2 2 6 6 6 6 ]
+end: [0 2 5 6 6 6 6 ]
+
 j:0, 0 0
-j:1, 0 5
-j:2, 0 5
+j:0开始选择
+start: [0 2 2 6 6 6 6 ]
+end: [0 2 5 6 6 6 6 ]
+
+j:1, 2 5
+j:1开始选择
+start: [0 2 2 6 6 6 6 ]
+end: [0 2 5 6 6 6 6 ]
+
+j:2, 2 5
+j:2开始选择

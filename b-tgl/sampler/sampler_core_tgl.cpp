@@ -7,19 +7,12 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
-#include <fstream>
 
 namespace py = pybind11;
 
 typedef int NodeIDType;
 typedef int EdgeIDType;
 typedef float TimeStampType;
-
-std::ofstream file("sample_output.txt");
-
-// 将 std::cout 的缓冲区与文件流对象关联
-std::streambuf* oldCoutStreamBuf = std::cout.rdbuf(file.rdbuf());
-
 
 class TemporalGraphBlock
 {
@@ -110,18 +103,14 @@ class ParallelSampler
         void update_ts_ptr(int slc, std::vector<NodeIDType> &root_nodes, 
                            std::vector<TimeStampType> &root_ts, float offset)
         {
-            #pragma omp parallel for schedule(static, int(ceil(static_cast<float>(root_nodes.size()) / num_threads)))
+#pragma omp parallel for schedule(static, int(ceil(static_cast<float>(root_nodes.size()) / num_threads)))
             for (std::vector<NodeIDType>::size_type i = 0; i < root_nodes.size(); i++)
             {
                 NodeIDType n = root_nodes[i];
                 omp_set_lock(&(ts_ptr_lock[n]));
                 for (std::vector<EdgeIDType>::size_type j = ts_ptr[slc][n]; j < indptr[n + 1]; j++)
                 {
-                    if (i < 10){
-                        std::cout << "index:" << i << " node:" << n << " bound:" << j << " comparing " << ts[j] << " with " << root_ts[i] << std::endl;
-                        std::cout << "选择ptr, offset:" << offset << "," <<  root_ts[i] + offset - 1e-7f << std::endl;
-                    }
-                    
+                    // std::cout << "comparing " << ts[j] << " with " << root_ts[i] << std::endl;
                     if (ts[j] > (root_ts[i] + offset - 1e-7f))
                     {
                         if (j != ts_ptr[slc][n])
@@ -185,7 +174,7 @@ class ParallelSampler
             _ret.ts.resize(cum_col.back() + num_root_nodes);
             _ret.dts.resize(cum_col.back() + num_root_nodes);
             _ret.nodes.resize(cum_col.back() + num_root_nodes);
-            #pragma omp parallel for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
             for (int tid = 0; tid < num_threads; tid++)
             {
                 std::transform(_row[tid]->begin(), _row[tid]->end(), _row[tid]->begin(),
@@ -263,7 +252,9 @@ class ParallelSampler
                     _ts[tid]->reserve(reserve_capacity);
                     _dts[tid]->reserve(reserve_capacity);
                     _nodes[tid]->reserve(reserve_capacity);
-                    #pragma omp for schedule(static, int(ceil(static_cast<float>((*root_nodes).size()) / num_threads)))
+// #pragma omp critical
+//                     std::cout<<tid<<" sampling: "<<root_nodes->size()<<" "<<int(ceil((*root_nodes).size() / num_threads))<<std::endl;
+#pragma omp for schedule(static, int(ceil(static_cast<float>((*root_nodes).size()) / num_threads)))
                     for (std::vector<NodeIDType>::size_type j = 0; j < (*root_nodes).size(); j++)
                     {
                         NodeIDType n = (*root_nodes)[j];
@@ -302,53 +293,19 @@ class ParallelSampler
                             if (tid == 0)
                                 ret[0].search_time += omp_get_wtime() - t_search_s;
                         }
-
-                        if (j < 10){
-                            std::cout << "start: [";
-
-                            // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
-                            for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
-                                std::cout << ts_ptr[num_history - 1 - i][cur_i] << " ";
-                            }
-                            std::cout << "]" << std::endl;
-
-                            std::cout << "end: [";
-
-                            // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
-                            for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
-                                std::cout << ts_ptr[num_history - i][cur_i] << " ";
-                            }
-                            std::cout << "]" << std::endl;
-
-                            std::cout << std::endl;
-
-                            std::cout << "j:" << j << ", " << s_search << " " << e_search << std::endl;
-                        }
-                        
+                        // std::cout << n << " " << s_search << " " << e_search << std::endl;
                         double t_sample_s = omp_get_wtime();
                         if ((recent) || (e_search - s_search < neighs))
-                        {
+                        {                            
                             // no sampling, pick recent neighbors
-                            if (!(e_search == s_search && indptr[n + 1] == e_search)){
-                                std::cout << "j:" << j << "开始选择" << std::endl;
-                                int cur_nei = neighs;
-                                for (EdgeIDType k = e_search; k >= s_search && cur_nei > 0; k--)
+                            for (EdgeIDType k = e_search; k > std::max(s_search, e_search - neighs); k--)
+                            {
+                                if (ts[k] < nts + offset - 1e-7f)
                                 {
-                                    // if (j < 10){
-                                    //     std::cout << "j:" << j << " k:" << k << " ts:" << ts[k] << " nts:" << nts <<std::endl;
-                                    // }
-                                    if (ts[k] < nts + offset - 1e-7f)
-                                    {
-                                        // if (j < 10){
-                                        //     std::cout << "j:" << j << "选择了" << std::endl;
-                                        // }
-                                        cur_nei --;
-                                        add_neighbor(_row[tid], _col[tid], _eid[tid], _ts[tid], 
-                                                    _dts[tid], _nodes[tid], k, nts, _out_node[tid]);
-                                    }
+                                    add_neighbor(_row[tid], _col[tid], _eid[tid], _ts[tid], 
+                                                 _dts[tid], _nodes[tid], k, nts, _out_node[tid]);
                                 }
                             }
-                            
                         }
                         else
                         {

@@ -84,23 +84,7 @@ for _, rows in df[:train_edge_end].groupby(group_indexes):
         break
 
 src,dst,outts,outeid,root_nodes,root_ts = ret_list[0]
-seed_num = root_nodes.shape[0]
-
-mask = src>-1
-# table = ((torch.arange(seed_num * fan_num, dtype = torch.int32, device = 'cuda:0').reshape(-1, fan_num)) / fan_num).to(torch.int64)
-
-table = gen_table(seed_num).to(torch.int64)
-
-dst_node = table[mask].to(torch.int32)
-# table[mask]可以直接作为0-200的dst节点 ,souce_nodes作为节点id
-
-# src[mask]中，每个值都是独立的节点编号，因此直接从200开始arange即可， 而节点id就直接拿src[mask]
-src_table = src[mask]
-src_node = torch.arange(src_table.shape[0], dtype = torch.int32, device = 'cuda:0') + seed_num
-
-#nodes为所有节点的id，src的节点前面拼dst的节点，id的话，dst节点id就是source_nodes
-nodes = torch.cat((root_nodes, src_table))
-tss = torch.cat((root_ts, outts[mask]))
+outeid = outeid[outeid > -1]
 t_col, t_row, t_ts, t_eid, t_nodes, t_dts = ret_tgl[0].col(), ret_tgl[0].row(), ret_tgl[0].ts(), ret_tgl[0].eid(), ret_tgl[0].nodes(), ret_tgl[0].dts()
 
 print(src)

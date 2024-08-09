@@ -43,16 +43,16 @@ sample_param, memory_param, gnn_param, train_param = parse_config('/home/gr/work
 sample_param['layer'] = 2
 sample_param['neighbor'] = [10, 10]
 
-indptr = torch.tensor([0,0,0,6,6,6,6,7]).numpy()
-indices = torch.tensor([1,2,3,4,5,6,7,0]).numpy()
-eid = torch.tensor([1,2,3,4,5,6,7,8]).numpy()
-ts = torch.tensor([1,2,3,4,5,6,7,8]).numpy()
+indptr = torch.tensor([0,2,2,6,6,6,6,7]).numpy()
+indices = torch.tensor([1,2,3,4,5,6,7]).numpy()
+eid = torch.tensor([1,2,3,4,5,6,7]).numpy()
+ts = torch.tensor([1,2,3,4,5,6,7]).numpy()
 g = {'indptr': indptr,'indices': indices,'eid':eid,'ts':ts}
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 
 
 sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),
-                              8, 1, 1, [3],
+                              1, 1, 1, [3],
                               True, sample_param['prop_time'],
                               1, float(sample_param['duration']))
 

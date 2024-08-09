@@ -53,7 +53,7 @@ class Pre_fetch:
         self.pre_same_nodes[:self.shared_ret_len[8]] = prefetch_res[8]
         self.cur_same_nodes[:self.shared_ret_len[9]] = prefetch_res[9]
 
-        # print(f"pre_fetch处理后cuda需要新增 {total_allo * 4 / 1024**3:.4f}GB显存 边数为: {self.shared_ret_len[2]} 节点数为{self.shared_ret_len[0]}")
+        print(f"pre_fetch处理后cuda需要新增 {total_allo * 4 / 1024**3:.4f}GB显存 边数为: {self.shared_ret_len[2]} 节点数为{self.shared_ret_len[0]}")
 
     def select_index(self, name, indices):
         # print(f"子程序 select {name}")
