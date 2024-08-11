@@ -6,7 +6,7 @@ if MODULE_PATH not in sys.path:
 	sys.path.append(MODULE_PATH)
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
 parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
@@ -14,7 +14,7 @@ parser.add_argument('--model_name', type=str, default='', help='name of stored m
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=100, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
-parser.add_argument('--threshold',type=float, default=0.04, help='placement budget')
+parser.add_argument('--threshold',type=float, default=0.1, help='placement budget')
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -202,6 +202,7 @@ for e in range(train_param['epoch']):
     time_up_buffs = 0
     time_up_mail = 0
     time_prep = 0
+    time_strategy = 0
     time_tot = 0
 
     time_model = 0
@@ -280,6 +281,8 @@ for e in range(train_param['epoch']):
             edge_idx = []
            
         node_hit = 0
+
+        strategy_s = time.time()
         if  nfeat_buffs is not None or (mailbox is not None and mailbox.mailbox_buffs):
             node_gpu_mask, node_gpu_local_ids, node_cpu_ids = \
             gen_flag_and_mask(node_idx, gpu_flag_n, gpu_map_n, plan_node)
@@ -305,7 +308,7 @@ for e in range(train_param['epoch']):
             
             edge_hit = torch.sum(mask) / mask.shape[0] * 100
         # print(f"node缓存命中率: {torch.sum(node_gpu_mask).item() / node_gpu_mask.shape[0] * 100:.2f}%, edge 缓存命中率: {torch.sum(edge_gpu_mask) / edge_gpu_mask.shape[0] * 100:.2f}%")
-        
+        time_strategy += time.time() - strategy_s
         
 
         aver_node_hit = (aver_node_hit * batch_num + node_hit) / (batch_num + 1)
@@ -325,6 +328,7 @@ for e in range(train_param['epoch']):
             mailbox.prep_input_mails(mfgs[0], node_idx, node_gpu_mask, node_gpu_local_ids, node_cpu_ids)
         t3 = time.time()
         #update buffs. 1. get batch plan. 2. update indicators. 3. update buffs.
+        strategy_s = time.time()
         if n_flag and batch_id < final_batch:
             ta = time.time()
             if pre_load:
@@ -380,6 +384,7 @@ for e in range(train_param['epoch']):
                 time_up_buffs += td-tc
         if mailbox is not None and mailbox.mailbox_buffs is not None and batch_id < final_batch:
             mailbox.update_mailbox_buffs(mfgs[0][0].srcdata['mem_input'], mfgs[0][0].srcdata['mem'], local_ID_I_n, local_ID_II_n, memory_param['mailbox_size'])
+        time_strategy += time.time() - strategy_s
         t_prep_s = time.time()
         time_sample += t0 - t_tot_s
         time_prep += t_prep_s - t_tot_s
@@ -424,7 +429,7 @@ for e in range(train_param['epoch']):
         time_per_batch += t_end - t_tot_s
     
     print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s mfgs time:{:.2f}s gen_flags time:{:.2f}s load_data time:{:.2f}s gen_plan time:{:.2f}s up_indicators time:{:.2f}s up_buffs time:{:.2f}s up_mail time:{:.2f}s'.format(time_tot, time_prep, time_sample, time_mfgs, time_gen_flags, time_load_data, time_gen_plan, time_up_indicators, time_up_buffs, time_up_mail))
-    print(f"model time: {time_model}, loss time: {time_loss} aver_node_hit: {aver_node_hit:.2f}%, aver_edge_hit: {aver_edge_hit:.2f}% ")
+    print(f"model time: {time_model}, loss time: {time_loss} aver_node_hit: {aver_node_hit:.2f}%, aver_edge_hit: {aver_edge_hit:.2f}% 策略开销: {time_strategy:.4f}s 注意prep time中包含策略开销 ")
     t0 = time.time()
     if gpu_flag_n is not None:
         mailbox.offload_for_eval(gpu_flag_n, gpu_map_n)
