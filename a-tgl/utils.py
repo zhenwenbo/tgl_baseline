@@ -8,6 +8,9 @@ import numpy as np
 import gc
 
 
+def cuda_GB():
+    return f"{torch.cuda.memory_allocated() / 1024**3:.10f}GB"
+
 def emptyCache():
     torch.cuda.empty_cache()
     gc.collect()

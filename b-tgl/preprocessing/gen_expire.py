@@ -6,6 +6,7 @@ import pandas as pd
 import time
 import sys
 import os
+total_start = time.time()
 root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
 if root_dir not in sys.path:
     sys.path.append(root_dir)
@@ -239,3 +240,5 @@ else:
 # 将数据写入JSON文件
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(existing_data, file, ensure_ascii=False, indent=4)
+
+print(f"共用时{time.time() - total_start:.4f}s")

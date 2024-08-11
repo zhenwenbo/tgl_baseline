@@ -75,15 +75,15 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "GDELT")
+model="TGN"
 
 timestamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p "../res-pre-simple-${timestamp}"
+mkdir -p "../res-${timestamp}"
 
 for d in "${ds[@]}"; do
 
   echo "处理 $d"
-
-  mkdir -p "../res-pre-simple-${timestamp}/${d}"
+  mkdir -p "../res-${timestamp}/${d}"
 
 
 
@@ -91,23 +91,18 @@ for d in "${ds[@]}"; do
   if [ "$d" == "GDELT" ]; then
     threshold=0.04
   fi
-  
-  nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}-mem.log"
-  monitor_memory_usage $pid
-  wait
 
-  nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-2-${threshold}.log &
+  nohup python /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" &>../res-${timestamp}/${d}/SIMPLE-1-res.log &
   pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-2-${threshold}-mem.log"
+  memory_usage_file="../res-${timestamp}/${d}/SIMPLE-1-res-mem.log"
   monitor_memory_usage $pid
   wait
 
 
-
-
+  nohup python /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-2.yml" &>../res-${timestamp}/${d}/SIMPLE-2-res.log &
+  pid=$!
+  memory_usage_file="../res-${timestamp}/${d}/SIMPLE-2-res-mem.log"
+  monitor_memory_usage $pid
+  wait
 
 done
-
-# python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data='GDELT' --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=0.8

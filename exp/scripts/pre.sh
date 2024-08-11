@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("STACK")
+ds=("GDELT")
 
 block_size=60000
 timestamp=$(date +%Y%m%d-%H%M%S)

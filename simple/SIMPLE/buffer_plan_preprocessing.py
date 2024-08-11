@@ -8,7 +8,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default = 'LASTFM')
+parser.add_argument('--data', type=str, help='dataset name', default = 'STACK')
 parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -46,7 +46,7 @@ import numpy as np
 from sampler import *
 from data_processing import *
 import time
-
+total_start = time.time()
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -367,6 +367,7 @@ if args.strategy == 'static':
 # vols表示所有节点/边 在每个batch存储特征的总和
 # 也就是说vols相比于mems多了batch时间上的冗余量
 if args.strategy == 'interval':
+
     t0 = time.time()
 
     #limit是显存总的可使用量 total_mem是所有特征存储总和，threshold是把多少存储作为gpu缓存来用
@@ -410,3 +411,6 @@ if args.strategy == 'interval':
             p.join()
         t1 = time.time()
         print('Parallel plan generation takes:{:.2f}s'.format(t1-t0))
+
+
+print(f"总用时{time.time() - total_start:.4f}s")

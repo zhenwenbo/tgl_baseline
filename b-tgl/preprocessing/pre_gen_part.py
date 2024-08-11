@@ -27,7 +27,7 @@ import dgl
 import numpy as np
 import sys
 import os
-
+total_start = time.time()
 root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
 if root_dir not in sys.path:
     sys.path.append(root_dir)
@@ -342,3 +342,4 @@ if __name__ == '__main__':
     feat_buffer.gen_part()
 
 
+    print(f"共用时{time.time() - total_start:.4f}s")

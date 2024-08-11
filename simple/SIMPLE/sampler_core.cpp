@@ -119,6 +119,7 @@ class ParallelSampler
                 {
                     // if (i < 10){
                     //     std::cout << "index:" << i << " node:" << n << " bound:" << j << " comparing " << ts[j] << " with " << root_ts[i] << std::endl;
+                    //     std::cout << "选择ptr, offset:" << offset << "," <<  root_ts[i] + offset - 1e-7f << std::endl;
                     // }
                     
                     if (ts[j] > (root_ts[i] + offset - 1e-7f))
@@ -302,30 +303,53 @@ class ParallelSampler
                                 ret[0].search_time += omp_get_wtime() - t_search_s;
                         }
 
-                        // if (j < 10){
-                        //     std::cout << "j:" << j << ", " << s_search << " " << e_search << std::endl;
-                        // }
+                        if (j < 10){
+                            // std::cout << "start: [";
+
+                            // // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
+                            // for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
+                            //     std::cout << ts_ptr[num_history - 1 - i][cur_i] << " ";
+                            // }
+                            // std::cout << "]" << std::endl;
+
+                            // std::cout << "end: [";
+
+                            // // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
+                            // for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
+                            //     std::cout << ts_ptr[num_history - i][cur_i] << " ";
+                            // }
+                            // std::cout << "]" << std::endl;
+
+                            // std::cout << std::endl;
+
+                            // std::cout << "j:" << j << ", " << s_search << " " << e_search << ", indptr: " <<indptr[n + 1] << "判断" << (e_search == s_search && indptr[n + 1] == e_search) << "recent:" << recent << std::endl;
+                        }
                         
                         double t_sample_s = omp_get_wtime();
                         if ((recent) || (e_search - s_search < neighs))
-                        {                            
+                        {
+                            // std::cout << "j:" << j << "进入判断" << std::endl;
                             // no sampling, pick recent neighbors
-                            int cur_nei = neighs;
-                            for (EdgeIDType k = e_search; k >= s_search && cur_nei > 0; k--)
-                            {
-                                // if (j < 10){
-                                //     std::cout << "j:" << j << " k:" << k << " ts:" << ts[k] << " nts:" << nts <<std::endl;
-                                // }
-                                if (ts[k] < nts + offset - 1e-7f)
+                            if (!(e_search == s_search && indptr[n + 1] == e_search)){
+                                // std::cout << "j:" << j << "开始选择" << std::endl;
+                                int cur_nei = neighs;
+                                for (EdgeIDType k = e_search; k >= s_search && cur_nei > 0; k--)
                                 {
                                     // if (j < 10){
-                                    //     std::cout << "j:" << j << "选择了" << std::endl;
+                                    //     std::cout << "j:" << j << " k:" << k << " ts:" << ts[k] << " nts:" << nts <<std::endl;
                                     // }
-                                    cur_nei --;
-                                    add_neighbor(_row[tid], _col[tid], _eid[tid], _ts[tid], 
-                                                 _dts[tid], _nodes[tid], k, nts, _out_node[tid]);
+                                    if (ts[k] < nts + offset - 1e-7f)
+                                    {
+                                        // if (j < 10){
+                                        //     std::cout << "j:" << j << "选择了" << std::endl;
+                                        // }
+                                        cur_nei --;
+                                        add_neighbor(_row[tid], _col[tid], _eid[tid], _ts[tid], 
+                                                    _dts[tid], _nodes[tid], k, nts, _out_node[tid]);
+                                    }
                                 }
                             }
+                            
                         }
                         else
                         {
