@@ -117,10 +117,10 @@ class ParallelSampler
                 omp_set_lock(&(ts_ptr_lock[n]));
                 for (std::vector<EdgeIDType>::size_type j = ts_ptr[slc][n]; j < indptr[n + 1]; j++)
                 {
-                    if (i < 10){
-                        std::cout << "index:" << i << " node:" << n << " bound:" << j << " comparing " << ts[j] << " with " << root_ts[i] << std::endl;
-                        std::cout << "选择ptr, offset:" << offset << "," <<  root_ts[i] + offset - 1e-7f << std::endl;
-                    }
+                    // if (i < 10){
+                    //     std::cout << "index:" << i << " node:" << n << " bound:" << j << " comparing " << ts[j] << " with " << root_ts[i] << std::endl;
+                    //     std::cout << "选择ptr, offset:" << offset << "," <<  root_ts[i] + offset - 1e-7f << std::endl;
+                    // }
                     
                     if (ts[j] > (root_ts[i] + offset - 1e-7f))
                     {
@@ -304,33 +304,34 @@ class ParallelSampler
                         }
 
                         if (j < 10){
-                            std::cout << "start: [";
+                            // std::cout << "start: [";
 
-                            // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
-                            for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
-                                std::cout << ts_ptr[num_history - 1 - i][cur_i] << " ";
-                            }
-                            std::cout << "]" << std::endl;
+                            // // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
+                            // for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
+                            //     std::cout << ts_ptr[num_history - 1 - i][cur_i] << " ";
+                            // }
+                            // std::cout << "]" << std::endl;
 
-                            std::cout << "end: [";
+                            // std::cout << "end: [";
 
-                            // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
-                            for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
-                                std::cout << ts_ptr[num_history - i][cur_i] << " ";
-                            }
-                            std::cout << "]" << std::endl;
+                            // // int size1 = sizeof(ts_ptr) / sizeof(ts_ptr[0]); // 计算数组元素的个数
+                            // for(int cur_i = 0; cur_i < indptr.size() - 1; ++cur_i) {
+                            //     std::cout << ts_ptr[num_history - i][cur_i] << " ";
+                            // }
+                            // std::cout << "]" << std::endl;
 
-                            std::cout << std::endl;
+                            // std::cout << std::endl;
 
-                            std::cout << "j:" << j << ", " << s_search << " " << e_search << std::endl;
+                            // std::cout << "j:" << j << ", " << s_search << " " << e_search << ", indptr: " <<indptr[n + 1] << "判断" << (e_search == s_search && indptr[n + 1] == e_search) << "recent:" << recent << std::endl;
                         }
                         
                         double t_sample_s = omp_get_wtime();
                         if ((recent) || (e_search - s_search < neighs))
                         {
+                            // std::cout << "j:" << j << "进入判断" << std::endl;
                             // no sampling, pick recent neighbors
                             if (!(e_search == s_search && indptr[n + 1] == e_search)){
-                                std::cout << "j:" << j << "开始选择" << std::endl;
+                                // std::cout << "j:" << j << "开始选择" << std::endl;
                                 int cur_nei = neighs;
                                 for (EdgeIDType k = e_search; k >= s_search && cur_nei > 0; k--)
                                 {
