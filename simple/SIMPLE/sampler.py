@@ -9,7 +9,7 @@ from tqdm import tqdm
 import sys
 import os
 
-root_dir = '/home/guorui/workspace/dgnn/simple'
+root_dir = '/raid/guorui/workspace/dgnn/simple'
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 

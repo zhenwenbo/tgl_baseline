@@ -6,15 +6,15 @@ if MODULE_PATH not in sys.path:
 	sys.path.append(MODULE_PATH)
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=100, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
-parser.add_argument('--threshold',type=float, default=0.08, help='placement budget')
+parser.add_argument('--threshold',type=float, default=0.1, help='placement budget')
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu

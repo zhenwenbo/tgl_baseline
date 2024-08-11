@@ -76,48 +76,37 @@ monitor_memory_usage() {
 
 ds=("STACK")
 
-block_size=60000
 timestamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p "../res-pre-${timestamp}"
+mkdir -p "../res-pre-simple-${timestamp}"
 
 for d in "${ds[@]}"; do
 
-  echo "处理 $d $block_size"
+  echo "处理 $d"
 
-  mkdir -p "../res-pre-${timestamp}/${d}"
-
-  nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire-mem.log"
-  monitor_memory_usage $pid
-  wait
-
-
-  nohup python /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-part.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-part-mem.log"
-  monitor_memory_usage $pid
-  wait
-
+  mkdir -p "../res-pre-simple-${timestamp}/${d}"
 
 
 
   threshold=0.1
   if [ "$d" == "GDELT" ]; then
-    threshold=0.05
+    threshold=0.04
   fi
 
-#   nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-1-${threshold}.log &
-#   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-1-${threshold}-mem.log"
-#   monitor_memory_usage $pid
-#   wait
+  if [ "$d" == "STACK" ]; then
+    threshold=0.08
+  fi
 
-#   nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-2-${threshold}.log &
-#   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/simple-2-${threshold}-mem.log"
-#   monitor_memory_usage $pid
-#   wait
+  nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}.log &
+  pid=$!
+  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}-mem.log"
+  monitor_memory_usage $pid
+  wait
+
+  nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-2-${threshold}.log &
+  pid=$!
+  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-2-${threshold}-mem.log"
+  monitor_memory_usage $pid
+  wait
 
 
 

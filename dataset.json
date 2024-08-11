@@ -1,0 +1,38 @@
+{
+    "LASTFM": {
+        "node_num": 1980,
+        "edge_num": 1293104,
+        "dim_edge_feat": 100,
+        "dim_node_feat": 100,
+        "storage_edge_feat_GB": "0.48172",
+        "storage_node_feat_GB": "0.00074"
+    },
+    "TALK": {
+        "node_num": 1140149,
+        "edge_num": 7833140,
+        "dim_edge_feat": 172,
+        "dim_node_feat": 172,
+        "storage_edge_feat_GB": "5.01908",
+        "storage_node_feat_GB": "0.73055"
+    },
+    "STACK": {
+        "node_num": 2601977,
+        "edge_num": 63497050,
+        "dim_edge_feat": 172,
+        "dim_node_feat": 172,
+        "storage_edge_feat_GB": "40.68573",
+        "storage_node_feat_GB": "1.66722"
+    },
+    "GDELT": {
+        "node_num": 16682,
+        "edge_num": 191290883,
+        "dim_edge_feat": 182,
+        "dim_node_feat": 413,
+        "storage_edge_feat_GB": "129.69576",
+        "storage_node_feat_GB": "0.02567"
+    },
+    "MAG": {
+        "node_num": 121751665,
+        "edge_num": 1297748927
+    }
+}
