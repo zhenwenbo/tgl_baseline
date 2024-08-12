@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "GDELT")
+ds=("GDELT")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-pre-simple-${timestamp}"
@@ -89,7 +89,7 @@ for d in "${ds[@]}"; do
 
   threshold=0.1
   if [ "$d" == "GDELT" ]; then
-    threshold=0.04
+    threshold=0.02
   fi
   
   nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}.log &

@@ -123,7 +123,7 @@ def load_intervals(data_name, type_name, mailbox_size, threshold, multi_layer=Fa
         start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + '_tgat.npy')
         end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + '_tgat.npy')
         IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + '_tgat.npy')
-    if multi_layer and mailbox and threshold==0.1:
+    if multi_layer and mailbox: #TODO 此处作改动契合预处理的保存逻辑，但是无法对threshold做消融
         start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + '_2.npy')
         end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + '_2.npy')
         IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + '_2.npy')
