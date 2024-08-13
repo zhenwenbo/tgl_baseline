@@ -212,7 +212,7 @@ for e in range(train_param['epoch']):
         else:
             mfgs = node_to_dgl_blocks(root_nodes, ts)
 
-        # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
+        print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
         mfgs = prepare_input(mfgs, node_feats, edge_feats, combine_first=combine_first)
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0])

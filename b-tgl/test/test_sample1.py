@@ -36,7 +36,7 @@ def gen_table(seed_num):
 
 
 from sampler.sampler_gpu import *
-fan_nums = [10, 10]
+fan_nums = [10]
 layers = len(fan_nums)
 
 sample_param, memory_param, gnn_param, train_param = parse_config('/home/gr/workspace/dgnn/b-tgl/config/TGAT-2.yml')
@@ -127,4 +127,6 @@ tss = torch.cat((root_ts, outts[mask]))
 t_col, t_row, t_ts, t_eid, t_nodes, t_dts = ret_tgl[0].col(), ret_tgl[0].row(), ret_tgl[0].ts(), ret_tgl[0].eid(), ret_tgl[0].nodes(), ret_tgl[0].dts()
 
 print(src)
+
+
 

@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -187,9 +187,12 @@ if __name__ == '__main__':
     node_feats, edge_feats = None,None
     if (not args.use_ayscn_prefetch):
         node_feats, edge_feats = load_feat(args.data)
-    
-    g, df = load_graph(args.data)
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+    g, df = load_graph(args.data)
+
+    #TODO GDELT改fanout为[7,7]
+    # sample_param['neighbor'] = [7,7]
+    
     train_edge_end = df[df['ext_roll'].gt(0)].index[0]
     val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
@@ -487,8 +490,9 @@ if __name__ == '__main__':
                 
                 # eid = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
                 eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
+                t_prep_s = time.time()
                 mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
-
+                t_prep_s = time.time()
                 block = None
                 if memory_param['deliver_to'] == 'neighbors':
                     # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]

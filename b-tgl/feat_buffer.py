@@ -567,7 +567,7 @@ class Feat_buffer:
 
 
         ret_list = self.sampler.sample_layer(root_nodes, root_ts)
-        src,dst,outts,outeid,root_nodes,root_ts = ret_list[-1]
+        src,dst,outts,outeid,root_nodes,root_ts,dts = ret_list[-1]
 
         mask = src > -1
         src = src[mask]
@@ -599,7 +599,7 @@ class Feat_buffer:
 
 
         ret_list = self.sampler.sample_layer(root_nodes, root_ts)
-        src,dst,outts,outeid,root_nodes,root_ts = ret_list[-1]
+        src,dst,outts,outeid,root_nodes,root_ts,dts = ret_list[-1]
 
         mask = src > -1
         src = src[mask]
@@ -610,7 +610,7 @@ class Feat_buffer:
         eid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
         for ret in ret_list:
             #找出每层的所有eid即可
-            src,dst,outts,outeid,root_nodes,root_ts = ret
+            src,dst,outts,outeid,root_nodes,root_ts,dts = ret
             eid = outeid[outeid > -1]
 
             cur_eid = torch.unique(eid)
@@ -753,7 +753,7 @@ class Feat_buffer:
 
             for ret in ret_list:
                 #找出每层的所有eid即可
-                src,dst,outts,outeid,root_nodes,root_ts = ret
+                src,dst,outts,outeid,root_nodes,root_ts,dts = ret
                 eid = outeid[outeid > -1]
 
                 cur_eid = torch.unique(eid)
@@ -762,7 +762,7 @@ class Feat_buffer:
             
             #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
             ret = ret_list[-1]
-            src,dst,outts,outeid,root_nodes,root_ts = ret
+            src,dst,outts,outeid,root_nodes,root_ts,dts = ret
             del ret_list
             del outts, outeid, root_ts, dst
             emptyCache()
@@ -856,7 +856,7 @@ class Feat_buffer:
 
             for ret in ret_list:
                 #找出每层的所有eid即可
-                src,dst,outts,outeid,root_nodes,root_ts = ret
+                src,dst,outts,outeid,root_nodes,root_ts,dts = ret
                 eid = outeid[outeid > -1]
 
                 cur_eid = torch.unique(eid)
@@ -865,7 +865,7 @@ class Feat_buffer:
             
             #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
             ret = ret_list[-1]
-            src,dst,outts,outeid,root_nodes,root_ts = ret
+            src,dst,outts,outeid,root_nodes,root_ts,dts = ret
             del ret_list
             del outts, outeid, root_ts, dst
             emptyCache()

@@ -14,7 +14,7 @@ parser.add_argument('--model_name', type=str, default='', help='name of stored m
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=100, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
-parser.add_argument('--threshold',type=float, default=0.04, help='placement budget')
+parser.add_argument('--threshold',type=float, default=0.01, help='placement budget')
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -92,6 +92,7 @@ if mailbox is not None and node_start is not None:
     
 nfeat_buffs, efeat_buffs = allocate_buffs(budget, node_feats, edge_feats, num_node, num_edge, device, nfeat_flag)
 #初始化buff，此处就是简单的[budget, dim]的buff空间开辟
+
 
 n_flag = (nfeat_buffs is not None and node_feats is not None) or (mailbox is not None and mailbox.mailbox_buffs is not None)
 #flag表示是否通过缓存获取
