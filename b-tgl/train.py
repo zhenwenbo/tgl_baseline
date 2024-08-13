@@ -2,15 +2,15 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
-parser.add_argument('--train_conf', type=str, default='basic_conf', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='basic_conf_cut', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -22,6 +22,7 @@ GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
 args.pre_sample_size = config.pre_sample_size
+args.cut_zombie = config.cut_zombie
 
 if (hasattr(config, 'model')):
     args.config = f'/raid/guorui/workspace/dgnn/b-tgl/config/{config.model}-{config.layer}.yml'
@@ -100,7 +101,7 @@ def eval(mode='val'):
                 mask_nodes = torch.from_numpy(np.concatenate([rows.dst.values, rows.src.values]).astype(np.int32)).cuda()
                 mask_nodes = torch.cat((mask_nodes, (torch.zeros(rows.src.values.shape[0], dtype = torch.int32, device = 'cuda:0') - 1)))
                 root_ts = torch.from_numpy(ts).cuda()
-                ret = sampler_gpu.sample_layer(root_nodes, root_ts)
+                ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
             else:
                 if sampler is not None:
                     if 'no_neg' in sample_param and sample_param['no_neg']:
@@ -416,7 +417,7 @@ if __name__ == '__main__':
                 
                 root_nodes = torch.from_numpy(root_nodes).cuda()
                 root_ts = torch.from_numpy(ts).cuda()
-                ret = sampler_gpu.sample_layer(root_nodes, root_ts)
+                ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
             else:
                 if sampler is not None:
                     if no_neg:

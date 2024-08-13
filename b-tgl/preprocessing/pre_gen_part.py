@@ -197,7 +197,7 @@ if __name__ == '__main__':
         df = df.iloc[inductive_inds]
         
     gnn_dim_node = 0 if node_feats is None else node_feats.shape[1]
-    gnn_dim_edge = 0 if edge_feats is None else edge_feats.shape[1]
+    gnn_dim_edge = 0 if (edge_feats is None or edge_feats.shape[0] == 0) else edge_feats.shape[1]
 
     if (args.use_ayscn_prefetch):
         if (args.data == 'LASTFM'):

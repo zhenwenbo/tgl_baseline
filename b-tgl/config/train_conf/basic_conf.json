@@ -1,7 +1,7 @@
 {
     "use_valid_edge": true,  
     "use_ayscn_prefetch": true,
-    "pre_sample_size": 600000,
+    "pre_sample_size": 60000,
     "part_neg_sample": false,
     "use_pin_memory": false,
     "model_eval": false

@@ -76,7 +76,7 @@ monitor_memory_usage() {
 
 ds=("MAG")
 
-block_size=600000
+block_size=100000
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-pre-${timestamp}"
 

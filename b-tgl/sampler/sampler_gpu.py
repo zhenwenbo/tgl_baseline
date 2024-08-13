@@ -47,13 +47,13 @@ class Sampler_GPU:
                                                     expired,
                                                     seed_num,self.fan_num,sample_param['cur_block'], sample_param['zombie_block'], out_src,out_dst,outts,outeid)
         mask = out_src > -1
-        return (out_src[mask], out_dst[mask], outts[mask], outeid[mask],
-                sampleIDs, curts, outdts[mask])
+        return [out_src[mask], out_dst[mask], outts[mask], outeid[mask],
+                sampleIDs, curts, outdts[mask]]
     
         # return (out_src.reshape(seed_num, -1), out_dst.reshape(seed_num, -1), outts.reshape(seed_num, -1), outeid.reshape(seed_num, -1),
         #         sampleIDs, curts,outdts)
 
-    def sample_layer(self, sampleIDs, curts, expired = None, sample_mode = 'normal', sample_param = {}):
+    def sample_layer(self, sampleIDs, curts, expired = None, sample_mode = 'normal', sample_param = {}, cut_zombie = False):
 
         ts = curts
         root_nodes = sampleIDs
@@ -64,10 +64,38 @@ class Sampler_GPU:
             self.fan_num = self.fan_nums[i]
 
             
-            sample_ret = self.sample(root_nodes, ts, sample_mask, expired=expired, mode = sample_mode, sample_param = sample_param)
-            (out_src, out_dst, outts, outeid, root_nodes, curts, dts) = sample_ret
+            [out_src, out_dst, outts, outeid, root_nodes, curts, dts] = self.sample(root_nodes, ts, sample_mask, expired=expired, mode = sample_mode, sample_param = sample_param)
+            # [out_src, out_dst, outts, outeid, root_nodes, curts, dts] = sample_ret
+            
+            if (cut_zombie):
+                # noncut_indices = torch.nonzero(dts <= torch.mean(dts)).reshape(-1)
+                # print(f"比平均值多的边数: {noncut_indices.shape[0]} 占比{noncut_indices.shape[0] / dts.shape[0] * 100 :.4f}%")
+                # out_src = out_src[noncut_indices]
+                # out_dst = out_dst[noncut_indices]
+                # outts = outts[noncut_indices]
+                # outeid = outeid[noncut_indices]
+                # dts = dts[noncut_indices]
+
+
+                cut_mask = torch.zeros(dts.shape[0], dtype=torch.bool, device = 'cuda:0')
+                cut_indices = torch.nonzero(dts > torch.median(dts)).reshape(-1)
+
+                # 随机裁剪一半
+                rand_indices = torch.randperm(cut_indices.shape[0], dtype = torch.int64, device = 'cuda:0')
+                cut_indices = cut_indices[rand_indices[:rand_indices.shape[0]//2]]
+                cut_mask[cut_indices] = True
+                noncut_mask = ~cut_mask
+
+                out_src = out_src[noncut_mask]
+                out_dst = out_dst[noncut_mask]
+                outts = outts[noncut_mask]
+                outeid = outeid[noncut_mask]
+                dts = dts[noncut_mask]
+
+
             # print(f"layer: {i} 不采样的节点:{torch.sum(sample_mask) if sample_mask != None else 0}, 采样边数{torch.sum(outeid > -1)}")
-                        
+            sample_list.append([out_src, out_dst, outts, outeid, root_nodes, curts, dts])
+
             if (i < self.layer - 1):
                 root_nodes = torch.cat((root_nodes,out_src)) #src_table是实际节点ID
                 ts = torch.cat((ts, outts))
@@ -76,7 +104,7 @@ class Sampler_GPU:
                     sample_mask = (res > -1).to(torch.int32)
                     
                
-            sample_list.append(sample_ret)
+            
 
         return sample_list
             
