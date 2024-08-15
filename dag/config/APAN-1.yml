@@ -1,14 +1,13 @@
 sampling:
-  - layer: 2
+  - layer: 1
     neighbor: 
-      - 10
       - 10
     strategy: 'recent'
     prop_time: False
     history: 1
     duration: 0
     num_thread: 32
-    no_neg: True
+    # no_neg: True
 memory: 
   - type: 'node'
     dim_time: 100

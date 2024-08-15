@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/APAN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='WIKI')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/dag/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -13,6 +13,7 @@ parser.add_argument('--rand_node_features', type=int, default=0, help='use rando
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
+args.model_eval = True
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 import torch

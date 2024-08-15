@@ -18,22 +18,10 @@ import numpy as np
 import pandas as pd
 import time
 from utils import *
-from sampler.sampler import *
+# from sampler.sampler import *
 
-def gen_table(seed_num):
-    fan_num = 2
-    start = time.time()
-    table = torch.zeros(seed_num * fan_num, dtype = torch.int32, device = 'cuda:0')
-    ar = torch.arange(seed_num, dtype = torch.int32, device = 'cuda:0')
-    for i in range(fan_num):
-        table[i * seed_num: (i+1) * seed_num] = ar
-    table = table.reshape(fan_num, -1).T
-    # print(f"gen_table use time {time.time() - start:.5f}s")
-    
-    return table
-
-d = 'GDELT'
-batch_size = 60000
+d = 'STACK'
+batch_size = 600000
 df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
 g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
 train_edge_end = df[df['ext_roll'].gt(0)].index[0]
@@ -47,13 +35,13 @@ fan_nums = [10,10]
 layers = len(fan_nums)
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 
-sample_param, memory_param, gnn_param, train_param = parse_config('/home/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+sample_param, memory_param, gnn_param, train_param = parse_config('/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 sample_param['layer'] = len(fan_nums)
 sample_param['neighbor'] = fan_nums
-sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),
-                              1, 1, sample_param['layer'], sample_param['neighbor'],
-                              sample_param['strategy']=='recent', sample_param['prop_time'],
-                              sample_param['history'], float(sample_param['duration']))
+# sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),
+#                               1, 1, sample_param['layer'], sample_param['neighbor'],
+#                               sample_param['strategy']=='recent', sample_param['prop_time'],
+#                               sample_param['history'], float(sample_param['duration']))
 
 class NegLinkSampler:
 
