@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -21,7 +21,11 @@ from config.train_conf import *
 GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
-args.pre_sample_size = config.pre_sample_size
+
+args.pre_sample_size = 600000
+# args.pre_sample_size = config.pre_sample_size
+args.cut_zombie = config.cut_zombie
+
 
 if (hasattr(config, 'model')):
     args.config = f'/raid/guorui/workspace/dgnn/b-tgl/config/{config.model}-{config.layer}.yml'
@@ -100,7 +104,7 @@ def eval(mode='val'):
                 mask_nodes = torch.from_numpy(np.concatenate([rows.dst.values, rows.src.values]).astype(np.int32)).cuda()
                 mask_nodes = torch.cat((mask_nodes, (torch.zeros(rows.src.values.shape[0], dtype = torch.int32, device = 'cuda:0') - 1)))
                 root_ts = torch.from_numpy(ts).cuda()
-                ret = sampler_gpu.sample_layer(root_nodes, root_ts)
+                ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
             else:
                 if sampler is not None:
                     if 'no_neg' in sample_param and sample_param['no_neg']:
@@ -187,11 +191,17 @@ if __name__ == '__main__':
     node_feats, edge_feats = None,None
     if (not args.use_ayscn_prefetch):
         node_feats, edge_feats = load_feat(args.data)
-    
-    g, df = load_graph(args.data)
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+    g, df = load_graph(args.data)
+
+    #TODO GDELT改fanout为[7,7]
+    # sample_param['neighbor'] = [7,7]
+    if (args.data in ['BITCOIN']):
+        train_edge_end = 86063713
+        val_edge_end = 110653345
+    else:
+        train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+        val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
     if args.use_inductive:
         inductive_inds = get_inductive_links(df, train_edge_end, val_edge_end)
@@ -213,6 +223,9 @@ if __name__ == '__main__':
         elif (args.data == 'GDELT'):
             gnn_dim_edge = 182 #TODO 为什么下载下来的数据集的edge feat是182呢？
             gnn_dim_node = 413
+        elif (args.data == 'BITCOIN'):
+            gnn_dim_edge = 172
+            gnn_dim_node = 172
         else:
             raise RuntimeError("have not this dataset config!")
     
@@ -375,7 +388,7 @@ if __name__ == '__main__':
 
         sampleTime = 0
         startTime = time.time()
-        test = df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)])
+        # test = df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)])
         # test1 = df[:train_edge_end].groupby(1)
         #TODO 此处reorder是干嘛的?
         for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
@@ -384,7 +397,7 @@ if __name__ == '__main__':
             time_presample_s = time.time()
             feat_buffer.run_batch(batch_num)
 
-            if (args.data in ['GDELT', 'STACK', 'TALK'] and batch_num % 1000 == 0):
+            if (batch_num % 1000 == 0):
                 print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
                 print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
                     loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
@@ -413,7 +426,7 @@ if __name__ == '__main__':
                 
                 root_nodes = torch.from_numpy(root_nodes).cuda()
                 root_ts = torch.from_numpy(ts).cuda()
-                ret = sampler_gpu.sample_layer(root_nodes, root_ts)
+                ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
             else:
                 if sampler is not None:
                     if no_neg:
@@ -448,6 +461,7 @@ if __name__ == '__main__':
             # src_node = torch.tensor(root_nodes[:node_num]).to(torch.int32)
             # dst_node = torch.tensor(root_nodes[node_num:node_num * 2]).to(torch.int32)
             # count_judge(src_node, dst_node)
+            # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
 
             time_feat_s = time.time()
             mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
@@ -488,7 +502,6 @@ if __name__ == '__main__':
                 # eid = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
                 eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
                 mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
-
                 block = None
                 if memory_param['deliver_to'] == 'neighbors':
                     # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]

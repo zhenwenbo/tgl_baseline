@@ -74,60 +74,28 @@ monitor_memory_usage() {
 
 
 
-ds=("TALK" "STACK")
+ds=("LASTFM" "TALK")
 
 block_size=600000
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
-for d in "${ds[@]}"; do
+for i in {1..10}
+do
+    for d in "${ds[@]}"; do
 
-  echo "处理 $d-$block_size"
-  mkdir -p "../res-${timestamp}/${d}"
-
-  for i in {1..10}
-  do
-    nohup python /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf' --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1-acc.yml" &>../res-${timestamp}/${d}/basic-${i}-res.log &
-    pid=$!
-    wait
-
-    nohup python /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_use_part_neg_conf' --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1-acc.yml" &>../res-${timestamp}/${d}/part-${i}-res.log &
-    pid=$!
-    wait
-
-  done
+        echo "处理 $d-$i"
+        mkdir -p "../res-${timestamp}/${d}"
 
 
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2-acc.yml" &>../res-${timestamp}/${d}/basic-${i}-res.log &
+        pid=$!
+        wait
 
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --data=${d} --train_conf='basic_eval_cut' --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2-acc.yml" &>../res-${timestamp}/${d}/cut-${i}-res.log &
+        pid=$!
+        wait
 
-#   nohup python /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/b-tgl/scripts/TGN-1.yml" &>../res/TGL-${d}-1-res.log &
-#   pid=$!
-#   memory_usage_file="../res/TGL-${d}-1-res-mem.log"
-#   monitor_memory_usage $pid
-#   wait
-
-#   nohup python /raid/guorui/workspace/dgnn/simple/main.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" &>../res/SIMPLE-${d}-1-res.log &
-#   pid=$!
-#   memory_usage_file="../res/SIMPLE-${d}-1-res-mem.log"
-#   monitor_memory_usage $pid
-#   wait
-
-#   nohup python /raid/guorui/workspace/dgnn/simple/main.py --data=${d} --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1-pre.yml" &>../res/SIMPLE-pre-${d}-1-res.log &
-#   pid=$!
-#   memory_usage_file="../res/SIMPLE-pre-${d}-1-res-mem.log"
-#   monitor_memory_usage $pid
-#   wait
-
-#   nohup python /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --pre_sample_size=${block_size} --config="/raid/guorui/workspace/dgnn/b-tgl/scripts/TGN-2.yml" &>../res/${d}-2-${block_size}_res.log &
-#   pid=$!
-#   memory_usage_file="../res/${d}-2-${block_size}_res_mem.log"
-#   monitor_memory_usage $pid
-#   wait
-
-#   nohup python /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/b-tgl/scripts/TGN-2.yml" &>../res/TGL_${d}-2_res.log &
-#   pid=$!
-#   memory_usage_file="../res/TGL_${d}-2_res_mem.log"
-#   monitor_memory_usage $pid
-#   wait
+    done
 
 done

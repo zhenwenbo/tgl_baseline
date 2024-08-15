@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -14,7 +14,7 @@ parser.add_argument('--use_ayscn_prefetch', action='store_true', default=False)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
+parser.add_argument('--pre_sample_size', type=int, default=600000, help='pre sample size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -189,15 +189,20 @@ if __name__ == '__main__':
     
     g, df = load_graph(args.data)
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+
+    if (args.data in ['BITCOIN']):
+        train_edge_end = 86063713
+        val_edge_end = 110653345
+    else:
+        train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+        val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
     if args.use_inductive:
         inductive_inds = get_inductive_links(df, train_edge_end, val_edge_end)
         df = df.iloc[inductive_inds]
         
     gnn_dim_node = 0 if node_feats is None else node_feats.shape[1]
-    gnn_dim_edge = 0 if edge_feats is None else edge_feats.shape[1]
+    gnn_dim_edge = 0 if (edge_feats is None or edge_feats.shape[0] == 0) else edge_feats.shape[1]
 
     if (args.use_ayscn_prefetch):
         if (args.data == 'LASTFM'):
@@ -212,6 +217,9 @@ if __name__ == '__main__':
         elif (args.data == 'GDELT'):
             gnn_dim_edge = 182 #TODO 为什么下载下来的数据集的edge feat是182呢？
             gnn_dim_node = 413
+        elif (args.data == 'BITCOIN'):
+            gnn_dim_edge = 172
+            gnn_dim_node = 172
         else:
             raise RuntimeError("have not this dataset config!")
     
@@ -338,8 +346,8 @@ if __name__ == '__main__':
                               sampler_gpu,neg_link_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
     if (not use_ayscn_prefetch):
         feat_buffer.init_feat(node_feats, edge_feats)
-    # feat_buffer.gen_part_incre()
-    feat_buffer.gen_part()
+    feat_buffer.gen_part_incre()
+    # feat_buffer.gen_part()
 
 
     print(f"共用时{time.time() - total_start:.4f}s")

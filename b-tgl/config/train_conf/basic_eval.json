@@ -3,7 +3,9 @@
     "use_ayscn_prefetch": true,
     "pre_sample_size": 600000,
     "part_neg_sample": false,
-    "model_eval": true
+    "use_pin_memory": false,
+    "model_eval": true,
+    "cut_zombie": false
     
 
 }

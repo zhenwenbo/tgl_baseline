@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/APAN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -36,8 +36,12 @@ def set_seed(seed):
 node_feats, edge_feats = load_feat(args.data, args.rand_edge_features, args.rand_node_features)
 g, df = load_graph(args.data)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+if (args.data in ['BITCOIN']):
+    train_edge_end = 86063713
+    val_edge_end = 110653345
+else:
+    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]
@@ -202,8 +206,10 @@ for e in range(train_param['epoch']):
             ret = sampler.get_ret()
             time_sample += ret[0].sample_time()
 
-        if (args.data in ['GDELT', 'STACK', 'TALK', 'MAG'] and batch_num % 1000 == 0):
+        if (batch_num % 1000 == 0):
             print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+            print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
+
             time_per_batch = 0
 
         t_prep_s = time.time()

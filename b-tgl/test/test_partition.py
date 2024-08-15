@@ -10,32 +10,32 @@ from utils import *
 import os
 
 
-d = 'MOOC'
-# gen_feat(d, 100, 100)
-path = f'/raid/guorui/DG/dataset/{d}'
-df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
-g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
-train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+d = 'BITCOIN'
+gen_feat(d, 172, 172)
+# path = f'/raid/guorui/DG/dataset/{d}'
+# df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+# g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
+# train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+# val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
-rand_de = 100
-rand_dn = 100
-if d == 'LASTFM':
-    edge_feats = torch.randn(1293103, rand_de)
-elif d == 'MOOC':
-    edge_feats = torch.randn(411749, rand_de)
-if rand_dn > 0:
-    if d == 'LASTFM':
-        node_feats = torch.randn(1980, rand_dn)
+# rand_de = 100
+# rand_dn = 100
+# if d == 'LASTFM':
+#     edge_feats = torch.randn(1293103, rand_de)
+# elif d == 'MOOC':
+#     edge_feats = torch.randn(411749, rand_de)
+# if rand_dn > 0:
+#     if d == 'LASTFM':
+#         node_feats = torch.randn(1980, rand_dn)
 
 
-batch_size = 600000
-group_indexes = np.array(df[:train_edge_end].index // batch_size)
+# batch_size = 600000
+# group_indexes = np.array(df[:train_edge_end].index // batch_size)
 
-from sampler_gpu import *
-fan_nums = [10,10]
-layers = len(fan_nums)
-sampler = Sampler_GPU(g, fan_nums, layers)
+# from sampler_gpu import *
+# fan_nums = [10,10]
+# layers = len(fan_nums)
+# sampler = Sampler_GPU(g, fan_nums, layers)
 
 
 

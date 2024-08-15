@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='WIKI')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/dag/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -13,9 +13,8 @@ parser.add_argument('--rand_node_features', type=int, default=0, help='use rando
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
-args.model_eval = True
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-
+args.model_eval = True
 import torch
 import time
 import random
@@ -37,8 +36,12 @@ def set_seed(seed):
 node_feats, edge_feats = load_feat(args.data, args.rand_edge_features, args.rand_node_features)
 g, df = load_graph(args.data)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+if (args.data in ['BITCOIN']):
+    train_edge_end = 86063713
+    val_edge_end = 110653345
+else:
+    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]
@@ -176,6 +179,10 @@ if 'reorder' in train_param:
     for i in range(1, train_param['reorder']):
         additional_idx = np.zeros(train_param['batch_size'] // train_param['reorder'] * i) - 1
         group_indexes.append(np.concatenate([additional_idx, base_idx])[:base_idx.shape[0]])
+
+
+# dag_topo = torch.load(f"/raid/guorui/DG/dataset/{args.data}/dag_topo.pt")
+batch_size = train_param['batch_size']
 for e in range(train_param['epoch']):
     print('Epoch {:d}:'.format(e))
     time_sample = 0
@@ -191,6 +198,11 @@ for e in range(train_param['epoch']):
         mailbox.reset()
         model.memory_updater.last_updated_nid = None
     for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
+
+        left = batch_num * batch_size
+        right = min(train_edge_end, (batch_num + 1) * batch_size)
+        rows = df[left: right]
+        # rows = df.loc[dag_topo[left:right].cpu()]
         t_tot_s = time.time()
         root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
         ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
@@ -203,8 +215,10 @@ for e in range(train_param['epoch']):
             ret = sampler.get_ret()
             time_sample += ret[0].sample_time()
 
-        if (args.data in ['GDELT', 'STACK', 'TALK', 'MAG'] and batch_num % 1000 == 0):
+        if (batch_num % 1000 == 0):
             print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+            print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
+
             time_per_batch = 0
 
         t_prep_s = time.time()
@@ -235,8 +249,7 @@ for e in range(train_param['epoch']):
             mem_edge_feats = edge_feats[eid] if edge_feats is not None else None
             block = None
             if memory_param['deliver_to'] == 'neighbors':
-                blocks = to_dgl_blocks(ret, sample_param['history'], reverse=True)
-                block = blocks[0][0]
+                block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
             mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
             mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
         time_prep += time.time() - t_prep_s
@@ -252,6 +265,21 @@ for e in range(train_param['epoch']):
             best_ap = ap
             torch.save(model.state_dict(), path_saver)
         print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
+
+        model.eval()
+        if sampler is not None:
+            sampler.reset()
+        if mailbox is not None:
+            mailbox.reset()
+            model.memory_updater.last_updated_nid = None
+            eval('train')
+            eval('val')
+        ap, auc = eval('test')
+        if args.eval_neg_samples > 1:
+            print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
+        else:
+            print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
+
     print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
 if (not args.model_eval):
