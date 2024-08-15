@@ -7,6 +7,8 @@ import os
 from utils import load_feat, emptyCache
 from config.train_conf import *
 
+import threading
+
 class Pre_fetch:
     def __init__(self, conn, prefetch_child_conn):
         self.conn = conn
@@ -14,6 +16,9 @@ class Pre_fetch:
 
         self.config = GlobalConfig()
         self.use_valid_edge = self.config.use_valid_edge
+
+        self.async_load_dic = {}
+        self.async_load_flag = {}
 
     def init_share_tensor(self, shared_tensor):
         part_node_map, node_feats, part_edge_map, edge_feats, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes, shared_ret_len, share_tmp_tensor = shared_tensor
@@ -145,6 +150,21 @@ class Pre_fetch:
         return self.valid_ef[original_positions.long()]
 
 
+    def load_file(self, paths, tags, i):
+
+        self.async_load_dic[tags[i]] = torch.load(paths[i])
+
+
+        #这个完成之后加载下一个
+        if ((i + 1) < len(paths)):
+            thread = threading.Thread(target=self.load_file, args=(paths, tags, i + 1))
+            self.async_load_flag[tags[i + 1]] = thread
+            thread.start()
+    
+    def async_load(self, paths, tags):
+        thread = threading.Thread(target=self.load_file, args=(paths, tags, 0))
+        self.async_load_flag[tags[0]] = thread
+        thread.start()
 
     def pre_fetch(self, block_num, memory_info, neg_info, part_node_map, conf):
         #1.预采样下一个块的负节点的neg_nodes和neg_eids
@@ -159,6 +179,18 @@ class Pre_fetch:
         t0 = time.time()
         neg_nodes, neg_eids = neg_info
         neg_nodes,neg_eids = neg_nodes.cpu(),neg_eids.cpu()
+        path, batch_size, fan_nums = conf
+
+        #incre_ef, part_ef, part_nf
+        if (self.use_valid_edge):
+            load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
+            tags = ['valid_edge_feat', 'part_edge_feat', 'part_node_feat']
+        else:
+            load_paths = [path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
+            tags = ['part_edge_feat', 'part_node_feat']
+        
+        self.async_load(load_paths, tags)
+
         # neg_nodes, _ = torch.sort(neg_nodes)
         # neg_eids, _ = torch.sort(neg_eids)
 
@@ -176,18 +208,16 @@ class Pre_fetch:
             del part_memory_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, neg_info
             # emptyCache()
         
-        path, batch_size, fan_nums = conf
+        
         t1 = time.time() - t0
         t0 = time.time()
 
-        pos_edge_feats = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt')
+        # pos_edge_feats = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt')
         pos_edge_map = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map.pt')
-        pos_node_feats = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt')
+        # pos_node_feats = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt')
         pos_node_map = torch.load(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map.pt')
         t2 = time.time() - t0
         t0 = time.time()
-        if (self.use_valid_edge):
-            self.update_valid_edge(block_num)
 
         t3 = time.time() - t0
         t0 = time.time()
@@ -201,9 +231,8 @@ class Pre_fetch:
         neg_node_feats = self.node_feats[dis_neg_nodes.to(torch.int64)]
 
         pos_node_map = torch.cat((pos_node_map, dis_neg_nodes))
-        pos_node_map,indices = torch.sort(pos_node_map)
-        node_feats = torch.cat((pos_node_feats, neg_node_feats))
-        node_feats = node_feats[indices]
+        pos_node_map,node_indices = torch.sort(pos_node_map)
+        
 
 
         # table1 = torch.zeros_like(neg_eids) - 1
@@ -217,18 +246,17 @@ class Pre_fetch:
         t4 = time.time() - t0
         t0 = time.time()
 
-        if (self.use_valid_edge):
-            dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
-        else:
+
+        if (not self.use_valid_edge):
             dis_neg_eids_feat = self.edge_feats[dis_neg_eids.to(torch.int64)]
+
 
         t5 = time.time() - t0
         t0 = time.time()
 
         pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
-        pos_edge_map,indices = torch.sort(pos_edge_map)
-        edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
-        edge_feats = edge_feats[indices]
+        pos_edge_map,edge_indices = torch.sort(pos_edge_map)
+        
         t6 = time.time() - t0
         t0 = time.time()
 
@@ -272,6 +300,28 @@ class Pre_fetch:
             self.prefetch_conn.recv()
         t9 = time.time() - t0
         t0 = time.time()
+
+        for tag in tags:
+            self.async_load_flag[tag].join()
+            data = self.async_load_dic[tag]
+            if (self.use_valid_edge and tag == 'valid_edge_feat'):
+                # print(tag)
+                self.update_valid_edge(block_num)
+
+                dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
+            elif (tag == 'part_node_feat'):
+                # print(tag)
+                pos_node_feats = data
+                node_feats = torch.cat((pos_node_feats, neg_node_feats))
+                node_feats = node_feats[node_indices]
+            elif (tag == 'part_edge_feat'):
+                # print(tag)
+                pos_edge_feats = data
+                edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
+                edge_feats = edge_feats[edge_indices]
+
+
+
         self.prefetch_after([pos_node_map, node_feats, pos_edge_map, edge_feats, part_memory,\
                               part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes])
         # self.preFetchDataCache.put({'node_info': [pos_node_map, node_feats], 'edge_info': [pos_edge_map, edge_feats],\

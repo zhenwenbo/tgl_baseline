@@ -35,10 +35,16 @@ def gen_expire(args):
 
     # d = 'LASTFM'
     # batch_size = 600000
-    df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
-    g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
-    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+    # df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+    # g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
+    g, df = load_graph(args.data)
+
+    if (args.data in ['BITCOIN']):
+        train_edge_end = 86063713
+        val_edge_end = 110653345
+    else:
+        train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+        val_edge_end = df[df['ext_roll'].gt(1)].index[0]
     group_indexes = np.array(df[:train_edge_end].index // batch_size)
 
     fan_nums = [10]
@@ -216,7 +222,7 @@ import os
 import json
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
 parser.add_argument('--bs', type=int, help='batch size', default='600000')
 parser.add_argument('--zombie_block', type=int, help='zombie block', default='2')
 args=parser.parse_args()

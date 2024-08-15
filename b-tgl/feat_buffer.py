@@ -78,9 +78,9 @@ class Feat_buffer:
         self.share_node_num = 1000000
 
         self.share_edge_num = 3000000 #TODO 动态扩容share tensor
-        if (d == 'STACK'):
-            self.share_edge_num = 40000000 #TODO 动态扩容share tensor
-            self.share_node_num = 10000000
+        # if (d == 'STACK' or d == ''):
+        self.share_edge_num = 40000000 #TODO 动态扩容share tensor
+        self.share_node_num = 10000000
 
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
@@ -776,13 +776,13 @@ class Feat_buffer:
             #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
             #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
 
-            if (self.edge_feats and self.edge_feats.shape[0] > 0):
+            if (self.edge_feats is not None and self.edge_feats.shape[0] > 0):
                 eid_uni,_ = torch.sort(eid_uni)
                 cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
                 saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat.pt')
                 saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
 
-            if (self.node_feats and self.edge_feats.shape[0] > 0):
+            if (self.node_feats is not None and self.edge_feats.shape[0] > 0):
                 nid_uni,_ = torch.sort(nid_uni)
                 cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
                 saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat.pt')
@@ -845,6 +845,7 @@ class Feat_buffer:
         group_indexes = np.array(df[:train_edge_end].index // batch_size)
 
         edge_map, node_map = None,None
+        max_edge_num, max_node_num = 0, 0
 
         for batch_num, rows in df[:train_edge_end].groupby(group_indexes):
             emptyCache()
@@ -884,25 +885,36 @@ class Feat_buffer:
             eid_uni,_ = torch.sort(eid_uni)
             # cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
             if (edge_map is None):
-                edge_map = eid_uni
+                edge_map = torch.tensor([2**31 - 1], dtype = torch.int32, device = 'cuda:0')
+            cur_edge_num = eid_uni.shape[0]
+            max_edge_num = max(cur_edge_num, max_edge_num)
             edge_map, incre_edge_indices, incre_eid = self.incre_strategy(edge_map, eid_uni)
             cur_edge_feat = self.select_index('edge_feats',incre_eid.to(torch.int64))
-            saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_incre_edge_feat.pt')
-            saveBin(edge_map.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_incre_edge_map.pt')
-            saveBin(incre_edge_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_incre_edge_indices.pt')
+            saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part{batch_num}_incre_edge_feat.pt')
+            saveBin(edge_map.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part{batch_num}_incre_edge_map.pt')
+            saveBin(incre_edge_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part{batch_num}_incre_edge_indices.pt')
 
             nid_uni,_ = torch.sort(nid_uni)
             # cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
             if (node_map is None):
-                node_map = nid_uni
+                node_map = torch.tensor([2**31 - 1], dtype = torch.int32, device = 'cuda:0')
+            
+            cur_node_num = eid_uni.shape[0]
+            max_node_num = max(cur_node_num, max_node_num)
             node_map, incre_node_indices, incre_nid = self.incre_strategy(node_map, nid_uni)
             cur_node_feat = self.select_index('node_feats',incre_nid.to(torch.int64))
-            saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_incre_node_feat.pt')
-            saveBin(node_map.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_incre_node_map.pt')
-            saveBin(incre_node_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_incre_node_indices.pt')
+            saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part{batch_num}_incre_node_feat.pt')
+            saveBin(node_map.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part{batch_num}_incre_node_map.pt')
+            saveBin(incre_node_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part{batch_num}_incre_node_indices.pt')
 
             sampleTime = time.time() - start
             # mfgs = sampler.gen_mfgs(ret_list)
             
             print(f"{root_nodes.shape}单层单block采样 + 转换block + 存储block数据 batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
             del root_nodes,eid_uni,nid_uni,src,mask,eid,_
+
+        import json
+        conf_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}-incre/part-info.json'
+        data = {'max_edge_num': max_edge_num, 'max_node_num': max_node_num}
+        with open(conf_path, 'w') as f:
+            json.dump(data, f)

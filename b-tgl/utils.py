@@ -68,6 +68,8 @@ def gen_feat(d, rand_de=0, rand_dn=0):
         edge_feats = torch.randn(63497049, 172)
     elif d == 'TALK':
         edge_feats = torch.randn(7833139, 172)
+    elif d == 'BITCOIN':
+        edge_feats = torch.randn(122948162, 172)
 
     if d == 'LASTFM':
         node_feats = torch.randn(1980, rand_dn)
@@ -77,6 +79,8 @@ def gen_feat(d, rand_de=0, rand_dn=0):
         node_feats = torch.randn(2601977, 172)
     elif d == 'TALK':
         node_feats = torch.randn(1140149, 172)
+    # elif d == 'BITCOIN':
+    #     node_feats = torch.randn(24575383, 172)
     
     if (edge_feats != None):
         saveBin(edge_feats, path + '/edge_features.pt')
@@ -105,7 +109,14 @@ def load_feat(d, load_node = True, load_edge = True):
     return node_feats, edge_feats
 
 def load_graph(d):
-    df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+    file_path = '/raid/guorui/DG/dataset/{}/edges.csv'.format(d)
+    if (d in ['BITCOIN']):
+        df = pd.read_csv(file_path, sep=' ', names=['src', 'dst', 'time'])
+        df['Unnamed: 0'] = range(1, len(df) + 1)
+    else:
+        df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+
+
     g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
     return g, df
 

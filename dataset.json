@@ -36,5 +36,9 @@
         "edge_num": 1297748927,
         "train_end": 1111701860,
         "val_end": 1198206616
+    },
+    "BIGCOIN":{
+        "node_num": 24575383,
+        "edge_num": 122948162
     }
 }
