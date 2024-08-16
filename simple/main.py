@@ -6,8 +6,8 @@ if MODULE_PATH not in sys.path:
 	sys.path.append(MODULE_PATH)
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -206,6 +206,17 @@ for e in range(train_param['epoch']):
     time_strategy = 0
     time_tot = 0
 
+    #1. prep (准备阶段, 包括生成采样子图、特征抽取注入、memory抽取注入)
+    #2. strategy (策略维护, 只有simple有这个)
+    #2. compute (训练阶段，包括前向传播和反向传播)
+    #3. update (更新阶段，包括更新memory与mailbox)
+    time_total_prep = 0
+    time_total_strategy = 0
+    time_total_compute = 0
+    time_total_update = 0
+    time_total_epoch = 0
+    time_total_epoch_s = time.time()
+
     time_model = 0
     time_loss = 0
     total_loss = 0
@@ -247,6 +258,7 @@ for e in range(train_param['epoch']):
             print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
             time_per_batch = 0
 
+        time_total_prep_s = time.time()
         root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
         pos_root_end = root_nodes.shape[0] * 2 // 3
         ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
@@ -328,6 +340,8 @@ for e in range(train_param['epoch']):
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0], node_idx, node_gpu_mask, node_gpu_local_ids, node_cpu_ids)
         t3 = time.time()
+        time_total_prep += time.time() - time_total_prep_s
+
         #update buffs. 1. get batch plan. 2. update indicators. 3. update buffs.
         strategy_s = time.time()
         if n_flag and batch_id < final_batch:
@@ -386,6 +400,8 @@ for e in range(train_param['epoch']):
         if mailbox is not None and mailbox.mailbox_buffs is not None and batch_id < final_batch:
             mailbox.update_mailbox_buffs(mfgs[0][0].srcdata['mem_input'], mfgs[0][0].srcdata['mem'], local_ID_I_n, local_ID_II_n, memory_param['mailbox_size'])
         time_strategy += time.time() - strategy_s
+        time_total_strategy += time.time() - strategy_s
+
         t_prep_s = time.time()
         time_sample += t0 - t_tot_s
         time_prep += t_prep_s - t_tot_s
@@ -394,6 +410,7 @@ for e in range(train_param['epoch']):
         time_load_data += t3 - t2
         
         batch_id += 1
+        time_total_compute_s = time.time()
         optimizer.zero_grad()
 
         time_model_s = time.time()
@@ -411,6 +428,9 @@ for e in range(train_param['epoch']):
         time_loss += time.time() - time_loss_s
 
         t_prep_s = time.time()
+
+        time_total_compute += time.time() - time_total_compute_s
+        time_total_update_s = time.time()
         if mailbox is not None:
             mem_edge_feats = edge_feats[rows['Unnamed: 0'].values].cuda()
             root_nodes_gpu = torch.from_numpy(root_nodes[:pos_root_end]).cuda()
@@ -426,7 +446,8 @@ for e in range(train_param['epoch']):
         time_tot += t_end - t_tot_s
         if mailbox is not None:
             time_up_mail += t_end - t_prep_s
-
+        
+        time_total_update += time.time() - time_total_update_s
         time_per_batch += t_end - t_tot_s
     
     print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s mfgs time:{:.2f}s gen_flags time:{:.2f}s load_data time:{:.2f}s gen_plan time:{:.2f}s up_indicators time:{:.2f}s up_buffs time:{:.2f}s up_mail time:{:.2f}s'.format(time_tot, time_prep, time_sample, time_mfgs, time_gen_flags, time_load_data, time_gen_plan, time_up_indicators, time_up_buffs, time_up_mail))
@@ -435,6 +456,11 @@ for e in range(train_param['epoch']):
     if gpu_flag_n is not None:
         mailbox.offload_for_eval(gpu_flag_n, gpu_map_n)
     
+    time_total_epoch = time.time() - time_total_epoch_s
+    time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+    print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+    print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
+
     if (not args.model_eval):
         continue
     ap, auc = eval('val')

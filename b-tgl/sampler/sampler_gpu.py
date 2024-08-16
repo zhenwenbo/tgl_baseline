@@ -26,6 +26,7 @@ class Sampler_GPU:
         self.fan_num = fan_nums[0]
         self.emb_buffer = emb_buffer
         
+        self.mask_time = 0
 
     def sample(self, sampleIDs, curts, sample_mask = None, expired = None, mode = 'normal', sample_param = {}):
         seed_num = sampleIDs.shape[0]
@@ -46,9 +47,13 @@ class Sampler_GPU:
             NUM = dgl.sampling.sample_with_expired(self.indptr,self.indices,curts,self.totalts,self.totaleid,sampleIDs,
                                                     expired,
                                                     seed_num,self.fan_num,sample_param['cur_block'], sample_param['zombie_block'], out_src,out_dst,outts,outeid)
+        
+        mask_time_s = time.time()
         mask = out_src > -1
-        return [out_src[mask], out_dst[mask], outts[mask], outeid[mask],
+        res = [out_src[mask], out_dst[mask], outts[mask], outeid[mask],
                 sampleIDs, curts, outdts[mask]]
+        self.mask_time += time.time() - mask_time_s
+        return res
     
         # return (out_src.reshape(seed_num, -1), out_dst.reshape(seed_num, -1), outts.reshape(seed_num, -1), outeid.reshape(seed_num, -1),
         #         sampleIDs, curts,outdts)

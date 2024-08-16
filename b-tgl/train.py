@@ -1,9 +1,20 @@
 import argparse
 import os
+import torch
+import time
+import random
+import dgl
+import numpy as np
+from modules import *
+from sampler.sampler import *
+from utils import *
+from sklearn.metrics import average_precision_score, roc_auc_score
+from utils import emptyCache
+import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -16,13 +27,23 @@ parser.add_argument('--rand_edge_features', type=int, default=128, help='use ran
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
+sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
 
 from config.train_conf import *
 GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
 
-args.pre_sample_size = 600000
+if (sample_param['layer'] == 1):
+    args.pre_sample_size = 600000
+else:
+    if (args.data == 'STACK'):
+        args.pre_sample_size = 60000
+    else:
+        args.pre_sample_size = 600000
+    
+
+print(f"实际的block大小为: {args.pre_sample_size}")
 # args.pre_sample_size = config.pre_sample_size
 args.cut_zombie = config.cut_zombie
 
@@ -36,17 +57,7 @@ if (config.model_eval):
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 print(f"训练配置: {config.config_data}")
-import torch
-import time
-import random
-import dgl
-import numpy as np
-from modules import *
-from sampler.sampler import *
-from utils import *
-from sklearn.metrics import average_precision_score, roc_auc_score
-from utils import emptyCache
-import os
+
 
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 def set_seed(seed):
@@ -191,7 +202,7 @@ if __name__ == '__main__':
     node_feats, edge_feats = None,None
     if (not args.use_ayscn_prefetch):
         node_feats, edge_feats = load_feat(args.data)
-    sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+    
     g, df = load_graph(args.data)
 
     #TODO GDELT改fanout为[7,7]
@@ -374,7 +385,14 @@ if __name__ == '__main__':
         time_per_batch = 0
         time_update_mem = 0
         time_update_mail = 0
+
+        time_total_prep = 0
+        time_total_strategy = 0
+        time_total_compute = 0
+        time_total_update = 0
+        time_total_epoch = 0
         # training
+        time_total_epoch_s = time.time()
         model.train()
         feat_buffer.mode = 'train'
         if sampler is not None:
@@ -391,16 +409,19 @@ if __name__ == '__main__':
         # test = df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)])
         # test1 = df[:train_edge_end].groupby(1)
         #TODO 此处reorder是干嘛的?
+        sampler_gpu.mask_time = 0
         for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
             loopTime = time.time()
             t_tot_s = time.time()
             time_presample_s = time.time()
+
+            time_total_prep_s = time.time()
             feat_buffer.run_batch(batch_num)
 
             if (batch_num % 1000 == 0):
                 print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
                 print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
-                    loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+                    loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s  mask_time: {sampler_gpu.mask_time:.4f}s")
                 if (feat_buffer):
                     feat_buffer.print_time()
                 time_per_batch = 0
@@ -468,11 +489,13 @@ if __name__ == '__main__':
             # print(f"feat时间0: {time.time() - time_feat_s:.7f}s")
             if mailbox is not None:
                 mailbox.prep_input_mails(mfgs[0])
-
+            
+            time_total_prep += time.time() - time_total_prep_s
             time_prep += time.time() - t_prep_s
             time_feat += time.time() - time_feat_s
             # print(f"feat时间: {time.time() - time_feat_s:.7f}s")
 
+            time_total_compute_s = time.time()
             optimizer.zero_grad()
             # print(f"数据转dgl图流程: {time.time() - time1:.4f}")
             
@@ -492,10 +515,11 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             time_opt += time.time() - time_opt_s
-
+            time_total_compute += time.time() - time_total_compute_s
             # print(f"one loop time3: {time.time() - loopTime:.4f}")
             t_prep_s = time.time()
             
+            time_total_update_s = time.time()
             if mailbox is not None:
                 
                 
@@ -517,6 +541,7 @@ if __name__ == '__main__':
 
             time_prep += time.time() - t_prep_s
             time_tot += time.time() - t_tot_s
+            time_total_update += time.time() - time_total_update_s
             # print(f"one loop time: {time.time() - loopTime:.4f}")
 
             time_per_batch += time.time() - t_tot_s
@@ -526,6 +551,12 @@ if __name__ == '__main__':
                loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
         feat_buffer.mode = 'val'
         feat_buffer.refresh_memory()
+
+        time_total_epoch += time.time() - time_total_epoch_s
+        time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+        print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+        print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
+
 
         if (not args.model_eval):
             continue

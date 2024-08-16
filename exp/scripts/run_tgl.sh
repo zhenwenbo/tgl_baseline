@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("STACK" "GDELT")
+ds=("LASTFM" "TALK" "STACK" "GDELT")
 model="TGN"
 
 block_size=600000
@@ -83,15 +83,15 @@ mkdir -p "../res-${timestamp}"
 
 for d in "${ds[@]}"; do
 
-  echo "处理 $d-$block_size"
+  echo "处理 $d"
   mkdir -p "../res-${timestamp}/${d}"
 
 
-#   nohup python /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-1_res.log &
-#   pid=$!
-#   memory_usage_file="../res-${timestamp}/${d}/TGL-1_res_mem.log"
-#   monitor_memory_usage $pid
-#   wait
+  nohup python /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-1_res.log &
+  pid=$!
+  memory_usage_file="../res-${timestamp}/${d}/TGL-1_res_mem.log"
+  monitor_memory_usage $pid
+  wait
 
 
   nohup python /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/TGL-2_res.log &

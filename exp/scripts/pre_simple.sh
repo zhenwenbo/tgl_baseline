@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("GDELT")
+ds=("LASTFM" "TALK" "STACK" "GDELT")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-pre-simple-${timestamp}"
