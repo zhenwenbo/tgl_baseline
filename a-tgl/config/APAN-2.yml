@@ -1,6 +1,7 @@
 sampling:
-  - layer: 1
+  - layer: 2
     neighbor: 
+      - 10
       - 10
     strategy: 'recent'
     prop_time: False

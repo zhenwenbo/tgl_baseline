@@ -240,7 +240,8 @@ for e in range(train_param['epoch']):
             mem_edge_feats = edge_feats[eid] if edge_feats is not None else None
             block = None
             if memory_param['deliver_to'] == 'neighbors':
-                block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                blocks = to_dgl_blocks(ret, sample_param['history'], reverse=True)
+                block = blocks[0][0]
             mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
             mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
         time_prep += time.time() - t_prep_s

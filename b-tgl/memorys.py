@@ -224,6 +224,7 @@ class MailBox():
                     self.mailbox_ts[nid.long(), self.next_mail_pos[nid.long()]] = mail_ts
                 else:
                     raise NotImplementedError
+                
                 if self.memory_param['mailbox_size'] > 1:
                     if self.update_mail_pos is None:
                         self.next_mail_pos[nid.long()] = torch.remainder(self.next_mail_pos[nid.long()] + 1, self.memory_param['mailbox_size'])
