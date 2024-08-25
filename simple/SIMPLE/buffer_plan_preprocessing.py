@@ -9,7 +9,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default = 'STACK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGAT-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--dim_edge_feat', type=int, default=128, help='dim of edge feat')
@@ -179,7 +179,7 @@ def alloc_budget(vols, mems, dims, limit, data_name, layer, mailbox_size, thresh
     #this is the total memory budget, while for the data_placement_single, the budget is number of data. 
     #This needs convertion.
     store_flag = np.ones(len(vols),dtype=bool)
-    if mailbox_size == 1:
+    if mailbox_size <= 1:
         if budget[0] > mems[0]:
             store_flag[0] = 0
             budget[0] = mems[0]
@@ -193,6 +193,8 @@ def alloc_budget(vols, mems, dims, limit, data_name, layer, mailbox_size, thresh
     budget = (budget/dims).astype(int)
     for i in np.nonzero(store_flag==True)[0]:
         print('Type-{} data needs to be dynamically placed.'.format(i)) #TYPE-0: node; TYPE-1: edge.
+    if (mailbox_size == 0):
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_'+str(layer)+f'_budget_tgat_{layer}.npy', budget)
     if layer > 1 and threshold == 0.1:
         np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_'+str(layer)+'_budget.npy', budget)
     if layer >1 and threshold != 0.1:
@@ -235,9 +237,14 @@ def data_placement_single(uni_list, count_list, num_data, num_batch, limit, name
     
     # save the selected intervals: start_batch_ids, end_batch_ids, mapped_data_ids
     # 已经根据start时间顺序排序
-    np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+name+'_'+str(layer)+'.npy', start)
-    np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+name+'_'+str(layer)+'.npy', end)
-    np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+name+'_'+str(layer)+'.npy', IDs)
+    if mailbox_size != 0:
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+name+'_'+str(layer)+'.npy', start)
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+name+'_'+str(layer)+'.npy', end)
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+name+'_'+str(layer)+'.npy', IDs)
+    else:
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+name+'_tgat_'+str(layer)+'.npy', start)
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+name+'_tgat_'+str(layer)+'.npy', end)
+        np.save('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+name+'_tgat_'+str(layer)+'.npy', IDs)
     t6 = time.time()
     print('Saving intervals takes:{:.2f}s'.format(t6-t5))    
     

@@ -119,10 +119,10 @@ def to_dgl_blocks(ret, hist, reverse=False, cuda=True):
     return mfgs
 
 def load_intervals(data_name, type_name, mailbox_size, threshold, multi_layer=False, mailbox=False, emb_reuse=False):
-    if multi_layer and not mailbox:
-        start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + '_tgat.npy')
-        end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + '_tgat.npy')
-        IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + '_tgat.npy')
+    if not mailbox:
+        start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
+        end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
+        IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
     if multi_layer and mailbox: #TODO 此处作改动契合预处理的保存逻辑，但是无法对threshold做消融
         start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + '_2.npy')
         end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + '_2.npy')
@@ -149,8 +149,8 @@ def load_total_intervals(d, budget, num_node, num_edge, mailbox_size, threshold,
     return node_start, node_end, node_IDs, edge_start, edge_end, edge_IDs
 
 def load_budget(d, mailbox_size, threshold, multi_layer=False, mailbox=False, emb_reuse=False):
-    if multi_layer and not mailbox:
-        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+'_budget_tgat.npy')
+    if not mailbox:
+        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+f'_{2 if multi_layer else 1}_budget_tgat_{2 if multi_layer else 1}.npy')
     if multi_layer and mailbox and threshold == 0.1:
         budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+'_2_budget.npy')
     if multi_layer and mailbox and threshold != 0.1:

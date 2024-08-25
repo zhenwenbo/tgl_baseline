@@ -90,7 +90,7 @@ def gen_feat(d, rand_de=0, rand_dn=0):
 
 
 def load_feat(d, load_node = True, load_edge = True):
-    node_feats = None
+    node_feats = torch.empty(0)
     if load_node and os.path.exists('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d)):
         node_feats = torch.load('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d))
         if node_feats.dtype == torch.bool:
@@ -195,7 +195,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
     t_idx = 0
     t_cuda = 0
     i = 0
-    if feat_buffer is not None or node_feats is not None: 
+    if feat_buffer is not None and node_feats is not None: 
         for b in mfgs[0]:
             if pinned:
                 if nids is not None:
@@ -216,7 +216,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                         srch = node_feats[b.srcdata['ID'].long()].float()
                 b.srcdata['h'] = srch.cuda()
     i = 0
-    if feat_buffer is not None or edge_feats is not None:
+    if feat_buffer is not None and edge_feats is not None:
         for mfg in mfgs:
             for b in mfg:
                 if b.num_src_nodes() > b.num_dst_nodes():

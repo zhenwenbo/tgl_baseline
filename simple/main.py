@@ -7,7 +7,7 @@ if MODULE_PATH not in sys.path:
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGAT-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -294,7 +294,7 @@ for e in range(train_param['epoch']):
             edge_idx = []
            
         node_hit = 0
-
+        edge_hit = 0
         strategy_s = time.time()
         if  nfeat_buffs is not None or (mailbox is not None and mailbox.mailbox_buffs):
             node_gpu_mask, node_gpu_local_ids, node_cpu_ids = \
@@ -319,13 +319,13 @@ for e in range(train_param['epoch']):
                 mask = edge_gpu_mask
             
             
-            edge_hit = torch.sum(mask) / mask.shape[0] * 100
+            edge_hit = (torch.sum(mask) / mask.shape[0] * 100).item()
         # print(f"node缓存命中率: {torch.sum(node_gpu_mask).item() / node_gpu_mask.shape[0] * 100:.2f}%, edge 缓存命中率: {torch.sum(edge_gpu_mask) / edge_gpu_mask.shape[0] * 100:.2f}%")
         time_strategy += time.time() - strategy_s
         
 
         aver_node_hit = (aver_node_hit * batch_num + node_hit) / (batch_num + 1)
-        aver_edge_hit = (aver_edge_hit * batch_num + edge_hit).item() / (batch_num + 1)
+        aver_edge_hit = (aver_edge_hit * batch_num + edge_hit) / (batch_num + 1)
         t2 = time.time()
         #load batch data.
         if gnn_param['arch'] != 'identity':
@@ -453,7 +453,7 @@ for e in range(train_param['epoch']):
     print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s mfgs time:{:.2f}s gen_flags time:{:.2f}s load_data time:{:.2f}s gen_plan time:{:.2f}s up_indicators time:{:.2f}s up_buffs time:{:.2f}s up_mail time:{:.2f}s'.format(time_tot, time_prep, time_sample, time_mfgs, time_gen_flags, time_load_data, time_gen_plan, time_up_indicators, time_up_buffs, time_up_mail))
     print(f"model time: {time_model}, loss time: {time_loss} aver_node_hit: {aver_node_hit:.2f}%, aver_edge_hit: {aver_edge_hit:.2f}% 策略开销: {time_strategy:.4f}s 注意prep time中包含策略开销 ")
     t0 = time.time()
-    if gpu_flag_n is not None:
+    if gpu_flag_n is not None and mailbox is not None:
         mailbox.offload_for_eval(gpu_flag_n, gpu_map_n)
     
     time_total_epoch = time.time() - time_total_epoch_s

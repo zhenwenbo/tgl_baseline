@@ -74,10 +74,9 @@ monitor_memory_usage() {
 
 
 
-ds=("GDELT")
-model="TGAT"
+ds=("LASTFM" "TALK" "STACK" "GDELT")
+model="TGN"
 
-block_size=600000
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
@@ -87,22 +86,17 @@ for d in "${ds[@]}"; do
   mkdir -p "../res-${timestamp}/${d}"
 
 
-
-
-
-#   nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-1_res.log &
+#   nohup python -u /home/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-1_res.log &
 #   pid=$!
-#   memory_usage_file="../res-${timestamp}/${d}/b-1_res_mem.log"
+#   memory_usage_file="../res-${timestamp}/${d}/ETC-1_res_mem.log"
 #   monitor_memory_usage $pid
 #   wait
 
-  if [ "$d" != "GDELT123" ]; then
-    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-2_res.log &
-    pid=$!
-    memory_usage_file="../res-${timestamp}/${d}/b-2_res_mem.log"
-    monitor_memory_usage $pid
-    wait
-  fi
 
+  nohup python -u /home/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/ETC-2_res.log &
+  pid=$!
+  memory_usage_file="../res-${timestamp}/${d}/ETC-2_res_mem.log"
+  monitor_memory_usage $pid
+  wait
 
 done

@@ -13,7 +13,7 @@ memory:
     mailbox_size: 0
 gnn:
   - arch: 'transformer_attention'
-    layer: 2
+    layer: 1
     att_head: 2
     dim_time: 100
     dim_out: 100

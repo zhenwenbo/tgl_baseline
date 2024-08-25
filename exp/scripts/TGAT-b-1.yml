@@ -1,7 +1,6 @@
 sampling:
-  - layer: 2
+  - layer: 1
     neighbor: 
-      - 10
       - 10
     strategy: 'recent'
     prop_time: False
@@ -13,12 +12,12 @@ memory:
     dim_out: 0
 gnn:
   - arch: 'transformer_attention'
-    layer: 2
+    layer: 1
     att_head: 2
     dim_time: 100
     dim_out: 100
 train:
-  - epoch: 2
+  - epoch: 5
     batch_size: 2000
     lr: 0.0001
     dropout: 0.1

@@ -2,14 +2,14 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name')
-parser.add_argument('--config', type=str, help='path to config file')
+parser.add_argument('--data', default='TALK', type=str, help='dataset name')
+parser.add_argument('--config', default='/home/guorui/workspace/dgnn/ETC/config/TGAT-1.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
-os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+# os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 import multiprocessing as mp
 import threading
@@ -247,6 +247,15 @@ if __name__ == '__main__':
         time_sample = 0
         time_prep = 0
         time_tot = 0
+        time_per_batch = 0
+
+        time_total_prep = 0
+        time_total_strategy = 0
+        time_total_compute = 0
+        time_total_update = 0
+        time_total_epoch = 0
+        time_total_epoch_s = time.time()
+
         total_loss = 0
         # training
         model.train()
@@ -257,6 +266,8 @@ if __name__ == '__main__':
             model.memory_updater.last_updated_nid = None
         #sample for all
         t_start = time.time()
+
+        time_total_prep_s = time.time()
         for _, rows in df[:train_edge_end].groupby(train_group_index):
             t0 = time.time()
             neg = neg_link_sampler.sample(len(rows))
@@ -302,7 +313,17 @@ if __name__ == '__main__':
         
         #start the main computation
         count = 0
-        for _, rows in df[:train_edge_end].groupby(train_group_index):
+        time_total_prep += time.time() - time_total_prep_s
+        batch_edge_count = 0
+        for batch_num, rows in df[:train_edge_end].groupby(train_group_index):
+
+            batch_edge_count += len(rows)
+            if (batch_num % 1000 == 0):
+                print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / batch_edge_count * (train_edge_end)):.3f}s")
+                print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
+
+                time_per_batch = 0
+                batch_edge_count = 0
             t0 = time.time()
             root_nodes = node_list[count]
             ts = ts_list[count]
@@ -329,6 +350,9 @@ if __name__ == '__main__':
                 mailbox.reconstruct(mfgs[0], uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts, inv_node)
             t1 = time.time()
             time_prep += t1-t0
+            time_total_prep += t1-t0
+
+            time_total_compute_s = time.time()
             #start pipelining
             optimizer.zero_grad()
             pred_pos, pred_neg = model(mfgs)
@@ -339,6 +363,8 @@ if __name__ == '__main__':
             optimizer.step()
             del mfgs[0]
             t2 = time.time()
+            time_total_compute += time.time() - time_total_compute_s
+
             if mailbox is not None:      
                 mem_edge_feats = edge_feats[rows['Unnamed: 0'].values].cuda()
                 root_nodes_gpu = torch.from_numpy(root_nodes).cuda()
@@ -351,16 +377,30 @@ if __name__ == '__main__':
                 mailbox.update_memory_trans(mem_nid, mem, mem_ts)
             t3 = time.time()
             time_prep += t3-t2
+            time_total_update += t3-t2
             time_tot += t3-t0
+
+            time_per_batch += time.time() - t0
         prep_thread.join()
         print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s'.format(time_tot, time_prep, time_sample))
+
+        time_total_epoch += time.time() - time_total_epoch_s
+        time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+        print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+        print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
+
+
+        model_eval = True
+        if (not model_eval):
+            continue
         ap, auc = eval(group_indices, 'val')
         if e > 2 and ap > best_ap:
             best_e = e
             best_ap = ap
             torch.save(model.state_dict(), path_saver)
         print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
-        
+    if (not model_eval):
+        exit(-1)
     print('Loading model at epoch {}...'.format(best_e))
     model.load_state_dict(torch.load(path_saver))
     model.eval()

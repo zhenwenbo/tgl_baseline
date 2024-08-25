@@ -64,10 +64,10 @@ class MailBox():
         
     def reconstruct(self, mfg, uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts, inv_node):
         for i, b in enumerate(mfg):
-            b.srcdata['mem'] = uni_mem[inv_node]
-            b.srcdata['mem_ts'] = uni_mem_ts[inv_node]
-            b.srcdata['mem_input'] = uni_mem_input[inv_node].reshape(b.srcdata['ID'].shape[0], -1)
-            b.srcdata['mail_ts'] = uni_mail_ts[inv_node]
+            b.srcdata['mem'] = uni_mem[inv_node[i]]
+            b.srcdata['mem_ts'] = uni_mem_ts[inv_node[i]]
+            b.srcdata['mem_input'] = uni_mem_input[inv_node[i]].reshape(b.srcdata['ID'].shape[0], -1)
+            b.srcdata['mail_ts'] = uni_mail_ts[inv_node[i]]
     
     def push_update_memory(self, nid, memory, root_nodes, ts, neg_samples=1):
         if nid is None:

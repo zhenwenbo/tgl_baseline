@@ -9,13 +9,13 @@ import time
 
 def load_feat(d):
     node_feats = None
-    if os.path.exists('DATA/{}/node_features.pt'.format(d)):
-        node_feats = torch.load('DATA/{}/node_features.pt'.format(d))
+    if os.path.exists('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d)):
+        node_feats = torch.load('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d))
         if node_feats.dtype == torch.bool:
             node_feats = node_feats.type(torch.float32)
     edge_feats = None
-    if os.path.exists('DATA/{}/edge_features.pt'.format(d)):
-        edge_feats = torch.load('DATA/{}/edge_features.pt'.format(d))
+    if os.path.exists('/raid/guorui/DG/dataset/{}/edge_features.pt'.format(d)):
+        edge_feats = torch.load('/raid/guorui/DG/dataset/{}/edge_features.pt'.format(d))
         if edge_feats.dtype == torch.bool:
             edge_feats = edge_feats.type(torch.float32)
    
@@ -32,8 +32,8 @@ def load_feat(d):
     return node_feats, edge_feats
 
 def load_graph(d):
-    df = pd.read_csv('DATA/{}/edges.csv'.format(d))
-    g = np.load('DATA/{}/ext_full.npz'.format(d))
+    df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+    g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
     return g, df
 
 def parse_config(f):
@@ -47,6 +47,7 @@ def parse_config(f):
 def to_dgl_blocks(ret, hist, reverse=False, cuda=True):
     mfgs = list()
     uni_time = 0
+    inv_nodes, inv_edges = [], []
     for r in ret:
         if not reverse:
             b = dgl.create_block((r.col(), r.row()), num_src_nodes=r.dim_in(), num_dst_nodes=r.dim_out())
@@ -65,16 +66,21 @@ def to_dgl_blocks(ret, hist, reverse=False, cuda=True):
             uni_edge, inv_edge = np.unique(r.eid(),return_inverse=True)
         else:
             uni_edge, inv_edge = None, None
+
+        inv_nodes.append(torch.from_numpy(inv_node))
+        inv_edges.append(torch.from_numpy(inv_edge))
         if cuda:
             mfgs.append(b.to('cuda:0'))
         else:
             mfgs.append(b)
     mfgs = list(map(list, zip(*[iter(mfgs)] * hist)))
     mfgs.reverse()
+    inv_nodes.reverse()
+    inv_edges.reverse()
     if not reverse:
-        return mfgs, torch.from_numpy(uni_node), torch.from_numpy(inv_node), torch.from_numpy(uni_edge), torch.from_numpy(inv_edge)
+        return mfgs, torch.from_numpy(uni_node), inv_nodes, torch.from_numpy(uni_edge), inv_edges
     else:
-        return mfgs, torch.from_numpy(uni_node), torch.from_numpy(inv_node), uni_edge, inv_edge
+        return mfgs, torch.from_numpy(uni_node), inv_nodes, torch.from_numpy(uni_edge), inv_edges
 
 def node_to_dgl_blocks(root_nodes, ts, cuda=True):
     mfgs = list()
@@ -98,15 +104,16 @@ def mfgs_to_cuda(mfgs):
 
 def feat_reconstruct(mfgs, node_data, edge_data, inv_node, inv_edge):
     if node_data is not None:
-        for b in mfgs[0]:
-            b.srcdata['h'] = node_data[inv_node]
+        for i,mfg in enumerate(mfgs):
+            for b in mfg:
+                b.srcdata['h'] = node_data[inv_node[i]]
     if edge_data is not None:
-        for mfg in mfgs:
+        for i,mfg in enumerate(mfgs):
             for b in mfg:
                 if b.num_src_nodes() > b.num_dst_nodes():
-                    b.edata['f'] = edge_data[inv_edge]
+                    b.edata['f'] = edge_data[inv_edge[i]]
     return mfgs
-                    
+
 def prepare_input_selection(mfgs, node_feats, edge_feats, uni_node, uni_edge):
     node_data, edge_data = None, None 
     if node_feats is not None:

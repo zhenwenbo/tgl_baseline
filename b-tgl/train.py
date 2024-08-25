@@ -13,15 +13,15 @@ from utils import emptyCache
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
-parser.add_argument('--train_conf', type=str, default='basic_conf', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='basic_eval', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -134,7 +134,7 @@ def eval(mode='val'):
                 else:
                     mfgs = node_to_dgl_blocks(root_nodes, ts)  
                     
-            mfgs = prepare_input(mfgs, feat_buffer = feat_buffer, combine_first=combine_first)
+            mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
             
             if mailbox is not None:
                 mailbox.prep_input_mails(mfgs[0])
@@ -196,9 +196,9 @@ def count_judge(src_node, dst_node):
     print(f"出现的最长的依赖长度为{maxLen},依赖链总长度为{countLen}")
 
 # set_seed(0)
-
 if __name__ == '__main__':
 
+    global node_feats, edge_feats
     node_feats, edge_feats = None,None
     if (not args.use_ayscn_prefetch):
         node_feats, edge_feats = load_feat(args.data)
@@ -237,6 +237,12 @@ if __name__ == '__main__':
         elif (args.data == 'BITCOIN'):
             gnn_dim_edge = 172
             gnn_dim_node = 172
+        elif (args.data == 'MAG'):
+            gnn_dim_edge = 0
+            gnn_dim_node = 768
+        elif (args.data == 'WIKI'):
+            gnn_dim_edge = 0
+            gnn_dim_node = 0
         else:
             raise RuntimeError("have not this dataset config!")
     
@@ -289,7 +295,10 @@ if __name__ == '__main__':
         print(f"Received: {result}")
         node_feats,edge_feats = 1,1
     # 主进程发送要调用的函数名和args变量
-
+    if (gnn_dim_node == 0):
+        node_feats = None
+    if (gnn_dim_edge == 0):
+        edge_feats = None
     #prefetch_others_conn处理其他的index这类串行操作
     #prefetch_conn 单独处理prefetch这个并行操作
     #这么做是为了防止prefetch的结果被其他的串行操作截胡了

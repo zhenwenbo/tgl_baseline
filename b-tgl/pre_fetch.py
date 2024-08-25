@@ -42,8 +42,8 @@ class Pre_fetch:
         
         total_allo = 0
         for i, tensor in enumerate(prefetch_res):
-            self.shared_ret_len[i] = tensor.shape[0]
-            total_allo += tensor.reshape(-1).shape[0]
+            self.shared_ret_len[i] = tensor.shape[0] if tensor is not None else 0
+            total_allo += tensor.reshape(-1).shape[0] if tensor is not None else 0
 
         self.part_node_map[:self.shared_ret_len[0]] = prefetch_res[0]
         self.part_node_feats[:self.shared_ret_len[1]] = prefetch_res[1]
@@ -152,7 +152,10 @@ class Pre_fetch:
 
     def load_file(self, paths, tags, i):
 
-        self.async_load_dic[tags[i]] = torch.load(paths[i])
+        if (os.path.exists(paths[i])):
+            self.async_load_dic[tags[i]] = torch.load(paths[i])
+        else:
+            self.async_load_dic[tags[i]] = None
 
 
         #这个完成之后加载下一个
@@ -176,6 +179,8 @@ class Pre_fetch:
         # print(f"子进程...")
         #TODO 这里暂时不考虑任何增量策略
         # print(f"子线程prefetch")
+        has_ef = self.edge_feats.shape[0] > 0
+        has_nf = self.node_feats.shape[0] > 0
         t0 = time.time()
         neg_nodes, neg_eids = neg_info
         neg_nodes,neg_eids = neg_nodes.cpu(),neg_eids.cpu()
@@ -228,7 +233,8 @@ class Pre_fetch:
         # dis_ind = table1 == -1
         dis_ind = torch.isin(neg_nodes, pos_node_map, assume_unique=True,invert=True)
         dis_neg_nodes = neg_nodes[dis_ind]
-        neg_node_feats = self.node_feats[dis_neg_nodes.to(torch.int64)]
+        if (has_nf):
+            neg_node_feats = self.node_feats[dis_neg_nodes.to(torch.int64)]
 
         pos_node_map = torch.cat((pos_node_map, dis_neg_nodes))
         pos_node_map,node_indices = torch.sort(pos_node_map)
@@ -247,7 +253,7 @@ class Pre_fetch:
         t0 = time.time()
 
 
-        if (not self.use_valid_edge):
+        if (has_ef and not self.use_valid_edge):
             dis_neg_eids_feat = self.edge_feats[dis_neg_eids.to(torch.int64)]
 
 
@@ -301,20 +307,21 @@ class Pre_fetch:
         t9 = time.time() - t0
         t0 = time.time()
 
+        node_feats, edge_feats = torch.empty(0, dtype = torch.float32), torch.empty(0, dtype = torch.float32)
         for tag in tags:
             self.async_load_flag[tag].join()
             data = self.async_load_dic[tag]
-            if (self.use_valid_edge and tag == 'valid_edge_feat'):
+            if (self.use_valid_edge and tag == 'valid_edge_feat' and has_ef):
                 # print(tag)
                 self.update_valid_edge(block_num)
 
                 dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
-            elif (tag == 'part_node_feat'):
+            elif (tag == 'part_node_feat' and has_nf):
                 # print(tag)
                 pos_node_feats = data
                 node_feats = torch.cat((pos_node_feats, neg_node_feats))
                 node_feats = node_feats[node_indices]
-            elif (tag == 'part_edge_feat'):
+            elif (tag == 'part_edge_feat' and has_ef):
                 # print(tag)
                 pos_edge_feats = data
                 edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))

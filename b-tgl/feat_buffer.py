@@ -539,9 +539,11 @@ class Feat_buffer:
 
     def load_part(self, part_num):
         path = self.path
-        self.part_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').cuda()
+        if (self.edge_feat_dim > 0):
+            self.part_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').cuda()
         self.part_edge_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
-        self.part_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').cuda()
+        if (self.node_feat_dim > 0):
+            self.part_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').cuda()
         self.part_node_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
 
     def load_part_pin(self, part_num):
@@ -685,14 +687,16 @@ class Feat_buffer:
         dgl.findSameNode(neg_nodes, self.part_node_map, table1, table2)
         dis_ind = table1 == -1
         dis_neg_nodes = neg_nodes[dis_ind]
-        dis_neg_nodes_feat = self.select_index('node_feats', dis_neg_nodes.to(torch.int64)).cuda()
-        if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
-            dis_neg_nodes_feat = dis_neg_nodes_feat.cpu().pin_memory()
+        if (self.node_feat_dim > 0):
+            dis_neg_nodes_feat = self.select_index('node_feats', dis_neg_nodes.to(torch.int64)).cuda()
+            if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
+                dis_neg_nodes_feat = dis_neg_nodes_feat.cpu().pin_memory()
 
         self.part_node_map = torch.cat((self.part_node_map, dis_neg_nodes))
         self.part_node_map,indices = torch.sort(self.part_node_map)
-        self.part_node_feats = torch.cat((self.part_node_feats, dis_neg_nodes_feat))
-        self.part_node_feats = self.part_node_feats[indices]
+        if (self.node_feat_dim > 0):
+            self.part_node_feats = torch.cat((self.part_node_feats, dis_neg_nodes_feat))
+            self.part_node_feats = self.part_node_feats[indices]
 
 
 
@@ -701,16 +705,18 @@ class Feat_buffer:
         dgl.findSameNode(neg_eids, self.part_edge_map, table1, table2)
         dis_ind = table1 == -1
         dis_neg_eids = neg_eids[dis_ind]
-        dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.to(torch.int64)).cuda()
-        if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
-            dis_neg_eids_feat = dis_neg_eids_feat.cpu().pin_memory()
+        if (self.edge_feat_dim > 0):
+            dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.to(torch.int64)).cuda()
+            if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
+                dis_neg_eids_feat = dis_neg_eids_feat.cpu().pin_memory()
 
         
         self.part_edge_map = torch.cat((self.part_edge_map, dis_neg_eids))
         self.part_edge_map,indices = torch.sort(self.part_edge_map)
         #TODO 当part_edge过大的时候，这里会产生一个较大的显存管理开销
-        self.part_edge_feats = torch.cat((self.part_edge_feats, dis_neg_eids_feat))
-        self.part_edge_feats = self.part_edge_feats[indices]
+        if (self.edge_feat_dim > 0):
+            self.part_edge_feats = torch.cat((self.part_edge_feats, dis_neg_eids_feat))
+            self.part_edge_feats = self.part_edge_feats[indices]
 
         self.time_neg_analyze += time.time() - time_neg_analyze_s
 
@@ -776,17 +782,18 @@ class Feat_buffer:
             #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
             #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
 
-            if (self.edge_feats is not None and self.edge_feats.shape[0] > 0):
-                eid_uni,_ = torch.sort(eid_uni)
+            
+            eid_uni,_ = torch.sort(eid_uni)
+            if (self.edge_feats.shape[0] > 0):
                 cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
                 saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat.pt')
-                saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
+            saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
 
-            if (self.node_feats is not None and self.edge_feats.shape[0] > 0):
-                nid_uni,_ = torch.sort(nid_uni)
+            nid_uni,_ = torch.sort(nid_uni)
+            if (self.node_feats.shape[0] > 0):
                 cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
                 saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat.pt')
-                saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
+            saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
 
             sampleTime = time.time() - start
             # mfgs = sampler.gen_mfgs(ret_list)

@@ -22,22 +22,34 @@ node_num = max(torch.max(src), torch.max(dst)) + 2
 ind, outd = inDegree(src, dst, node_num)
 
 # topo_res = torch.zeros(node_num, )
+
+
+#测试： LASTFM总共有129W条边，我们直接把前面9w条边处理了
+cut_edge = torch.nonzero(src < 90000)
+
+src[cut_edge] = node_num - 1
+dst[cut_edge] = node_num - 1
+ind, outd = inDegree(src, dst, node_num)
+# cut_node_dst = dst[cut_edge]
+print(f"释放了{cut_edge.shape[0]}条边")
+
+
 import time
 #找到当前入度为0的节点，用作训练的正边
-# while True:
-#     # time.sleep(0.1)
+while True:
+    # time.sleep(0.1)
 
 
-#     cut_node = torch.nonzero(ind == 0).reshape(-1)
-#     # ind[cut_node] = -1
-#     cut_edge = torch.nonzero(torch.isin(src, cut_node)).reshape(-1)
+    cut_node = torch.nonzero(ind == 0).reshape(-1)
+    # ind[cut_node] = -1
+    cut_edge = torch.nonzero(torch.isin(src, cut_node)).reshape(-1)
 
-#     src[cut_edge] = node_num - 1
-#     dst[cut_edge] = node_num - 1
-#     ind, outd = inDegree(src, dst, node_num)
-#     # cut_node_dst = dst[cut_edge]
-#     print(f"释放了{cut_edge.shape[0]}条边")
-#     # ind[cut_node_dst.long()] -= 1
+    src[cut_edge] = node_num - 1
+    dst[cut_edge] = node_num - 1
+    ind, outd = inDegree(src, dst, node_num)
+    # cut_node_dst = dst[cut_edge]
+    print(f"释放了{cut_edge.shape[0]}条边")
+    # ind[cut_node_dst.long()] -= 1
 
 import torch
 import networkx as nx

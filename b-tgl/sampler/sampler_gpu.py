@@ -8,7 +8,7 @@ from utils import emptyCache
 class Sampler_GPU:
     def __init__(self, g, fan_nums, layer, emb_buffer = None):
 
-        if (layer < 2 or g['indices'].shape[0] < 100000000):
+        if ((not g['indices'].shape[0] > 1000000000) and (layer < 2 or g['indices'].shape[0] < 100000000)):
             self.indptr = torch.from_numpy(g['indptr']).cuda().to(torch.int32)
             self.indices = torch.from_numpy(g['indices']).to(torch.int32).cuda()
             self.totalts = torch.from_numpy(g['ts']).to(torch.float32).cuda()

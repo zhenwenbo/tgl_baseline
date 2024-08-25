@@ -6,7 +6,7 @@ Orca/
 WinGNN/
 TimeSGN/
 models/
-intervals/
+intervals*/
 build/
 __pycache__/
 *.log

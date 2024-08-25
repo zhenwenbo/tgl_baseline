@@ -21,7 +21,7 @@ from utils import *
 from sampler.sampler import *
 
 
-d = 'MAG'
+d = 'TALK'
 batch_size = 2000
 df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
 g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
@@ -38,7 +38,7 @@ else:
 
 
 from sampler.sampler_gpu import *
-fan_nums = [10]
+fan_nums = [10,10]
 layers = len(fan_nums)
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 

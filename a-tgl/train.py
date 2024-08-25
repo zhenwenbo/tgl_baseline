@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--data', type=str, help='dataset name', default='MAG')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -186,6 +186,16 @@ for e in range(train_param['epoch']):
     time_tot = 0
     total_loss = 0
     time_per_batch = 0
+
+
+    
+    time_total_prep = 0
+    time_total_strategy = 0
+    time_total_compute = 0
+    time_total_update = 0
+    time_total_epoch = 0
+    time_total_epoch_s = time.time()
+
     # training
     model.train()
     if sampler is not None:
@@ -195,6 +205,7 @@ for e in range(train_param['epoch']):
         model.memory_updater.last_updated_nid = None
     for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
         t_tot_s = time.time()
+        time_total_prep_s = time.time()
         root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
         ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
         if sampler is not None:
@@ -208,7 +219,7 @@ for e in range(train_param['epoch']):
 
         if (batch_num % 1000 == 0):
             print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
-            print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
+            print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s")
 
             time_per_batch = 0
 
@@ -223,8 +234,9 @@ for e in range(train_param['epoch']):
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0])
         time_prep += time.time() - t_prep_s
+        time_total_prep += time.time() - time_total_prep_s
 
-
+        time_total_compute_s = time.time()
         optimizer.zero_grad()
         pred_pos, pred_neg = model(mfgs)
         loss = creterion(pred_pos, torch.ones_like(pred_pos))
@@ -232,9 +244,10 @@ for e in range(train_param['epoch']):
         total_loss += float(loss) * train_param['batch_size']
         loss.backward()
         optimizer.step()
-
+        time_total_compute += time.time() - time_total_compute_s
 
         t_prep_s = time.time()
+        time_total_update_s = time.time()
         if mailbox is not None:
             eid = rows['Unnamed: 0'].values
             mem_edge_feats = edge_feats[eid] if edge_feats is not None else None
@@ -245,11 +258,15 @@ for e in range(train_param['epoch']):
             mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
             mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
         time_prep += time.time() - t_prep_s
-
+        time_total_update += time.time() - time_total_update_s
 
         time_tot += time.time() - t_tot_s
         time_per_batch += time.time() - t_tot_s
 
+    time_total_epoch += time.time() - time_total_epoch_s
+    time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+    print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+    print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
     if (args.model_eval):
         ap, auc = eval('val')
         if e > 2 and ap > best_ap:

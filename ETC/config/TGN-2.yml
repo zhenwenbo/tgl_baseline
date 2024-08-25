@@ -9,9 +9,14 @@ sampling:
     duration: 0
     num_thread: 8
 memory: 
-  - type: 'none'
-    dim_out: 0
-    mailbox_size: 0
+  - type: 'node'
+    dim_time: 100
+    deliver_to: 'self'
+    mail_combine: 'last'
+    memory_update: 'gru'
+    mailbox_size: 1
+    combine_node_feature: True
+    dim_out: 100
 gnn:
   - arch: 'transformer_attention'
     layer: 2
@@ -19,10 +24,9 @@ gnn:
     dim_time: 100
     dim_out: 100
 train:
-  - epoch: 2
+  - epoch: 5
     batch_size: 2000
     lr: 0.0001
-    dropout: 0.1
-    att_dropout: 0.1
-    interval_to_gpu: False
-    pre_load: False
+    dropout: 0.2
+    att_dropout: 0.2
+    all_on_gpu: False
