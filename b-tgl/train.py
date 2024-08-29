@@ -13,7 +13,7 @@ from utils import emptyCache
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -21,7 +21,7 @@ parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
-parser.add_argument('--train_conf', type=str, default='basic_eval', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='basic_conf', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -35,7 +35,7 @@ config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
 
 if (sample_param['layer'] == 1):
-    args.pre_sample_size = 600000
+    args.pre_sample_size = 60000
 else:
     if (args.data == 'STACK'):
         args.pre_sample_size = 60000
@@ -97,23 +97,35 @@ def eval(mode='val'):
     model.eval()
     aps = list()
     aucs_mrrs = list()
+
     if mode == 'val':
-        eval_df = df[train_edge_end:val_edge_end]
+        left = df_conf['train_edge_end']
+        eval_df_end = val_edge_end
     elif mode == 'test':
-        eval_df = df[val_edge_end:]
+        left = df_conf['val_edge_end']
+        eval_df_end = datas['src'].shape[0]
         neg_samples = args.eval_neg_samples
     elif mode == 'train':
-        eval_df = df[:train_edge_end]
+        left = 0
+        eval_df_end = df_conf['train_edge_end']
     with torch.no_grad():
         total_loss = 0
-        for _, rows in eval_df.groupby(eval_df.index // train_param['batch_size']):
-            root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows) * neg_samples)]).astype(np.int32)
-            ts = np.tile(rows.time.values, neg_samples + 2).astype(np.float32)
+
+        while True:
+            right += batch_size
+            right = min(right, eval_df_end)
+            if (left >= right):
+                break
+
+            src = datas['src'][left: right]
+            dst = datas['dst'][left: right]
+            times = datas['time'][left: right]
+            eid = datas['eid'][left: right]
+            root_nodes = np.concatenate([src, dst, neg_link_sampler.sample(src.shape[0] * neg_samples)]).astype(np.int32)
+            ts = np.tile(times, neg_samples + 2).astype(np.float32)
             
             if (use_gpu_sample):
                 root_nodes = torch.from_numpy(root_nodes).cuda()
-                mask_nodes = torch.from_numpy(np.concatenate([rows.dst.values, rows.src.values]).astype(np.int32)).cuda()
-                mask_nodes = torch.cat((mask_nodes, (torch.zeros(rows.src.values.shape[0], dtype = torch.int32, device = 'cuda:0') - 1)))
                 root_ts = torch.from_numpy(ts).cuda()
                 ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
             else:
@@ -149,13 +161,16 @@ def eval(mode='val'):
             else:
                 aucs_mrrs.append(roc_auc_score(y_true, y_pred))
             if mailbox is not None:
-                eid = torch.from_numpy(rows['Unnamed: 0'].values).cuda().to(torch.int32)
+                eid = torch.from_numpy(eid).cuda().to(torch.int32)
                 mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
                 block = None
                 if memory_param['deliver_to'] == 'neighbors':
                     block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
                 mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block, neg_samples=neg_samples)
                 mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts, neg_samples=neg_samples)
+            
+            left = right
+
         if mode == 'val':
             val_losses.append(float(total_loss))
     ap = float(torch.tensor(aps).mean())
@@ -203,16 +218,13 @@ if __name__ == '__main__':
     if (not args.use_ayscn_prefetch):
         node_feats, edge_feats = load_feat(args.data)
     
-    g, df = load_graph(args.data)
+    g, datas, df_conf = load_graph_bin(args.data)
 
     #TODO GDELT改fanout为[7,7]
     # sample_param['neighbor'] = [7,7]
-    if (args.data in ['BITCOIN']):
-        train_edge_end = 86063713
-        val_edge_end = 110653345
-    else:
-        train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-        val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+
+    train_edge_end = df_conf['train_edge_end']
+    val_edge_end = df_conf['val_edge_end']
 
     if args.use_inductive:
         inductive_inds = get_inductive_links(df, train_edge_end, val_edge_end)
@@ -269,11 +281,14 @@ if __name__ == '__main__':
 
     #TODO presample_batch = 100
     emb_buffer = None
-    if (not args.no_emb_buffer):
-        emb_buffer = Embedding_buffer(g, df, train_param, train_edge_end, 100, args.dis_threshold, sample_param['neighbor'], gnn_param, neg_link_sampler)
+    # if (not args.no_emb_buffer):
+    #     emb_buffer = Embedding_buffer(g, df, train_param, train_edge_end, 100, args.dis_threshold, sample_param['neighbor'], gnn_param, neg_link_sampler)
     # no_neg = True
     sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], emb_buffer)
-
+    node_num = g['indptr'].shape[0] - 1
+    g = None
+    del g
+    emptyCache()
 
     import torch.multiprocessing as multiprocessing
     multiprocessing.set_start_method("spawn")
@@ -309,7 +324,7 @@ if __name__ == '__main__':
 
     model = GeneralModel(gnn_dim_node, gnn_dim_edge, sample_param, memory_param, gnn_param, train_param, emb_buffer, combined=combine_first).cuda()
 
-    mailbox = MailBox(memory_param, g['indptr'].shape[0] - 1, gnn_dim_edge, prefetch_conn=prefetch_conn) if memory_param['type'] != 'none' else None
+    mailbox = MailBox(memory_param, node_num, gnn_dim_edge, prefetch_conn=prefetch_conn) if memory_param['type'] != 'none' else None
     creterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=train_param['lr'])
 
@@ -344,23 +359,7 @@ if __name__ == '__main__':
     best_ap = 0
     best_e = 0
     val_losses = list()
-    group_indexes = list()
-    group_indexes.append(np.array(df[:train_edge_end].index // train_param['batch_size']))
 
-
-    if 'reorder' in train_param:
-        # random chunk shceduling
-        reorder = train_param['reorder']
-        group_idx = list()
-        for i in range(reorder):
-            group_idx += list(range(0 - i, reorder - i))
-        group_idx = np.repeat(np.array(group_idx), train_param['batch_size'] // reorder)
-        group_idx = np.tile(group_idx, train_edge_end // train_param['batch_size'] + 1)[:train_edge_end]
-        group_indexes.append(group_indexes[0] + group_idx)
-        base_idx = group_indexes[0]
-        for i in range(1, train_param['reorder']):
-            additional_idx = np.zeros(train_param['batch_size'] // train_param['reorder'] * i) - 1
-            group_indexes.append(np.concatenate([additional_idx, base_idx])[:base_idx.shape[0]])
 
 
 
@@ -370,10 +369,12 @@ if __name__ == '__main__':
     train_neg_sampler = None
     if (config.part_neg_sample):
         train_neg_sampler = TrainNegLinkSampler(g['indptr'].shape[0] - 1, g['indptr'][-1])
+    elif (config.use_disk):
+        train_neg_sampler = ReNegLinkSampler(node_num, 0.9)
     else:
         train_neg_sampler = neg_link_sampler
         
-    feat_buffer = Feat_buffer(args.data, g, df, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
+    feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
                               sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
     if (not use_ayscn_prefetch):
         feat_buffer.init_feat(node_feats, edge_feats)
@@ -415,11 +416,23 @@ if __name__ == '__main__':
 
         sampleTime = 0
         startTime = time.time()
-        # test = df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)])
-        # test1 = df[:train_edge_end].groupby(1)
+
         #TODO 此处reorder是干嘛的?
         sampler_gpu.mask_time = 0
-        for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
+        left, right = 0, 0
+        batch_num = 0
+        batch_size = train_param['batch_size']
+        while True:
+            right += batch_size
+            right = min(train_edge_end, right)
+            if (left >= right):
+                break
+
+            src = datas['src'][left: right]
+            dst = datas['dst'][left: right]
+            times = datas['time'][left: right]
+            eid = datas['eid'][left: right]
+
             loopTime = time.time()
             t_tot_s = time.time()
             time_presample_s = time.time()
@@ -435,11 +448,11 @@ if __name__ == '__main__':
                     feat_buffer.print_time()
                 time_per_batch = 0
 
-            if (emb_buffer and emb_buffer.use_buffer):
-                emb_buffer.cur_mode = 'presample'
-                emb_buffer.run_batch(batch_num)
+            # if (emb_buffer and emb_buffer.use_buffer):
+            #     emb_buffer.cur_mode = 'presample'
+            #     emb_buffer.run_batch(batch_num)
 
-                emb_buffer.cur_mode = 'train'
+            #     emb_buffer.cur_mode = 'train'
             time_presample += time.time() - time_presample_s
 
             # emptyCache()
@@ -448,8 +461,9 @@ if __name__ == '__main__':
             neg_start = (batch_num % feat_buffer.presample_batch) * train_param['batch_size']
             neg_end = min(feat_buffer.neg_sample_nodes.shape[0], ((batch_num % feat_buffer.presample_batch) + 1) * train_param['batch_size'])
             neg_sample_nodes = feat_buffer.neg_sample_nodes[neg_start: neg_end]
-            root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_sample_nodes]).astype(np.int32)
-            ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
+
+            root_nodes = np.concatenate([src, dst, neg_sample_nodes]).astype(np.int32)
+            ts = np.concatenate([times, times, times]).astype(np.float32)
             
             t_sample_s = time.time()
             if (use_gpu_sample):
@@ -532,8 +546,10 @@ if __name__ == '__main__':
             if mailbox is not None:
                 
                 
-                # eid = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
-                eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
+                eid = eid.cuda()
+                # eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
+                # TODO 这个mem_edge_feats一定在part_edge_feat中吗？存疑...
+                # TODO 经过验证他不在...
                 mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
                 block = None
                 if memory_param['deliver_to'] == 'neighbors':
@@ -554,6 +570,9 @@ if __name__ == '__main__':
             # print(f"one loop time: {time.time() - loopTime:.4f}")
 
             time_per_batch += time.time() - t_tot_s
+
+            left = right
+            batch_num += 1
 
         print(f"total loop use time: {time.time() - startTime:.4f}")
         print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\

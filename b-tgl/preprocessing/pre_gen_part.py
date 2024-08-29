@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -14,7 +14,7 @@ parser.add_argument('--use_ayscn_prefetch', action='store_true', default=False)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--pre_sample_size', type=int, default=600000, help='pre sample size')
+parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -216,7 +216,7 @@ if __name__ == '__main__':
     # gpu_sampler = Sampler_GPU(g, 10)
 
 
-    feat_buffer = Feat_buffer(args.data, g, df, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
+    feat_buffer = Feat_buffer(args.data, df, None, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
                               sampler_gpu,neg_link_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
     if (not use_ayscn_prefetch):
         feat_buffer.init_feat(node_feats, edge_feats)

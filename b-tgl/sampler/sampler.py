@@ -16,6 +16,33 @@ class NegLinkSampler:
     def sample(self, n):
         return np.random.randint(self.num_nodes, size=n)
     
+
+class ReNegLinkSampler:
+
+    pre_res = None
+    ratio = 1
+
+    def __init__(self, num_nodes, ratio):
+        self.ratio = ratio
+        print(f"重放负采样，重放比例为 {self.ratio}")
+        self.num_nodes = num_nodes
+
+    def sample(self, n):
+        
+        cur_res = np.random.randint(self.num_nodes, size=n)
+        if (self.pre_res is not None):
+            #将上一次pre_res中的百分之k 随机替换到cur_res中
+            pre_ind = np.random.randint(self.pre_res.shape[0], size = int(cur_res.shape[0] * self.ratio))
+            cur_ind = torch.randperm((cur_res.shape[0]), dtype = torch.int32)[:int(cur_res.shape[0]  * self.ratio)].numpy()
+
+            cur_res[cur_ind] = self.pre_res[pre_ind]
+            # cur_res[]   
+            sameNum = np.sum(np.isin(cur_res, self.pre_res))
+
+            # print(f'相同的负采样节点个数: {sameNum} 占比: {sameNum / n * 100:.2f}%')
+        self.pre_res = cur_res
+        return cur_res
+
 import math
 from config.train_conf import *
 class TrainNegLinkSampler:

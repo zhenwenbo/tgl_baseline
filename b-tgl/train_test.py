@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -21,7 +21,7 @@ from config.train_conf import *
 GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
 args.use_ayscn_prefetch = config.use_ayscn_prefetch
-args.pre_sample_size = config.pre_sample_size
+args.pre_sample_size = 600000
 args.cut_zombie = config.cut_zombie
 
 if (hasattr(config, 'model')):
@@ -120,7 +120,7 @@ def eval(mode='val'):
                 else:
                     mfgs = node_to_dgl_blocks(root_nodes, ts)  
                     
-            mfgs = prepare_input(mfgs, feat_buffer = feat_buffer, combine_first=combine_first)
+            mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
             
             if mailbox is not None:
                 mailbox.prep_input_mails(mfgs[0])
@@ -182,10 +182,12 @@ def count_judge(src_node, dst_node):
     print(f"出现的最长的依赖长度为{maxLen},依赖链总长度为{countLen}")
 
 # set_seed(0)
-
 if __name__ == '__main__':
-
+    
+    
+    global node_feats, edge_feats
     node_feats, edge_feats = None,None
+
     if (not args.use_ayscn_prefetch):
         node_feats, edge_feats = load_feat(args.data)
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
@@ -231,7 +233,6 @@ if __name__ == '__main__':
     use_gpu_sample = True
     no_neg = 'no_neg' in sample_param and sample_param['no_neg']
     from emb_buffer import *
-
 
     if args.use_inductive:
         test_df = df[val_edge_end:]
@@ -338,10 +339,15 @@ if __name__ == '__main__':
     from feat_buffer import *
     # gpu_sampler = Sampler_GPU(g, 10)
 
+    use_reNegSample = True
     train_neg_sampler = None
     if (config.part_neg_sample):
         train_neg_sampler = TrainNegLinkSampler(g['indptr'].shape[0] - 1, g['indptr'][-1])
+    elif use_reNegSample:
+        print(f"使用重放负采样")
+        train_neg_sampler = ReNegLinkSampler(g['indptr'].shape[0] - 1)
     else:
+        print(f"使用常规负采样")
         train_neg_sampler = neg_link_sampler
         
     feat_buffer = Feat_buffer(args.data, g, df, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
@@ -350,6 +356,7 @@ if __name__ == '__main__':
         feat_buffer.init_feat(node_feats, edge_feats)
     # feat_buffer.gen_part()
 
+    val_ap, test_ap = [], []
 
     for e in range(train_param['epoch']):
         print('Epoch {:d}:'.format(e))
@@ -389,9 +396,9 @@ if __name__ == '__main__':
             feat_buffer.run_batch(batch_num)
 
             if (args.data in ['GDELT', 'STACK', 'TALK'] and batch_num % 1000 == 0):
-                print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
-                print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
-                    loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+                # print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+                # print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
+                #     loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
                 if (feat_buffer):
                     feat_buffer.print_time()
                 time_per_batch = 0
@@ -513,9 +520,9 @@ if __name__ == '__main__':
 
             time_per_batch += time.time() - t_tot_s
 
-        print(f"total loop use time: {time.time() - startTime:.4f}")
-        print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
-               loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+        # print(f"total loop use time: {time.time() - startTime:.4f}")
+        # print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
+        #        loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
         feat_buffer.mode = 'val'
         feat_buffer.refresh_memory()
 
@@ -523,12 +530,13 @@ if __name__ == '__main__':
             continue
         eval_time_s = time.time()
         ap, auc = eval('val')
+        val_ap.append(f'{ap:.6f}')
         
         if e > 2 and ap > best_ap:
             best_e = e
             best_ap = ap
             torch.save(model.state_dict(), path_saver)
-        print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}, eval time: {:.2f}'.format(total_loss, ap, auc, time.time() - eval_time_s))
+        # print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}, eval time: {:.2f}'.format(total_loss, ap, auc, time.time() - eval_time_s))
         # print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
 
@@ -548,11 +556,12 @@ if __name__ == '__main__':
                     eval('train')
                     eval('val')
                 ap, auc = eval('test')
-                if args.eval_neg_samples > 1:
-                    print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
-                else:
-                    print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
-    
+                # if args.eval_neg_samples > 1:
+                #     print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
+                # else:
+                #     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
+                test_ap.append(f'{ap:.6f}')
+        print(f'val: {val_ap}; test: {test_ap}')
     if (args.model_eval):
         print('Loading model at epoch {}...'.format(best_e))
         model.load_state_dict(torch.load(path_saver))

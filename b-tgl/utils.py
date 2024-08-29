@@ -6,6 +6,7 @@ import time
 import pandas as pd
 import numpy as np
 import gc
+import json
 
 def cuda_GB():
     return f"{torch.cuda.memory_allocated() / 1024**3:.4f}GB"
@@ -45,15 +46,109 @@ def emptyCache():
     torch.cuda.empty_cache()
     gc.collect()
 
+#在当前目录下保存这个tensor的数据类型以及所处容器(cpu or cuda)以便恢复
 def saveBin(tensor,savePath,addSave=False):
 
-    directory = os.path.dirname(savePath)
+    savePath = savePath.replace('.pt','.bin')
+    dir = os.path.dirname(savePath)
+    if(not os.path.exists(dir)):
+        os.makedirs(dir)
+    json_path = dir + '/saveBinConf.json'
+    
+    tensor_info = {
+        'dtype': str(tensor.dtype).replace('torch.',''),
+        'device': str(tensor.device),
+        'shape': (tensor.shape)
+    }
 
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    try:
+        with open(json_path, 'r') as f:
+            config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        config = {}
+    
+    config[savePath] = tensor_info
+    with open(json_path, 'w') as f:
+        json.dump(config, f, indent=4)
 
-    torch.save(tensor, savePath)
+    if isinstance(tensor, torch.Tensor):
+        tensor.cpu().numpy().tofile(savePath)
+    elif isinstance(tensor, np.ndarray):
+        tensor.tofile(savePath)
 
+
+
+confs = {}
+
+def loadConf(path):
+    directory = os.path.dirname(path)
+    json_path = directory + '/saveBinConf.json'
+    with open(json_path, 'r') as f:
+        res = json.load(f)
+    confs[directory] = res
+
+    return res
+
+def loadBin(path):
+    path = path.replace('.pt', '.bin')
+    directory = os.path.dirname(path)
+    if directory not in confs:
+        loadConf(path)
+
+    cur_conf = confs[directory][path]
+    res = torch.from_numpy(np.fromfile(path, dtype = getattr(np, cur_conf['dtype']))).to(cur_conf['device']).reshape(cur_conf['shape'])
+    return res
+
+def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=10):
+    # 利用 numpy 的内存映射函数来映射整个文件
+    data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
+    result = []
+
+    for i in range(0, len(indices), batch_size):
+        batch_indices = indices[i:i+batch_size]
+        # 批量读取
+        batch_data = data[batch_indices, :]
+        result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
+    
+    # 将结果合并成一个tensor
+    if (len(result) == 0):
+        return torch.from_numpy(np.empty(0, dtype=dtype))
+    return torch.cat(result, dim=0).reshape(-1, shape[1])
+
+def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float32):
+
+    shape = (feat_len,)
+    row_bytes = np.prod(shape) * dtype().itemsize
+    
+    data = []
+    with open(file_path, 'rb') as f:
+        for idx in indices:
+            # 计算偏移量
+            offset = idx * row_bytes
+            f.seek(offset)
+            
+            # 读取一行数据
+            row_data = np.fromfile(f, dtype=dtype, count=np.prod(shape))
+            row_data = row_data.reshape(shape)
+            
+            data.append(row_data)
+    
+    return torch.from_numpy(np.array(data))
+
+def loadBinDisk(path, ind):
+    path = path.replace('.pt', '.bin')
+    directory = os.path.dirname(path)
+    if directory not in confs:
+        loadConf(path)
+
+    cur_conf = confs[directory][path]
+    ind = ind.cpu()
+    read_disk_s = time.time()
+    # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
+    
+    res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']))
+    print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape}")
+    return res
 
 def gen_feat(d, rand_de=0, rand_dn=0):
     path = f'/raid/guorui/DG/dataset/{d}'
@@ -116,9 +211,32 @@ def load_graph(d):
     else:
         df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
 
+    # datas = {}
+    # base_path = f'/raid/guorui/DG/dataset/{d}'
+    # datas['src'] = loadBin(f'{base_path}/df-src.bin')
+    # datas['dst'] = loadBin(f'{base_path}/df-dst.bin')
+    # datas['time'] = loadBin(f'{base_path}/df-time.bin')
+    # datas['eid'] = loadBin(f'{base_path}/df-eid.bin')
 
     g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
     return g, df
+
+
+def load_graph_bin(d):
+    datas = {}
+    base_path = f'/raid/guorui/DG/dataset/{d}'
+    datas['src'] = loadBin(f'{base_path}/df-src.bin')
+    datas['dst'] = loadBin(f'{base_path}/df-dst.bin')
+    datas['time'] = loadBin(f'{base_path}/df-time.bin')
+    datas['eid'] = loadBin(f'{base_path}/df-eid.bin')
+
+    json_path = f'/raid/guorui/DG/dataset/{d}/df-conf.json'
+
+    with open(json_path, 'r') as f:
+        df_conf = json.load(f)
+
+    g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
+    return g, datas, df_conf
 
 def parse_config(f):
     conf = yaml.safe_load(open(f, 'r'))

@@ -18,6 +18,8 @@ class Sampler_GPU:
             self.indices = torch.from_numpy(g['indices']).to(torch.int32).pin_memory()
             self.totalts = torch.from_numpy(g['ts']).to(torch.float32).pin_memory()
             self.totaleid = torch.from_numpy(g['eid']).to(torch.int32).pin_memory()
+        
+        # del g
         # self.indices = torch.from_numpy(g['indices']).to(torch.int32).cuda()
         # self.totalts = torch.from_numpy(g['ts']).to(torch.float32).cuda()
         # self.totaleid = torch.from_numpy(g['eid']).to(torch.int32).cuda()

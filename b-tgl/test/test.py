@@ -414,3 +414,133 @@ indptr = sampler_gpu.indptr
 totaleid = sampler_gpu.totaleid
 totalts = sampler_gpu.totalts
 indices = sampler_gpu.indices
+
+
+
+import torch
+import os
+import json
+def saveBin(tensor,savePath,addSave=False):
+
+    savePath = savePath.replace('.pt','.bin')
+    dir = os.path.dirname(savePath)
+    if(not os.path.exists(dir)):
+        os.makedirs(dir)
+    json_path = dir + '/saveBinConf.json'
+    
+    tensor_info = {
+        'dtype': str(tensor.dtype).replace('torch.',''),
+        'device': str(tensor.device),
+        'shape': (tensor.shape)
+    }
+
+    try:
+        with open(json_path, 'r') as f:
+            config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        config = {}
+    
+    config[savePath] = tensor_info
+    with open(json_path, 'w') as f:
+        json.dump(config, f, indent=4)
+
+    if isinstance(tensor, torch.Tensor):
+        tensor.cpu().numpy().tofile(savePath)
+    elif isinstance(tensor, np.ndarray):
+        tensor.tofile(savePath)
+data = 'GDELT'
+path = f'/raid/guorui/DG/dataset/{data}/edge_features.pt'
+tensor = torch.load(path)
+saveBin(tensor, path)
+
+path = f'/raid/guorui/DG/dataset/{data}/node_features.pt'
+tensor = torch.load(path)
+saveBin(tensor, path)
+
+
+import numpy as np
+
+def read_binary_file_indices(file_path, indices, shape=(172,), dtype=np.float32):
+    """
+    从二进制文件中读取特定索引的数据。
+
+    Args:
+        file_path (str): 文件路径。
+        indices (list or np.array): 要读取的行索引。
+        shape (tuple): 每行数据的形状，默认为(172,)。
+        dtype (numpy.dtype): 数据类型，默认为np.int32。
+
+    Returns:
+        np.ndarray: 请求索引对应的数据。
+    """
+    # 计算每一行的字节大小
+    row_bytes = np.prod(shape) * dtype().itemsize
+    
+    data = []
+    with open(file_path, 'rb') as f:
+        for idx in indices:
+            # 计算偏移量
+            offset = idx * row_bytes
+            f.seek(offset)
+            
+            # 读取一行数据
+            row_data = np.fromfile(f, dtype=dtype, count=np.prod(shape))
+            row_data = row_data.reshape(shape)
+            
+            data.append(row_data)
+    
+    return np.array(data)
+
+# 使用示例
+# import torch
+# file_path = '/raid/guorui/DG/dataset/STACK/edge_features.bin'
+# indices = np.random.randint(0,60000000,size=20000)
+# indices = np.concatenate((indices, indices+1, indices+2, indices+3, indices+4))
+# indices = np.sort(indices)
+# import time
+# start = time.time()
+# data = torch.from_numpy(read_binary_file_indices(file_path, indices))
+# print(f"读取用时{time.time() - start:.3f}s")
+# print(data.shape)
+
+
+
+import numpy as np
+import torch
+
+def read_data_from_file(file_path, indices, shape=(60000000, 172), dtype=np.float32, batch_size=10):
+    # 利用 numpy 的内存映射函数来映射整个文件
+    data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
+    
+    result = []
+    
+    # 处理索引，分批读取
+    for i in range(0, len(indices), batch_size):
+        batch_indices = indices[i:i+batch_size]
+        # 批量读取
+        batch_data = data[batch_indices, :]
+        result.append(torch.tensor(batch_data))  # 转换为torch tensor
+    
+    # 将结果合并成一个tensor
+    return torch.cat(result, dim=0)
+
+import torch
+file_path = '/raid/guorui/DG/dataset/STACK/edge_features.bin'
+indices = np.random.randint(0,60000000,size=100000)
+# indices = np.concatenate((indices, indices+1, indices+2, indices+3, indices+4))
+indices = np.sort(indices)
+import time
+start = time.time()
+data = read_data_from_file(file_path, indices)
+print(f"读取用时{time.time() - start:.3f}s")
+print(data.shape)
+# result现在是包含指定索引数据的torch tensor
+
+start = time.time()
+data1 = torch.from_numpy(read_binary_file_indices(file_path, indices))
+print(f"读取用时{time.time() - start:.3f}s")
+print(data1.shape)
+
+# memmap有额外内存开销速度快，尤其是针对数据比较连续的情况下更快 （但是也有可能memmap走了系统缓存，纯离散读没有走）
+# 后面两者都测试一遍... （也许也可以写论文里?）
+

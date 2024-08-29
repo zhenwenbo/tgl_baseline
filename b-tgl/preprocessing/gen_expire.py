@@ -74,7 +74,6 @@ def gen_expire(args):
     end_ptr = 0
 
     map = torch.zeros(max_edge_num, dtype = torch.int32, device = 'cuda:0') + (2**31 - 1) 
-    #TODO 此处是为了map排序后未写入的节点不会影响 若出现int32无法存储的eid，则无法运行
 
     exp_eids = None
 
@@ -95,7 +94,7 @@ def gen_expire(args):
 
         cur_eids = torch.arange(start_eid, end_eid, dtype = torch.int32, device='cuda:0')
         cur_edge_feat = edge_feats[cur_eids.cpu().long()]
-        torch.save(cur_edge_feat.cpu(), part_path + f'/part{cur_batch}_edge_incre.pt')
+        saveBin(cur_edge_feat.cpu(), part_path + f'/part{cur_batch}_edge_incre.pt')
         #TODO incre feat可以和gen_part里的正边采样出的边特征合作一下
 
         replace_idx = None
@@ -152,9 +151,9 @@ def gen_expire(args):
                 map[replace_idx] = cur_eids
                 # break
 
-        torch.save(map.cpu(), part_path + f'/part{cur_batch}_edge_incre_map.pt')
+        saveBin(map.cpu(), part_path + f'/part{cur_batch}_edge_incre_map.pt')
         if (replace_idx is not None):
-            torch.save(replace_idx.cpu(), part_path + f'/part{cur_batch}_edge_incre_replace.pt')
+            saveBin(replace_idx.cpu(), part_path + f'/part{cur_batch}_edge_incre_replace.pt')
 
         start = time.time()
         expired_clone = expired.clone()
@@ -222,8 +221,8 @@ import os
 import json
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='WIKI')
-parser.add_argument('--bs', type=int, help='batch size', default='600000')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--bs', type=int, help='batch size', default='60000')
 parser.add_argument('--zombie_block', type=int, help='zombie block', default='2')
 args=parser.parse_args()
 

@@ -14,10 +14,10 @@ import multiprocessing
 import json
 
 class Feat_buffer:
-    def __init__(self, d, g, df, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, prefetch_conn = None, feat_dim = None):
+    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, prefetch_conn = None, feat_dim = None):
         self.d = d
-        self.g = g
         self.df = df
+        self.datas = datas
         self.sampler = sampler
         self.neg_sampler = neg_sampler
         self.presample_batch = presample_batch
@@ -79,8 +79,8 @@ class Feat_buffer:
 
         self.share_edge_num = 3000000 #TODO 动态扩容share tensor
         # if (d == 'STACK' or d == ''):
-        self.share_edge_num = 40000000 #TODO 动态扩容share tensor
-        self.share_node_num = 10000000
+        self.share_edge_num = 2000000 #TODO 动态扩容share tensor
+        self.share_node_num = 2000000
 
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
@@ -91,6 +91,17 @@ class Feat_buffer:
         self.preFetchDataCache = Queue()
         self.cur_block = 0
         self.config = GlobalConfig()
+        self.use_disk = self.config.use_disk
+        if (self.use_disk):
+            self.edge_feats_path = f'/raid/guorui/DG/dataset/{self.d}/edge_features.bin'
+            self.node_feats_path = f'/raid/guorui/DG/dataset/{self.d}/node_features.bin'
+
+            if ('mailbox_size' in memory_param):
+                self.memory_shape = [memory_param['dim_out']]
+                self.memory_ts_shape = [1]
+                self.mailbox_shape = [memory_param['mailbox_size'], 2 * memory_param['dim_out'] + self.edge_feat_dim]
+                self.mailbox_ts_shape = [memory_param['mailbox_size']]
+        
 
         self.use_ayscn = self.config.use_ayscn_prefetch
 
@@ -162,7 +173,7 @@ class Feat_buffer:
 
         #TODO 这里预先开辟1GB内存的 共享内存用于select_index
         #TODO 为APAN的mailbox，这里提高10倍给mailbox用
-        self.share_tmp_tensor = torch.zeros(3000000000).share_memory_()
+        self.share_tmp_tensor = torch.zeros(300000000).share_memory_()
         shared_tensor = (*shared_tensor, self.share_tmp_tensor)
 
         self.prefetch_conn.send(('init_share_tensor', (shared_tensor,)))
@@ -186,11 +197,13 @@ class Feat_buffer:
         self_v = getattr(self,name, None)
         if (self_v is not None):
             return self_v[indices]
+        elif (name in ['node_feats', 'edge_feats'] and self.use_disk):
+            result = loadBinDisk(getattr(self, f'{name}_path'), indices)
         else:
             self.prefetch_conn.send(('select_index', (name, indices)))
             dim, shape = self.prefetch_conn.recv()
             result = self.share_tmp_tensor[:shape].reshape(dim)
-            return result
+        return result
         
     def update_index(self, name, indices, value):
         self_v = getattr(self,name, None)
@@ -330,10 +343,10 @@ class Feat_buffer:
         neg_eids, _ = torch.sort(neg_eids)
 
         path = self.path
-        pos_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_edge_feat.pt')
-        pos_edge_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_edge_map.pt').cuda()
-        pos_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_node_feat.pt')
-        pos_node_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_node_map.pt').cuda()
+        pos_edge_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_edge_feat.pt')
+        pos_edge_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_edge_map.pt').cuda()
+        pos_node_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_node_feat.pt')
+        pos_node_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{block_num}_node_map.pt').cuda()
 
         table1 = torch.zeros_like(neg_nodes) - 1
         table2 = torch.zeros_like(pos_node_map) - 1
@@ -393,17 +406,6 @@ class Feat_buffer:
 
         #nodes做sort + unique找出最终的indices
 
-    def test(self, pipe):
-        #做CPU开销
-        for i in range(10):
-            time.sleep(1)
-
-            # tensor = torch.arange(1000000000)
-
-            # path = '/raid/guorui/DG/dataset/STACK/part-600000-[10]/part1_edge_feat.pt'
-            test_feats = torch.load(f'/raid/guorui/DG/dataset/STACK/part-600000-[10]/part{i+30}_edge_feat.pt')
-        
-        print(f'test over..')
 
     def move_to_gpu(self, datas, flag=False, use_pin = False):
         res = []
@@ -483,8 +485,6 @@ class Feat_buffer:
                 self.time_analyze += time.time() - time_ana_s
                 self.neg_sample_nodes = self.neg_sample_nodes_async
 
-                #TODO 做测试
-                # self.pool.apply_async(self.test, args=[self.pipe])
             else:
                 #使用异步策略
                 if (self.cur_block == 0):
@@ -510,7 +510,7 @@ class Feat_buffer:
                     self.time_async += time.time() - time_load_s
 
                     if (flag is not None and 'extension' in flag):
-                        print(f"子程序需要扩容,主程序进行share tensor扩容")
+                        print(f"{flag} 子程序需要扩容,主程序进行share tensor扩容")
 
                     self.prefetch_after()
 
@@ -526,7 +526,11 @@ class Feat_buffer:
 
                 neg_info = self.pre_neg_sample(self.cur_block + 1)
                 if (neg_info is not None):
-                    self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map,\
+                    if (self.use_disk):
+                        self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map, self.part_edge_map,\
+                                            (self.path, self.batch_size, self.sampler.fan_nums))))
+                    else:
+                        self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map, None,\
                                             (self.path, self.batch_size, self.sampler.fan_nums))))
                 # self.preFetchExecutor.submit(self.pre_fetch,self.cur_block + 1,\
                 #      memory_info)
@@ -540,18 +544,18 @@ class Feat_buffer:
     def load_part(self, part_num):
         path = self.path
         if (self.edge_feat_dim > 0):
-            self.part_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').cuda()
-        self.part_edge_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
+            self.part_edge_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').cuda()
+        self.part_edge_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
         if (self.node_feat_dim > 0):
-            self.part_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').cuda()
-        self.part_node_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
+            self.part_node_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').cuda()
+        self.part_node_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
 
     def load_part_pin(self, part_num):
         path = self.path
-        self.part_edge_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').pin_memory()
-        self.part_edge_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
-        self.part_node_feats = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').pin_memory()
-        self.part_node_map = torch.load(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
+        self.part_edge_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').pin_memory()
+        self.part_edge_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
+        self.part_node_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').pin_memory()
+        self.part_node_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
 
     def pre_sample(self):
         time_presample_s = time.time()
@@ -560,12 +564,13 @@ class Feat_buffer:
         start = self.cur_batch * self.train_batch_size
         end = min(self.train_edge_end, (self.cur_batch + self.batch_num) * self.train_batch_size)
 
-        df = self.df
+        src = self.datas['src'][start: end]
+        dst = self.datas['dst'][start: end]
+        times = self.datas['time'][start: end]
 
-        rows = df[start:end]
-        self.neg_sample_nodes = self.neg_sampler.sample(len(rows))
-        root_nodes = torch.from_numpy(np.concatenate([rows.src.values, rows.dst.values, self.neg_sample_nodes]).astype(np.int32)).cuda()
-        root_ts = torch.from_numpy(np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)).cuda()
+        self.neg_sample_nodes = self.neg_sampler.sample(src.shape[0])
+        root_nodes = torch.from_numpy(np.concatenate([src, dst, self.neg_sample_nodes]).astype(np.int32)).cuda()
+        root_ts = torch.from_numpy(np.concatenate([times, times, times]).astype(np.float32)).cuda()
 
 
         ret_list = self.sampler.sample_layer(root_nodes, root_ts)
@@ -590,14 +595,11 @@ class Feat_buffer:
         if(start >= end):
             return None
 
-        df = self.df
+        times = self.datas['time'][start: end]
 
-        rows = df[start:end]
-        
-
-        self.neg_sample_nodes_async = self.neg_sampler.sample(len(rows))
+        self.neg_sample_nodes_async = self.neg_sampler.sample((times.shape[0]))
         root_nodes = torch.from_numpy(np.concatenate([self.neg_sample_nodes_async]).astype(np.int32)).cuda()
-        root_ts = torch.from_numpy(np.concatenate([rows.time.values]).astype(np.float32)).cuda()
+        root_ts = torch.from_numpy(np.concatenate([times]).astype(np.float32)).cuda()
 
 
         ret_list = self.sampler.sample_layer(root_nodes, root_ts)
@@ -644,7 +646,14 @@ class Feat_buffer:
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
-        if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory and False):
+        if (self.use_ayscn and self.use_disk):
+            #当异步加载且disk时，仅第一个block需要在当前类给出memory，此时后面block的都在part_memory
+            self.part_memory = torch.zeros([nodes.shape[0]] + self.memory_shape, dtype = torch.float32, device = 'cuda:0')
+            self.part_memory_ts = torch.zeros([nodes.shape[0]], dtype = torch.float32, device = 'cuda:0')
+            self.part_mailbox = torch.zeros([nodes.shape[0]] + self.mailbox_shape, dtype = torch.float32, device = 'cuda:0')
+            self.part_mailbox_ts = torch.zeros([nodes.shape[0]] + self.mailbox_ts_shape, dtype = torch.float32, device = 'cuda:0')
+            
+        elif (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory and False):
             self.part_memory = self.select_index('memory',nodes).pin_memory()
             self.part_memory_ts = self.select_index('memory_ts',nodes).pin_memory()
             self.part_mailbox = self.select_index('mailbox',nodes).pin_memory()
@@ -751,11 +760,12 @@ class Feat_buffer:
             root_nodes = torch.from_numpy(np.concatenate([rows.src.values, rows.dst.values]).astype(np.int32)).cuda()
             root_ts = torch.from_numpy(np.concatenate([rows.time.values, rows.time.values]).astype(np.float32)).cuda()
 
-
+            # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
             start = time.time()
             ret_list = self.sampler.sample_layer(root_nodes, root_ts)
-            eid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
-            nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
+            eid_uni = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
+            nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
+            # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
 
             for ret in ret_list:
                 #找出每层的所有eid即可
@@ -782,7 +792,6 @@ class Feat_buffer:
             #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
             #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
 
-            
             eid_uni,_ = torch.sort(eid_uni)
             if (self.edge_feats.shape[0] > 0):
                 cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))

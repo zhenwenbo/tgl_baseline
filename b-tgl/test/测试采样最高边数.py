@@ -21,8 +21,8 @@ from utils import *
 from sampler.sampler import *
 
 
-d = 'TALK'
-batch_size = 2000
+d = 'STACK'
+batch_size = 60000
 df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
 g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
 
@@ -67,6 +67,8 @@ left = 0
 right = 0
 cur_batch = 0
 
+edge_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{d}/edge_reorder_map.bin')
+
 while True:
     
     
@@ -105,6 +107,8 @@ while True:
 
 
     src,dst,outts,outeid,root_nodes,root_ts,dts = ret_list[0]
+    eid,_ = torch.sort(torch.unique(outeid))
+    eid_reorder,_ = torch.sort(edge_reorder_map[eid.long()])
     cur_edge_num = outeid[outeid > -1].shape[0]
     cur_node_num = torch.unique(torch.cat((root_nodes, src[src>-1]))).shape[0]
 
