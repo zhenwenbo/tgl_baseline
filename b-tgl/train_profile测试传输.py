@@ -13,8 +13,8 @@ from utils import emptyCache
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -380,260 +380,266 @@ if __name__ == '__main__':
         train_neg_sampler = neg_link_sampler
         
     feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
-                              sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge), node_num=node_num)
+                              sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
     if (not use_ayscn_prefetch):
         feat_buffer.init_feat(node_feats, edge_feats)
     # feat_buffer.gen_part()
 
     test_ap, val_ap = [], []
-    for e in range(train_param['epoch']):
-        print('Epoch {:d}:'.format(e))
-        time_sample = 0
-        time_prep = 0
-        time_tot = 0
-        time_feat = 0
-        time_model = 0
-        time_opt = 0
-        time_presample = 0
-        time_gen_dgl = 0
-        total_loss = 0
-        time_per_batch = 0
-        time_update_mem = 0
-        time_update_mail = 0
+    train_param['epoch'] = 1
 
-        time_total_prep = 0
-        time_total_strategy = 0
-        time_total_compute = 0
-        time_total_update = 0
-        time_total_epoch = 0
-        # training
-        time_total_epoch_s = time.time()
-        model.train()
-        feat_buffer.mode = 'train'
-        if sampler is not None:
-            sampler.reset()
-        if mailbox is not None:
-            mailbox.reset()
-            mailbox.set_buffer(feat_buffer)
-            model.memory_updater.last_updated_nid = None
-        if (feat_buffer is not None):
-            feat_buffer.reset()
+    with torch.profiler.profile(use_cuda=True) as prof:
+        for e in range(train_param['epoch']):
+            print('Epoch {:d}:'.format(e))
+            time_sample = 0
+            time_prep = 0
+            time_tot = 0
+            time_feat = 0
+            time_model = 0
+            time_opt = 0
+            time_presample = 0
+            time_gen_dgl = 0
+            total_loss = 0
+            time_per_batch = 0
+            time_update_mem = 0
+            time_update_mail = 0
 
-        sampleTime = 0
-        startTime = time.time()
+            time_total_prep = 0
+            time_total_strategy = 0
+            time_total_compute = 0
+            time_total_update = 0
+            time_total_epoch = 0
+            # training
+            time_total_epoch_s = time.time()
+            model.train()
+            feat_buffer.mode = 'train'
+            if sampler is not None:
+                sampler.reset()
+            if mailbox is not None:
+                mailbox.reset()
+                mailbox.set_buffer(feat_buffer)
+                model.memory_updater.last_updated_nid = None
+            if (feat_buffer is not None):
+                feat_buffer.reset()
 
-        #TODO 此处reorder是干嘛的?
-        sampler_gpu.mask_time = 0
-        left, right = 0, 0
-        batch_num = 0
-        batch_size = train_param['batch_size']
-        while True:
-            right += batch_size
-            right = min(train_edge_end, right)
-            if (left >= right):
-                break
+            sampleTime = 0
+            startTime = time.time()
 
-            src = datas['src'][left: right]
-            dst = datas['dst'][left: right]
-            times = datas['time'][left: right]
-            eid = datas['eid'][left: right]
+            #TODO 此处reorder是干嘛的?
+            sampler_gpu.mask_time = 0
+            left, right = 0, 0
+            batch_num = 0
+            batch_size = train_param['batch_size']
+            while True:
+                right += batch_size
+                right = min(train_edge_end, right)
+                if (left >= right):
+                    break
 
-            loopTime = time.time()
-            t_tot_s = time.time()
-            time_presample_s = time.time()
+                src = datas['src'][left: right]
+                dst = datas['dst'][left: right]
+                times = datas['time'][left: right]
+                eid = datas['eid'][left: right]
 
-            time_total_prep_s = time.time()
-            feat_buffer.run_batch(batch_num)
+                loopTime = time.time()
+                t_tot_s = time.time()
+                time_presample_s = time.time()
 
-            if (batch_num % 1000 == 0):
-                print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
-                print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
-                    loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s  mask_time: {sampler_gpu.mask_time:.4f}s")
-                if (feat_buffer):
-                    feat_buffer.print_time()
-                time_per_batch = 0
+                time_total_prep_s = time.time()
+                feat_buffer.run_batch(batch_num)
+
+                if (batch_num % 1000 == 0):
+                    print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+                    print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
+                        loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s  mask_time: {sampler_gpu.mask_time:.4f}s")
+                    if (feat_buffer):
+                        feat_buffer.print_time()
+                    time_per_batch = 0
+
+                # if (emb_buffer and emb_buffer.use_buffer):
+                #     emb_buffer.cur_mode = 'presample'
+                #     emb_buffer.run_batch(batch_num)
+
+                #     emb_buffer.cur_mode = 'train'
+                time_presample += time.time() - time_presample_s
+
+                # emptyCache()
+                
+                #此处和预采样用一样的负节点
+                neg_start = (batch_num % feat_buffer.presample_batch) * train_param['batch_size']
+                neg_end = min(feat_buffer.neg_sample_nodes.shape[0], ((batch_num % feat_buffer.presample_batch) + 1) * train_param['batch_size'])
+                neg_sample_nodes = feat_buffer.neg_sample_nodes[neg_start: neg_end]
+
+                root_nodes = np.concatenate([src, dst, neg_sample_nodes]).astype(np.int32)
+                ts = np.concatenate([times, times, times]).astype(np.float32)
+                
+                t_sample_s = time.time()
+                if (use_gpu_sample):
+                    
+                    root_nodes = torch.from_numpy(root_nodes).cuda()
+                    root_ts = torch.from_numpy(ts).cuda()
+                    if 'no_neg' in sample_param and sample_param['no_neg']:
+                        pos_root_end = root_nodes.shape[0] * 2 // 3
+                        ret = sampler_gpu.sample_layer(root_nodes[:pos_root_end], root_ts[:pos_root_end], cut_zombie=args.cut_zombie)
+                    else:
+                        ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
+                else:
+                    if sampler is not None:
+                        if no_neg:
+                            pos_root_end = root_nodes.shape[0] * 2 // 3
+                            sampler.sample(root_nodes[:pos_root_end], ts[:pos_root_end])
+                        else:
+                            sampler.sample(root_nodes, ts)
+                        ret = sampler.get_ret()
+                        # time_sample += ret[0].sample_time()
+                
+                time_sample += time.time() - t_sample_s
+                # if (_ == 10):
+                #     np.save(f"./sample_res_epo{e}", {"col": ret[0].col(),"row": ret[0].row(),"eid": ret[0].eid(), "ts": ret[0].ts()})
+
+                # print(f"one loop time1: {time.time() - loopTime:.4f}")
+                time1 = time.time()
+                t_gen_dgl_s = time.time()
+                t_prep_s = time.time()
+                if (use_gpu_sample):
+                    if gnn_param['arch'] != 'identity':
+                        mfgs = sampler_gpu.gen_mfgs(ret)
+                        root_nodes = root_nodes.cpu().numpy()
+                    else:
+                        mfgs = th_node_to_dgl_blocks(root_nodes, root_ts)  
+                else:
+                    if gnn_param['arch'] != 'identity':
+                        mfgs = to_dgl_blocks(ret, sample_param['history'])
+                    else:
+                        mfgs = node_to_dgl_blocks(root_nodes, ts)  
+                # emptyCache()
+                # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
+                time_gen_dgl += time.time() - t_gen_dgl_s
+                #对依赖进行分析
+                # node_num = rows.src.values.shape[0]
+                # src_node = torch.tensor(root_nodes[:node_num]).to(torch.int32)
+                # dst_node = torch.tensor(root_nodes[node_num:node_num * 2]).to(torch.int32)
+                # count_judge(src_node, dst_node)
+                # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
+
+                time_feat_s = time.time()
+                mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
+                # print(f"feat时间0: {time.time() - time_feat_s:.7f}s")
+                if mailbox is not None:
+                    mailbox.prep_input_mails(mfgs[0])
+                
+                time_total_prep += time.time() - time_total_prep_s
+                time_prep += time.time() - t_prep_s
+                time_feat += time.time() - time_feat_s
+                # print(f"feat时间: {time.time() - time_feat_s:.7f}s")
+
+                time_total_compute_s = time.time()
+                optimizer.zero_grad()
+                # print(f"数据转dgl图流程: {time.time() - time1:.4f}")
+                
+                time1 = time.time()
+
+                time_model_s = time.time()
+                pred_pos, pred_neg = model(mfgs)
+                # model_structure(model)
+                # print(f"模型传播流程: {time.time() - time1:.4f}")
+                time_model += time.time() - time_model_s
+
+                time_opt_s = time.time()
+                loss = creterion(pred_pos, torch.ones_like(pred_pos))
+                loss += creterion(pred_neg, torch.zeros_like(pred_neg))
+                total_loss += float(loss.item()) * train_param['batch_size']
+                # print(f"one loop time2.1: {time.time() - loopTime:.4f}")
+                loss.backward()
+                optimizer.step()
+                time_opt += time.time() - time_opt_s
+                time_total_compute += time.time() - time_total_compute_s
+                # print(f"one loop time3: {time.time() - loopTime:.4f}")
+                t_prep_s = time.time()
+                
+                time_total_update_s = time.time()
+                if mailbox is not None:
+                    
+                    
+                    eid = eid.cuda()
+                    # eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
+                    
+                    mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
+                    block = None
+                    if memory_param['deliver_to'] == 'neighbors':
+                        # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                        block = sampler_gpu.gen_mfgs(ret, reverse=True)[0][0]
+                        # block = mfgs[0][0]
+
+                    time_upd_s = time.time()
+                    mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
+                    time_update_mail += time.time() - time_upd_s
+
+                    time_upd_s = time.time()
+                    mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
+                    time_update_mem += time.time() - time_upd_s
+
+                time_prep += time.time() - t_prep_s
+                time_tot += time.time() - t_tot_s
+                time_total_update += time.time() - time_total_update_s
+                # print(f"one loop time: {time.time() - loopTime:.4f}")
+
+                time_per_batch += time.time() - t_tot_s
+
+                left = right
+                batch_num += 1
+
+            print(f"total loop use time: {time.time() - startTime:.4f}")
+            print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
+                loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+            feat_buffer.mode = 'val'
+            feat_buffer.refresh_memory()
+
+            time_total_epoch += time.time() - time_total_epoch_s
+            time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+            print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+            print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
+
+
+            if (not args.model_eval):
+                continue
+            eval_time_s = time.time()
+            ap, auc = eval('val')
+            
+            if e > 2 and ap > best_ap:
+                best_e = e
+                best_ap = ap
+                torch.save(model.state_dict(), path_saver)
+            print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}, eval time: {:.2f}'.format(total_loss, ap, auc, time.time() - eval_time_s))
+            val_ap.append(f'{ap:.6f}')
+            # print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
             # if (emb_buffer and emb_buffer.use_buffer):
-            #     emb_buffer.cur_mode = 'presample'
-            #     emb_buffer.run_batch(batch_num)
+            #     emb_buffer.reset_time()
 
-            #     emb_buffer.cur_mode = 'train'
-            time_presample += time.time() - time_presample_s
+            test_per_epoch = True
+            if (test_per_epoch):
+                if (args.model_eval):
+                    model.eval()
 
-            # emptyCache()
-            
-            #此处和预采样用一样的负节点
-            neg_start = (batch_num % feat_buffer.presample_batch) * train_param['batch_size']
-            neg_end = min(feat_buffer.neg_sample_nodes.shape[0], ((batch_num % feat_buffer.presample_batch) + 1) * train_param['batch_size'])
-            neg_sample_nodes = feat_buffer.neg_sample_nodes[neg_start: neg_end]
-
-            root_nodes = np.concatenate([src, dst, neg_sample_nodes]).astype(np.int32)
-            ts = np.concatenate([times, times, times]).astype(np.float32)
-            
-            t_sample_s = time.time()
-            if (use_gpu_sample):
-                
-                root_nodes = torch.from_numpy(root_nodes).cuda()
-                root_ts = torch.from_numpy(ts).cuda()
-                if 'no_neg' in sample_param and sample_param['no_neg']:
-                    pos_root_end = root_nodes.shape[0] * 2 // 3
-                    ret = sampler_gpu.sample_layer(root_nodes[:pos_root_end], root_ts[:pos_root_end], cut_zombie=args.cut_zombie)
-                else:
-                    ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
-            else:
-                if sampler is not None:
-                    if no_neg:
-                        pos_root_end = root_nodes.shape[0] * 2 // 3
-                        sampler.sample(root_nodes[:pos_root_end], ts[:pos_root_end])
-                    else:
-                        sampler.sample(root_nodes, ts)
-                    ret = sampler.get_ret()
-                    # time_sample += ret[0].sample_time()
-            
-            time_sample += time.time() - t_sample_s
-            # if (_ == 10):
-            #     np.save(f"./sample_res_epo{e}", {"col": ret[0].col(),"row": ret[0].row(),"eid": ret[0].eid(), "ts": ret[0].ts()})
-
-            # print(f"one loop time1: {time.time() - loopTime:.4f}")
-            time1 = time.time()
-            t_gen_dgl_s = time.time()
-            t_prep_s = time.time()
-            if (use_gpu_sample):
-                if gnn_param['arch'] != 'identity':
-                    mfgs = sampler_gpu.gen_mfgs(ret)
-                    root_nodes = root_nodes.cpu().numpy()
-                else:
-                    mfgs = th_node_to_dgl_blocks(root_nodes, root_ts)  
-            else:
-                if gnn_param['arch'] != 'identity':
-                    mfgs = to_dgl_blocks(ret, sample_param['history'])
-                else:
-                    mfgs = node_to_dgl_blocks(root_nodes, ts)  
-            # emptyCache()
-            # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
-            time_gen_dgl += time.time() - t_gen_dgl_s
-            #对依赖进行分析
-            # node_num = rows.src.values.shape[0]
-            # src_node = torch.tensor(root_nodes[:node_num]).to(torch.int32)
-            # dst_node = torch.tensor(root_nodes[node_num:node_num * 2]).to(torch.int32)
-            # count_judge(src_node, dst_node)
-            # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
-
-            time_feat_s = time.time()
-            mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
-            # print(f"feat时间0: {time.time() - time_feat_s:.7f}s")
-            if mailbox is not None:
-                mailbox.prep_input_mails(mfgs[0])
-            
-            time_total_prep += time.time() - time_total_prep_s
-            time_prep += time.time() - t_prep_s
-            time_feat += time.time() - time_feat_s
-            # print(f"feat时间: {time.time() - time_feat_s:.7f}s")
-
-            time_total_compute_s = time.time()
-            optimizer.zero_grad()
-            # print(f"数据转dgl图流程: {time.time() - time1:.4f}")
-            
-            time1 = time.time()
-
-            time_model_s = time.time()
-            pred_pos, pred_neg = model(mfgs)
-            # model_structure(model)
-            # print(f"模型传播流程: {time.time() - time1:.4f}")
-            time_model += time.time() - time_model_s
-
-            time_opt_s = time.time()
-            loss = creterion(pred_pos, torch.ones_like(pred_pos))
-            loss += creterion(pred_neg, torch.zeros_like(pred_neg))
-            total_loss += float(loss.item()) * train_param['batch_size']
-            # print(f"one loop time2.1: {time.time() - loopTime:.4f}")
-            loss.backward()
-            optimizer.step()
-            time_opt += time.time() - time_opt_s
-            time_total_compute += time.time() - time_total_compute_s
-            # print(f"one loop time3: {time.time() - loopTime:.4f}")
-            t_prep_s = time.time()
-            
-            time_total_update_s = time.time()
-            if mailbox is not None:
-                
-                
-                eid = eid.cuda()
-                # eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
-                
-                mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
-                block = None
-                if memory_param['deliver_to'] == 'neighbors':
-                    # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
-                    block = sampler_gpu.gen_mfgs(ret, reverse=True)[0][0]
-                    # block = mfgs[0][0]
-
-                time_upd_s = time.time()
-                mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
-                time_update_mail += time.time() - time_upd_s
-
-                time_upd_s = time.time()
-                mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
-                time_update_mem += time.time() - time_upd_s
-
-            time_prep += time.time() - t_prep_s
-            time_tot += time.time() - t_tot_s
-            time_total_update += time.time() - time_total_update_s
-            # print(f"one loop time: {time.time() - loopTime:.4f}")
-
-            time_per_batch += time.time() - t_tot_s
-
-            left = right
-            batch_num += 1
-
-        print(f"total loop use time: {time.time() - startTime:.4f}")
-        print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
-               loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
-        feat_buffer.mode = 'val'
-        feat_buffer.refresh_memory()
-
-        time_total_epoch += time.time() - time_total_epoch_s
-        time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
-        print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
-        print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
-
-
-        if (not args.model_eval):
-            continue
-        eval_time_s = time.time()
-        ap, auc = eval('val')
-        
-        if e > 2 and ap > best_ap:
-            best_e = e
-            best_ap = ap
-            torch.save(model.state_dict(), path_saver)
-        print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}, eval time: {:.2f}'.format(total_loss, ap, auc, time.time() - eval_time_s))
-        val_ap.append(f'{ap:.6f}')
-        # print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
-
-        # if (emb_buffer and emb_buffer.use_buffer):
-        #     emb_buffer.reset_time()
-
-        test_per_epoch = True
-        if (test_per_epoch):
-            if (args.model_eval):
-                model.eval()
-
-                if sampler is not None:
-                    sampler.reset()
-                if mailbox is not None:
-                    mailbox.reset()
-                    model.memory_updater.last_updated_nid = None
-                    eval('train')
-                    eval('val')
-                ap, auc = eval('test')
-                # if args.eval_neg_samples > 1:
-                #     print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
-                # else:
-                #     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
-                test_ap.append(f'{ap:.6f}')
-        print(f'val: {val_ap}; test: {test_ap}')
+                    if sampler is not None:
+                        sampler.reset()
+                    if mailbox is not None:
+                        mailbox.reset()
+                        model.memory_updater.last_updated_nid = None
+                        eval('train')
+                        eval('val')
+                    ap, auc = eval('test')
+                    # if args.eval_neg_samples > 1:
+                    #     print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
+                    # else:
+                    #     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
+                    test_ap.append(f'{ap:.6f}')
+            print(f'val: {val_ap}; test: {test_ap}')
     
+    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=100))
+    # print(prof.key_averages().table(sort_by="gpu_time_total", row_limit=10))
+
     if (args.model_eval):
         print('Loading model at epoch {}...'.format(best_e))
         model.load_state_dict(torch.load(path_saver))

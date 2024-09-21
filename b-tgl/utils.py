@@ -96,19 +96,40 @@ def loadBin(path):
         loadConf(path)
 
     cur_conf = confs[directory][path]
+
+    
+        
     res = torch.from_numpy(np.fromfile(path, dtype = getattr(np, cur_conf['dtype']))).to(cur_conf['device']).reshape(cur_conf['shape'])
+    if (cur_conf['dtype'] == 'float16'):
+        res = res.to(torch.float32)
     return res
 
-def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=10):
+def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=512, use_slice = False):
     # 利用 numpy 的内存映射函数来映射整个文件
+    use_slice = False
     data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
     result = []
+    if (use_slice):
+        print(f"预处理slice")
+        batch_slice = torch.nonzero(torch.diff(indices) > 24).reshape(-1) + 1
+        left = 0
+        for right in batch_slice:
+            batch_indices = indices[left:right]
+            # 批量读取
+            batch_data = data[batch_indices, :]
+            result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
+            left = right
 
-    for i in range(0, len(indices), batch_size):
-        batch_indices = indices[i:i+batch_size]
-        # 批量读取
+        batch_indices = indices[left:indices.shape[0]]
         batch_data = data[batch_indices, :]
         result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
+        left = right
+    else:
+        for i in range(0, len(indices), batch_size):
+            batch_indices = indices[i:i+batch_size]
+            # 批量读取
+            batch_data = data[batch_indices, :]
+            result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
     
     # 将结果合并成一个tensor
     if (len(result) == 0):
@@ -135,7 +156,7 @@ def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float3
     
     return torch.from_numpy(np.array(data))
 
-def loadBinDisk(path, ind):
+def loadBinDisk(path, ind, use_slice = False):
     path = path.replace('.pt', '.bin')
     directory = os.path.dirname(path)
     if directory not in confs:
@@ -146,8 +167,10 @@ def loadBinDisk(path, ind):
     read_disk_s = time.time()
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
     
-    res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']))
-    print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape}")
+    res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
+    if (cur_conf['dtype'] == 'float16'):
+        res = res.to(torch.float32)
+    # print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape}")
     return res
 
 def gen_feat(d, rand_de=0, rand_dn=0):
@@ -273,6 +296,17 @@ def to_dgl_blocks(ret, hist, reverse=False, cuda=True):
             mfgs.append(b)
     mfgs = list(map(list, zip(*[iter(mfgs)] * hist)))
     mfgs.reverse()
+    return mfgs
+
+def th_node_to_dgl_blocks(root_nodes, ts, cuda=True):
+    mfgs = list()
+    b = dgl.create_block(([],[]), num_src_nodes=root_nodes.shape[0], num_dst_nodes=root_nodes.shape[0]).to('cuda:0')
+    b.srcdata['ID'] = root_nodes
+    b.srcdata['ts'] = ts
+    if cuda:
+        mfgs.insert(0, [b.to('cuda:0')])
+    else:
+        mfgs.insert(0, [b])
     return mfgs
 
 def node_to_dgl_blocks(root_nodes, ts, cuda=True):

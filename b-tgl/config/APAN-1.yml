@@ -7,7 +7,7 @@ sampling:
     history: 1
     duration: 0
     num_thread: 32
-    # no_neg: True
+    no_neg: True
 memory: 
   - type: 'node'
     dim_time: 100

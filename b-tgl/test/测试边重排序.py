@@ -11,7 +11,7 @@ import time
 from utils import *
 from sampler.sampler import *
 
-dataset = 'STACK'
+dataset = 'MAG'
 
 g, df = load_graph(dataset)
 

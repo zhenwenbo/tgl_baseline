@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='MAG')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -14,7 +14,7 @@ parser.add_argument('--use_ayscn_prefetch', action='store_true', default=False)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
+parser.add_argument('--pre_sample_size', type=int, default=600000, help='pre sample size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 

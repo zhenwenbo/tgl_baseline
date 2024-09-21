@@ -67,6 +67,8 @@ left = 0
 right = 0
 cur_batch = 0
 
+reverse = True
+
 while True:
     
     
@@ -95,7 +97,7 @@ while True:
     #     dst = dst[mask]
     #     outeid = outeid[mask]
     #     outts = outts[mask]
-    mfgs = sampler_gpu.gen_mfgs(ret_list)
+    mfgs = sampler_gpu.gen_mfgs(ret_list, reverse=reverse)
     gen_time = time.time() - gen_start
 
 
@@ -114,14 +116,19 @@ while True:
     
     # mfgs = sampler_gpu.gen_mfgs(ret_list)
 
-    mfgs_tgl = to_dgl_blocks(ret_tgl, sample_param['history'])
+    mfgs_tgl = to_dgl_blocks(ret_tgl, sample_param['history'], reverse=reverse)
 
     b1 = mfgs[0][0]
     b2 = mfgs_tgl[0][0]
 
-    print(torch.sum(b1.srcdata['ID'] != b2.srcdata['ID']))
-    print(torch.sum(b1.srcdata['ts'] != b2.srcdata['ts']))
-    print(torch.sum(b1.edata['dt'] != b2.edata['dt']))
+    if (reverse):
+        print(torch.sum(b1.dstdata['ID'] != b2.dstdata['ID']))
+        print(torch.sum(b1.dstdata['ts'] != b2.dstdata['ts']))
+        print(torch.sum(b1.edata['dt'] != b2.edata['dt']))
+    else:
+        print(torch.sum(b1.srcdata['ID'] != b2.srcdata['ID']))
+        print(torch.sum(b1.srcdata['ts'] != b2.srcdata['ts']))
+        print(torch.sum(b1.edata['dt'] != b2.edata['dt']))
     for i in range(len(ret_list)):
             
         src,dst,outts,outeid,root_nodes,root_ts,dts = ret_list[i]

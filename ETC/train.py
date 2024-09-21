@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', default='TALK', type=str, help='dataset name')
-parser.add_argument('--config', default='/home/guorui/workspace/dgnn/ETC/config/TGAT-1.yml', type=str, help='path to config file')
+parser.add_argument('--config', default='/home/guorui/workspace/dgnn/ETC/config/TimeSGN-2.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -390,7 +390,7 @@ if __name__ == '__main__':
         print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
 
 
-        model_eval = True
+        model_eval = False
         if (not model_eval):
             continue
         ap, auc = eval(group_indices, 'val')

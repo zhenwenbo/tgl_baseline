@@ -341,6 +341,47 @@ class GRUMemeoryUpdater(torch.nn.Module):
                         b.srcdata['h'] = updated_memory + self.node_feat_map(b.srcdata['h'])
                 else:
                     b.srcdata['h'] = updated_memory
+class FFNMemeoryUpdater(torch.nn.Module):
+
+    def __init__(self, memory_param, dim_in, dim_hid, dim_time, dim_node_feat):
+        super(FFNMemeoryUpdater, self).__init__()
+        self.dim_hid = dim_hid
+        self.dim_in = dim_in
+        self.dim_node_feat = dim_node_feat
+        self.memory_param = memory_param
+        self.dim_time = dim_time
+        self.updater = torch.nn.Linear(dim_in + dim_time, dim_hid)
+        self.layer_norm = torch.nn.LayerNorm(dim_hid)
+        self.layer_norm1 = torch.nn.LayerNorm(dim_hid)
+        self.last_updated_memory = None
+        self.last_updated_ts = None
+        self.last_updated_nid = None
+        if dim_time > 0:
+            self.time_enc = TimeEncode(dim_time)
+        if memory_param['combine_node_feature']:
+            if dim_node_feat > 0 and dim_node_feat != dim_hid:
+                self.node_feat_map = torch.nn.Linear(dim_node_feat, dim_hid)
+        
+
+    def forward(self, mfg):
+        for b in mfg:
+            if self.dim_time > 0:
+                time_feat = self.time_enc(b.srcdata['ts'] - b.srcdata['mem_ts'])
+                b.srcdata['mem_input'] = torch.cat([b.srcdata['mem_input'], time_feat], dim=1)
+           
+            updated_memory = self.layer_norm(self.updater(b.srcdata['mem_input'])) + b.srcdata['mem']
+            updated_memory = self.layer_norm1(updated_memory)
+            self.last_updated_ts = b.srcdata['ts'].detach().clone()
+            self.last_updated_memory = updated_memory.detach().clone()
+            self.last_updated_nid = b.srcdata['ID'].detach().clone()
+            if self.memory_param['combine_node_feature']:
+                if self.dim_node_feat > 0:
+                    if self.dim_node_feat == self.dim_hid:
+                        b.srcdata['h'] += updated_memory
+                    else:
+                        b.srcdata['h'] = updated_memory + self.node_feat_map(b.srcdata['h'])
+                else:
+                    b.srcdata['h'] = updated_memory
 
 class RNNMemeoryUpdater(torch.nn.Module):
 

@@ -131,7 +131,7 @@ class Sampler_GPU:
         
         return table
 
-    def gen_block(self, sample_ret):
+    def gen_block(self, sample_ret, reverse = False):
         start = time.time()
         src,dst,outts,outeid,root_nodes,root_ts,dts = sample_ret
         
@@ -155,13 +155,22 @@ class Sampler_GPU:
         tss = torch.cat((root_ts, outts))
 
         # print(f"dst_node shape: {dst_node.shape}, max in dst node: {torch.max(dst_node)}, num_dst: {root_nodes.shape[0]}")
-        b = dgl.create_block((src_node.to(torch.int64), dst_node.to(torch.int64)), num_src_nodes = nodes.shape[0], num_dst_nodes = root_nodes.shape[0])
-        b.srcdata['ID'] = nodes
-        b.srcdata['ts'] = tss
+        if (not reverse):
+            b = dgl.create_block((src_node.to(torch.int64), dst_node.to(torch.int64)), num_src_nodes = nodes.shape[0], num_dst_nodes = root_nodes.shape[0])
+            b.srcdata['ID'] = nodes
+            b.srcdata['ts'] = tss
 
-        outdts = dts - outts
-        b.edata['dt'] = outdts
-        b.edata['ID'] = outeid
+            outdts = dts - outts
+            b.edata['dt'] = outdts
+            b.edata['ID'] = outeid
+        else:
+            b = dgl.create_block((dst_node.to(torch.int64), src_node.to(torch.int64)), num_src_nodes = root_nodes.shape[0], num_dst_nodes = nodes.shape[0])
+            b.dstdata['ID'] = nodes
+            b.dstdata['ts'] = tss
+
+            outdts = dts - outts
+            b.edata['dt'] = outdts
+            b.edata['ID'] = outeid
 
         # print(f"gen block用时{time.time() - start:.5f}s")
         return b
@@ -209,13 +218,13 @@ class Sampler_GPU:
         # print(f"gen block用时{time.time() - start:.5f}s")
         return b
 
-    def gen_mfgs(self, sample_ret_list):
+    def gen_mfgs(self, sample_ret_list, reverse = False):
         mfgs = list()
 
         start = time.time()
         for i, sample_ret in enumerate(sample_ret_list):
             self.fan_num = self.fan_nums[i]
-            b = self.gen_block(sample_ret)
+            b = self.gen_block(sample_ret, reverse)
             # TODO 多层采样 及 块批采样
             
             mfgs.append(b.to('cuda:0'))

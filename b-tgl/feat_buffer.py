@@ -14,7 +14,7 @@ import multiprocessing
 import json
 
 class Feat_buffer:
-    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, prefetch_conn = None, feat_dim = None):
+    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, prefetch_conn = None, feat_dim = None):
         self.d = d
         self.df = df
         self.datas = datas
@@ -68,19 +68,34 @@ class Feat_buffer:
 
         self.err_num = 0
         self.err_detection = False
+        if (self.err_detection):
+            self.det_node_feats, self.det_edge_feats = load_feat(self.d)
 
-        
+
+        self.mem_detection = False
+        if (self.mem_detection):
+            self.det_memory = torch.zeros((node_num, memory_param['dim_out']), dtype=torch.float32)
+            self.det_memory_ts = torch.zeros((node_num), dtype=torch.float32)
+            self.det_mailbox = torch.zeros((node_num, memory_param['mailbox_size'], 2 * memory_param['dim_out'] + self.edge_feat_dim), dtype=torch.float32)
+            self.det_mailbox_ts = torch.zeros((node_num, memory_param['mailbox_size']), dtype=torch.float32)
+
+            
+        self.config = GlobalConfig()
+        self.use_disk = self.config.use_disk
+
         #下面是运行时做异步处理的部分
         self.preFetchExecutor = concurrent.futures.ThreadPoolExecutor(2)  # 线程池
         # ctx = multiprocessing.get_context("spawn")
         # self.pool = ctx.Pool(processes=1)
         # self.pipe = multiprocessing.Pipe(duplex=False)
-        self.share_node_num = 1000000
-
-        self.share_edge_num = 3000000 #TODO 动态扩容share tensor
         # if (d == 'STACK' or d == ''):
+
         self.share_edge_num = 2000000 #TODO 动态扩容share tensor
-        self.share_node_num = 2000000
+        self.share_node_num = 500000
+
+        if (d == 'MAG'):
+            self.share_edge_num = 10000000
+            self.share_node_num = 5000000
 
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
@@ -90,8 +105,7 @@ class Feat_buffer:
 
         self.preFetchDataCache = Queue()
         self.cur_block = 0
-        self.config = GlobalConfig()
-        self.use_disk = self.config.use_disk
+        
         if (self.use_disk):
             self.edge_feats_path = f'/raid/guorui/DG/dataset/{self.d}/edge_features.bin'
             self.node_feats_path = f'/raid/guorui/DG/dataset/{self.d}/node_features.bin'
@@ -118,7 +132,7 @@ class Feat_buffer:
             file_path = f'/raid/guorui/workspace/dgnn/b-tgl/preprocessing/expire-{self.batch_size}.json'
             with open(file_path, 'r', encoding='utf-8') as file:
                 expire_info = json.load(file)
-            if (self.prefetch_conn is not None):
+            if (self.prefetch_conn is not None and (self.config.use_valid_edge and not self.config.use_disk)):
                 self.prefetch_conn.send(('init_valid_edge', (expire_info[d], self.edge_feat_dim, (self.path, self.batch_size, self.sampler.fan_nums))))
                 self.prefetch_conn.recv()
             
@@ -155,6 +169,16 @@ class Feat_buffer:
         cur_same_nodes = torch.zeros(node_num, dtype = torch.bool).share_memory_()
 
         shared_tensor = (part_node_map, node_feats, part_edge_map, edge_feats, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes)
+
+        if (self.config.use_disk):
+            shared_node_d_ind = torch.zeros(node_num, dtype = torch.int32).share_memory_()
+            shared_edge_d_ind = torch.zeros(edge_num, dtype = torch.int32).share_memory_()
+
+            shared_tensor = (*shared_tensor, shared_node_d_ind, shared_edge_d_ind)
+            self.share_node_d_ind = shared_node_d_ind
+            self.share_edge_d_ind = shared_edge_d_ind
+
+        
         shared_ret_len = torch.zeros(len(shared_tensor), dtype = torch.int32).share_memory_()
 
         shared_tensor = (*shared_tensor, shared_ret_len)
@@ -170,11 +194,14 @@ class Feat_buffer:
         self.share_pre_same_nodes = pre_same_nodes
         self.share_cur_same_nodes = cur_same_nodes
         self.shared_ret_len = shared_ret_len
+        
 
         #TODO 这里预先开辟1GB内存的 共享内存用于select_index
         #TODO 为APAN的mailbox，这里提高10倍给mailbox用
         self.share_tmp_tensor = torch.zeros(300000000).share_memory_()
         shared_tensor = (*shared_tensor, self.share_tmp_tensor)
+
+        
 
         self.prefetch_conn.send(('init_share_tensor', (shared_tensor,)))
         self.prefetch_conn.recv()
@@ -251,6 +278,12 @@ class Feat_buffer:
         self.time_refresh = 0
         self.time_async = 0
 
+        if (self.mem_detection):
+            self.det_memory.zero_()
+            self.det_memory_ts.zero_()
+            self.det_mailbox.zero_()
+            self.det_mailbox_ts.zero_()
+
     def input_mails(self, b):
 
         nid = b.srcdata['ID']
@@ -275,17 +308,36 @@ class Feat_buffer:
         b.srcdata['mem_input'] = self.part_mailbox[table2].reshape(b.srcdata['ID'].shape[0], -1).cuda()
         b.srcdata['mail_ts'] = self.part_mailbox_ts[table2].cuda()
 
+        if(self.mem_detection):
+            err_num = torch.sum(b.srcdata['mem'].cpu() != self.det_memory[nid.long().cpu()])
+            err_num += torch.sum(b.srcdata['mem_ts'].cpu() != self.det_memory_ts[nid.long().cpu()])
+            err_num += torch.sum(b.srcdata['mem_input'].cpu() != self.det_mailbox[nid.long().cpu()].reshape(b.srcdata['ID'].shape[0], -1))
+            err_num += torch.sum(b.srcdata['mail_ts'].cpu() != self.det_mailbox_ts[nid.long().cpu()])
+            # print(f"edge缓存...与非缓存对比不一致的个数: {err_num}")
+            if (err_num + torch.nonzero(table2 == -1).shape[0]):
+                raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
+
 
     #TODO 下一个预采样时需要将mem数据刷入回去
-    def update_mailbox(self, nid, mail, mail_ts):
+    def update_mailbox(self, nid, mail, mail_ts, n_ptr = None):
         #将part_mail中的nid改成mail和mail_ts
+        nid = nid.cuda()
+        if (n_ptr is not None):
+            n_ptr = n_ptr.cuda()
         table1 = torch.zeros_like(self.part_memory_map) - 1
         table2 = torch.zeros_like(nid) - 1
         dgl.findSameIndex(self.part_memory_map, nid, table1, table2)
         table2 = table2.to(torch.int64)
 
-        self.part_mailbox[table2, 0] = mail
-        self.part_mailbox_ts[table2, 0] = mail_ts
+        if (n_ptr is None):
+            n_ptr = 0
+            
+        self.part_mailbox[table2, n_ptr] = mail
+        self.part_mailbox_ts[table2, n_ptr] = mail_ts
+
+        if (self.mem_detection):
+            self.det_mailbox[nid.long().cpu(), n_ptr] = mail.cpu()
+            self.det_mailbox_ts[nid.long().cpu(), n_ptr] = mail_ts.cpu()
 
     def update_memory(self, nid, memory, ts):
         table1 = torch.zeros_like(self.part_memory_map) - 1
@@ -296,15 +348,23 @@ class Feat_buffer:
         self.part_memory[table2] = memory
         self.part_memory_ts[table2] = ts
 
-    def get_e_feat(self, eid):
+        if (self.mem_detection):
+            self.det_memory[nid.long().cpu()] = memory.cpu()
+            self.det_memory_ts[nid.long().cpu()] = ts.cpu()
+
+
+    def get_e_feat(self, eid, compute_index_time = False):
+        index_s = time.time()
         table1 = torch.zeros_like(self.part_edge_map) - 1
         table2 = torch.zeros_like(eid) - 1
         dgl.findSameIndex(self.part_edge_map, eid, table1, table2)
+        if (compute_index_time):
+            print(f"get_e_feat index time: {time.time() - index_s:.4f}s")
 
         # print(f"缓存的边特征中,未命中的{torch.nonzero(table2 == -1).shape[0]}")
         res = self.part_edge_feats[table2.to(torch.int64)]
         if (self.err_detection):
-            err_num = torch.sum(res.cpu() != self.select_index('edge_feats',eid.long().cpu()))
+            err_num = torch.sum(res.cpu() != self.det_edge_feats[eid.long().cpu()])
             # print(f"edge缓存...与非缓存对比不一致的个数: {err_num}")
             if (err_num + torch.nonzero(table2 == -1).shape[0]):
                 raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
@@ -321,7 +381,7 @@ class Feat_buffer:
         # print(f"缓存的节点特征中,未命中的{torch.nonzero(table2 == -1).shape[0]}")
         res = self.part_node_feats[table2.to(torch.int64)]
         if (self.err_detection):
-            err_num = torch.sum(res.cpu() != self.select_index('node_feats',nid.long().cpu()))
+            err_num = torch.sum(res.cpu() != self.det_node_feats[nid.long().cpu()])
             if (err_num + torch.nonzero(table2 == -1).shape[0]):
                 print(f"节点缓存...与非缓存对比不一致的个数: {err_num}")
                 raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
@@ -431,19 +491,40 @@ class Feat_buffer:
 
         node_num = self.shared_ret_len[0]
         edge_num = self.shared_ret_len[2]
-        pre_num = self.shared_ret_len[-2]
-        cur_num = self.shared_ret_len[-1]
+        pre_num = self.shared_ret_len[8]
+        cur_num = self.shared_ret_len[9]
+
+        
         use_pin = hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory
 
         allo1 = cuda_GB()
 
-        self.part_edge_map, self.part_edge_feats = self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]
-        self.part_edge_map = self.move_to_gpu([self.part_edge_map])[0]
-        self.part_edge_feats = self.move_to_gpu([self.part_edge_feats], use_pin=use_pin)[0]
+        if (self.use_disk):
+            disk_s = time.time()
+            node_d_ind_num = self.shared_ret_len[10].cuda()
+            edge_d_ind_num = self.shared_ret_len[11].cuda()
+            node_d_ind, edge_d_ind = self.share_node_d_ind[:node_d_ind_num].long().cuda(), self.share_edge_d_ind[:edge_d_ind_num].long().cuda()
+            
+            
+            if (self.edge_feat_dim > 0):
+                part_edge_map, part_edge_feats = self.share_part_edge_map[:edge_num].cuda(), self.share_part_edge_feats[:edge_num].cuda()
+                part_edge_feats[edge_d_ind] = self.get_e_feat(part_edge_map[edge_d_ind])
+                self.part_edge_map, self.part_edge_feats = part_edge_map, part_edge_feats
 
-        self.part_node_map, self.part_node_feats = self.share_part_node_map[:node_num], self.share_part_node_feats[:node_num]
-        self.part_node_map = self.move_to_gpu([self.part_node_map])[0]
-        self.part_node_feats = self.move_to_gpu([self.part_node_feats], use_pin = use_pin)[0]
+            part_node_map, part_node_feats = self.share_part_node_map[:node_num].cuda(), self.share_part_node_feats[:node_num].cuda()
+            part_node_feats[node_d_ind] = self.get_n_feat(part_node_map[node_d_ind])
+            self.part_node_map, self.part_node_feats = part_node_map, part_node_feats
+
+            # print(f"disk带来的额外开销 {time.time() - disk_s:.6f}s")
+        else:
+            if (self.edge_feat_dim > 0):
+                self.part_edge_map, self.part_edge_feats = self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]
+                self.part_edge_map = self.move_to_gpu([self.part_edge_map])[0]
+                self.part_edge_feats = self.move_to_gpu([self.part_edge_feats], use_pin=use_pin)[0]
+
+            self.part_node_map, self.part_node_feats = self.share_part_node_map[:node_num], self.share_part_node_feats[:node_num]
+            self.part_node_map = self.move_to_gpu([self.part_node_map])[0]
+            self.part_node_feats = self.move_to_gpu([self.part_node_feats], use_pin = use_pin)[0]
 
 
         self.part_memory_map = self.part_node_map
@@ -486,7 +567,9 @@ class Feat_buffer:
                 self.neg_sample_nodes = self.neg_sample_nodes_async
 
             else:
-                #使用异步策略
+                #使用异步策略 此处memory info应当是pre_block的信息，需要在cur_block运行时并行的将pre_block的memory信息刷入内存
+                memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+
                 if (self.cur_block == 0):
                     #第一个块使用同步加载
                     time_first = time.time()
@@ -518,7 +601,7 @@ class Feat_buffer:
 
                 time_ana_s = time.time()
                 self.neg_sample_nodes = self.neg_sample_nodes_async
-                memory_info = (self.part_memory_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+                
                 #此时开始运行当前块，我们异步的加载下一个块的信息
 
                 # print(f"运行子进程，传入memory_info")
@@ -809,6 +892,81 @@ class Feat_buffer:
             
             print(f"{root_nodes.shape}单层单block采样 + 转换block + 存储block数据 batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
             del root_nodes,eid_uni,nid_uni,src,mask,eid,_
+
+
+    #流式... budget为内存预算，单位为MB, 默认16GB内存预算
+    def gen_part_stream(self, budget = (16 * 1024)):
+        #当分区feat不存在的时候做输出
+        d = self.d
+        path = self.path
+        # if os.path.exists(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}'):
+        #     print(f"already  partfeat")
+        #     return
+
+        df = self.df
+        batch_size = self.batch_size
+        # node_feats, edge_feats = load_feat(d)
+        train_edge_end = self.train_edge_end
+        group_indexes = np.array(df[:train_edge_end].index // batch_size)
+
+        history_datas = []
+        cur_mem_byte = 0 #单位为字节
+
+        for batch_num, rows in df[:train_edge_end].groupby(group_indexes):
+            emptyCache()
+            root_nodes = torch.from_numpy(np.concatenate([rows.src.values, rows.dst.values]).astype(np.int32)).cuda()
+            root_ts = torch.from_numpy(np.concatenate([rows.time.values, rows.time.values]).astype(np.float32)).cuda()
+
+            # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
+            start = time.time()
+            ret_list = self.sampler.sample_layer(root_nodes, root_ts)
+            eid_uni = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
+            nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
+            # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
+
+            for ret in ret_list:
+                #找出每层的所有eid即可
+                src,dst,outts,outeid,root_nodes,root_ts,dts = ret
+                eid = outeid[outeid > -1]
+
+                cur_eid = torch.unique(eid)
+                eid_uni = torch.cat((cur_eid, eid_uni))
+                eid_uni = torch.unique(eid_uni)
+            
+            #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
+            ret = ret_list[-1]
+            src,dst,outts,outeid,root_nodes,root_ts,dts = ret
+            del ret_list
+            del outts, outeid, root_ts, dst
+            emptyCache()
+
+            mask = src > -1
+            src = src[mask]
+            nid_uni = torch.cat((src, root_nodes))
+            nid_uni = torch.unique(nid_uni)
+
+            #处理这个eid_uni，抽特征然后存就行。这里eid是个全局的
+            #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
+            #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
+
+            cur_datas = {}
+            eid_uni,_ = torch.sort(eid_uni)
+            if (self.edge_feats.shape[0] > 0):
+ 
+                cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
+                saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat.pt')
+            saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
+
+            nid_uni,_ = torch.sort(nid_uni)
+            if (self.node_feats.shape[0] > 0):
+                cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
+                saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat.pt')
+            saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
+
+            sampleTime = time.time() - start
+            # mfgs = sampler.gen_mfgs(ret_list)
+            
+            print(f"{root_nodes.shape}单层单block采样 + 转换block + 存储block数据 batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
 
 
     

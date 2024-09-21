@@ -6,7 +6,7 @@
     "use_pin_memory": false,
     "model_eval": false,
     "cut_zombie": false,
-    "use_disk": true
+    "use_disk": false
     
 
 }

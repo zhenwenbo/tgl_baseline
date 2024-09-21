@@ -15,6 +15,7 @@ class MailBox():
         if (prefetch_conn):
             prefetch_conn.send(('init_memory', (memory_param, num_nodes, dim_edge_feat)))
             prefetch_conn.recv()
+            self.next_mail_pos = torch.zeros((num_nodes), dtype=torch.long).cuda() if _next_mail_pos is None else _next_mail_pos
         else:
             self.node_memory = torch.zeros((num_nodes, memory_param['dim_out']), dtype=torch.float32) if _node_memory is None else _node_memory
             self.node_memory_ts = torch.zeros(num_nodes, dtype=torch.float32) if _node_memory_ts is None else _node_memory_ts
@@ -203,8 +204,9 @@ class MailBox():
                     dst_mail = torch.cat([mem_dst, mem_src], dim=1)
                 mail = torch.cat([src_mail, dst_mail], dim=0)
                 mail = torch.cat([mail, mail[block.edges()[0].long()]], dim=0)
-                mail_ts = torch.from_numpy(ts[:num_true_edges * 2]).to(self.device)
+                mail_ts = torch.from_numpy(ts[:num_true_edges * 2]).to(device)
                 mail_ts = torch.cat([mail_ts, mail_ts[block.edges()[0].long()]], dim=0)
+                
                 if self.memory_param['mail_combine'] == 'mean':
                     (nid, idx) = torch.unique(block.dstdata['ID'], return_inverse=True)
                     mail = scatter(mail, idx, reduce='mean', dim=0)
@@ -212,7 +214,7 @@ class MailBox():
                     self.mailbox[nid.long(), self.next_mail_pos[nid.long()]] = mail
                     self.mailbox_ts[nid.long(), self.next_mail_pos[nid.long()]] = mail_ts
                 elif self.memory_param['mail_combine'] == 'last':
-                    nid = block.dstdata['ID']
+                    nid = block.dstdata['ID'].cuda()
                     # find unique nid to update mailbox
                     uni, inv = torch.unique(nid, return_inverse=True)
                     perm = torch.arange(inv.size(0), dtype=inv.dtype, device=inv.device)
@@ -220,8 +222,28 @@ class MailBox():
                     nid = nid[perm]
                     mail = mail[perm]
                     mail_ts = mail_ts[perm]
-                    self.mailbox[nid.long(), self.next_mail_pos[nid.long()]] = mail
-                    self.mailbox_ts[nid.long(), self.next_mail_pos[nid.long()]] = mail_ts
+
+                    
+                    if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+                        self.feat_buffer.update_mailbox(nid, mail, mail_ts,n_ptr = self.next_mail_pos[nid.long()])
+
+                        # self.mailbox[nid.long().cpu(), self.next_mail_pos[nid.long()].cpu()] = mail.cpu()
+                        # self.mailbox_ts[nid.long().cpu(), self.next_mail_pos[nid.long()].cpu()] = mail_ts.cpu()
+                        # if self.memory_param['mailbox_size'] > 1:
+                        #     self.next_mail_pos[nid.long()] = torch.remainder(self.next_mail_pos[nid.long()] + 1, self.memory_param['mailbox_size'])
+
+                    else:
+                        if (self.feat_buffer != None and self.feat_buffer.prefetch_conn != None):
+                            self.feat_buffer.update_index('mailbox', (nid.long(), self.next_mail_pos[nid.long()]), mail.cpu())
+                            self.feat_buffer.update_index('mailbox_ts', (nid.long(), self.next_mail_pos[nid.long()]), mail_ts.cpu())
+                        else:
+                            self.mailbox[nid.long(), self.next_mail_pos[nid.long()]] = mail
+                            self.mailbox_ts[nid.long(), self.next_mail_pos[nid.long()]] = mail_ts
+
+
+                    # self.mailbox[nid.long(), self.next_mail_pos[nid.long()]] = mail
+                    # self.mailbox_ts[nid.long(), self.next_mail_pos[nid.long()]] = mail_ts
+
                 else:
                     raise NotImplementedError
                 
