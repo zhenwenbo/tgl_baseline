@@ -34,4 +34,6 @@ while true; do
 done
 
 echo "执行后续逻辑"
-bash /home/guorui/workspace/dgnn/exp/scripts/run_b_tgl.sh
+bash /home/guorui/workspace/dgnn/exp/scripts/pre.sh
+bash /home/guorui/workspace/dgnn/exp/scripts/run_test.sh
+# bash /home/guorui/workspace/dgnn/exp/scripts/run_b_tgl.sh

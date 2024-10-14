@@ -2,7 +2,7 @@ import torch
 import dgl
 from layers import TimeEncode
 from torch_scatter import scatter
-
+import time
 class MailBox():
 
     def __init__(self, memory_param, num_nodes, dim_edge_feat, prefetch_conn = None, feat_buffer = None, _node_memory=None, _node_memory_ts=None,_mailbox=None, _mailbox_ts=None, _next_mail_pos=None, _update_mail_pos=None):
@@ -25,6 +25,8 @@ class MailBox():
         self.update_mail_pos = _update_mail_pos
         self.device = torch.device('cpu')
 
+
+        self.find_uni_time = 0
         self.feat_buffer = feat_buffer
         
     def set_buffer(self, feat_buffer):
@@ -34,6 +36,8 @@ class MailBox():
             self.feat_buffer.init_memory(self.node_memory, self.node_memory_ts, self.mailbox, self.mailbox_ts)
 
     def reset(self):
+        print(f"更新memory时寻找最后出现的用时{self.find_uni_time:.4f}s")
+        self.find_uni_time = 0
         if (self.prefetch_conn):
             self.prefetch_conn.send(('reset_memory', ()))
             self.prefetch_conn.recv()
@@ -80,7 +84,7 @@ class MailBox():
                 torch.index_select(self.mailbox_ts, 0, idx, out=self.pinned_mailbox_ts_buffs[i][:idx.shape[0]])
                 b.srcdata['mail_ts'] = self.pinned_mailbox_ts_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
             else:
-                if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+                if (self.feat_buffer != None and (self.feat_buffer.mode == 'train' or self.feat_buffer.use_b_test)):
                     self.feat_buffer.input_mails(b)
                 else:
                     if (self.feat_buffer != None and self.feat_buffer.prefetch_conn != None):
@@ -98,7 +102,7 @@ class MailBox():
         if nid is None:
             return
 
-        if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+        if (self.feat_buffer != None and (self.feat_buffer.mode == 'train' or self.feat_buffer.use_b_test)):
             device = 'cuda:0'
         else:
             device = self.device
@@ -108,17 +112,22 @@ class MailBox():
             nid = nid[:num_true_src_dst].to(device)
             memory = memory[:num_true_src_dst].to(device)
             ts = ts[:num_true_src_dst].to(device)
+
             #TODO 优化? 此处的nid并不是unique的，也就是说并没有取最新的memory？ 我们手动取一个unique
+            find_s = time.time()
             uni, inv = torch.unique(nid, return_inverse=True)
+            uni, inv = uni.cpu(), inv.cpu()
             perm = torch.arange(inv.size(0), dtype=inv.dtype, device=inv.device)
             perm = inv.new_empty(uni.size(0)).scatter_(0, inv, perm)
-            nid = uni
+            nid = uni.cuda()
+            perm = perm.cuda()
             memory = memory[perm]
             ts = ts[perm]
+            self.find_uni_time += time.time() - find_s
 
-            if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+            if (self.feat_buffer != None and (self.feat_buffer.mode == 'train' or self.feat_buffer.use_b_test)):
                
-                nid = torch.unique(nid)
+                # nid = torch.unique(nid)
                 self.feat_buffer.update_memory(nid, memory, ts)
 
                 # self.node_memory[nid.long().cpu()] = memory.cpu()
@@ -132,7 +141,7 @@ class MailBox():
                     self.node_memory_ts[nid.long()] = ts
 
     def update_mailbox(self, nid, memory, root_nodes, ts, edge_feats, block, neg_samples=1):
-        if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+        if (self.feat_buffer != None and (self.feat_buffer.mode == 'train' or self.feat_buffer.use_b_test)):
             device = 'cuda:0'
         else:
             device = self.device
@@ -159,23 +168,36 @@ class MailBox():
                     dst_mail = torch.cat([mem_dst, mem_src], dim=1)
                     
                 mail = torch.cat([src_mail, dst_mail], dim=1).reshape(-1, src_mail.shape[1])
+                # print(mail)
                 nid = torch.cat([src.unsqueeze(1), dst.unsqueeze(1)], dim=1).reshape(-1)
                 mail_ts = torch.from_numpy(ts[:num_true_edges * 2]).to(device)
                 if mail_ts.dtype == torch.float64:
                     import pdb; pdb.set_trace()
                 # find unique nid to update mailbox
+                find_s = time.time()
                 uni, inv = torch.unique(nid, return_inverse=True)
+                uni, inv = uni.cpu(), inv.cpu()
                 perm = torch.arange(inv.size(0), dtype=inv.dtype, device=inv.device)
                 perm = inv.new_empty(uni.size(0)).scatter_(0, inv, perm)
+                perm = perm.cuda()
+                self.find_uni_time += time.time() - find_s
+                # print(nid)
+                # print(mail)
+                # print(mail_ts)
+                # print(perm)
                 #perm的意义是找到nid中unique且在最后一个出现的，目的就是用所有节点的最新的那个做更新
                 nid = nid[perm]
                 mail = mail[perm]
                 mail_ts = mail_ts[perm]
 
                 if self.memory_param['mail_combine'] == 'last':
-                    if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+                    if (self.feat_buffer != None and (self.feat_buffer.mode == 'train' or self.feat_buffer.use_b_test)):
+                        # print(nid)
+                        # print(mail)
+                        # print(mail_ts)
                         self.feat_buffer.update_mailbox(nid, mail, mail_ts)
-
+                        # print(self.feat_buffer.get_mailbox(nid))
+                        # asdasd = 1
                         # self.mailbox[nid.long().cpu(), self.next_mail_pos[nid.long()].cpu()] = mail.cpu()
                         # self.mailbox_ts[nid.long().cpu(), self.next_mail_pos[nid.long()].cpu()] = mail_ts.cpu()
                         # if self.memory_param['mailbox_size'] > 1:
@@ -224,7 +246,7 @@ class MailBox():
                     mail_ts = mail_ts[perm]
 
                     
-                    if (self.feat_buffer != None and self.feat_buffer.mode == 'train'):
+                    if (self.feat_buffer != None and (self.feat_buffer.mode == 'train' or self.feat_buffer.use_b_test)):
                         self.feat_buffer.update_mailbox(nid, mail, mail_ts,n_ptr = self.next_mail_pos[nid.long()])
 
                         # self.mailbox[nid.long().cpu(), self.next_mail_pos[nid.long()].cpu()] = mail.cpu()

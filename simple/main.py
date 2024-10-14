@@ -41,6 +41,17 @@ g, df = load_graph(args.data)
 num_node = g['indptr'].shape[0] - 1
 num_edge = len(df)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+
+if (args.data == 'BITCOIN'):
+    train_param['epoch'] = 1
+if (args.data == 'GDELT' and sample_param['layer'] == 2):
+    sample_param['neighbor'] = [8, 8]
+    train_param['epoch'] = 1
+    print(f"GDELT二跳修改邻域为8,8")
+print(sample_param)
+print(train_param)
+
+
 interval_to_gpu = train_param['interval_to_gpu']
 pre_load = train_param['pre_load']
 emb_reuse = True if 'emb_reuse' in gnn_param and gnn_param['emb_reuse'] else False
@@ -65,8 +76,12 @@ if interval_to_gpu:
 #此处将interval、budget都读取出来了，nodefeat、edgefeat存到了cpu
 nfeat_flag = True if (gnn_param['arch'] != 'identity' and node_start is not None) else False
         
-train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+if (args.data in ['BITCOIN']):
+    train_edge_end = 86063713
+    val_edge_end = 110653345
+else:
+    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
 gnn_dim_node = 0 if node_feats is None else node_feats.shape[1]
 gnn_dim_edge = 0 if edge_feats is None else edge_feats.shape[1]

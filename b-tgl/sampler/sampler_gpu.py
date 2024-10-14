@@ -4,7 +4,7 @@ import torch
 import numpy as np
 import time
 from utils import emptyCache
-
+  
 class Sampler_GPU:
     def __init__(self, g, fan_nums, layer, emb_buffer = None):
 

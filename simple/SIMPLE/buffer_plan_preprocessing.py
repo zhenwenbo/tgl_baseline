@@ -8,8 +8,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default = 'STACK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGAT-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default = 'BITCOIN')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--dim_edge_feat', type=int, default=128, help='dim of edge feat')
@@ -33,6 +33,9 @@ elif (args.data == 'STACK'):
 elif (args.data == 'GDELT'):
     args.dim_edge_feat = 182 #TODO 为什么下载下来的数据集的edge feat是182呢？
     args.dim_node_feat = 413
+elif (args.data == 'BITCOIN'):
+    args.dim_edge_feat = 172
+    args.dim_node_feat = 172
 else:
     raise RuntimeError("have not this dataset config!")
     
@@ -261,8 +264,20 @@ print('loading graph takes:{:.2f}s'.format(t1-t0))
 print('start intializing...')
 t0 = time.time()
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+
+if (args.data == 'GDELT' and sample_param['layer'] == 2):
+    sample_param['neighbor'] = [8, 8]
+    train_param['epoch'] = 1
+    print(f"GDELT二跳修改邻域为8,8")
+print(sample_param)
+print(train_param)
+
+if (args.data in ['BITCOIN']):
+    train_edge_end = 86063713
+    val_edge_end = 110653345
+else:
+    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
 sampler = None
 if not ('no_sample' in sample_param and sample_param['no_sample']):

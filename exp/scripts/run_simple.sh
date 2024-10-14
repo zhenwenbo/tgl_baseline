@@ -75,36 +75,39 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "GDELT")
-model="TGAT"
+ds=("GDELT")
+
+models=("TGN" "TimeSGN")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
-for d in "${ds[@]}"; do
+for model in "${models[@]}"; do
+    for d in "${ds[@]}"; do
 
-  echo "处理 $d"
-  mkdir -p "../res-${timestamp}/${d}"
+    echo "处理 $d"
+    mkdir -p "../res-${timestamp}/${d}"
 
 
 
-  threshold=0.1
-  if [ "$d" == "GDELT" ]; then
-    threshold=0.01
-  fi
+    threshold=0.1
+    if [ "$d" == "GDELT" ]; then
+        threshold=0.01
+    fi
 
-  nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" &>../res-${timestamp}/${d}/SIMPLE-1-res.log &
-  pid=$!
-  memory_usage_file="../res-${timestamp}/${d}/SIMPLE-1-res-mem.log"
-  monitor_memory_usage $pid
-  wait
+    # nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" &>../res-${timestamp}/${d}/SIMPLE-1-res.log &
+    # pid=$!
+    # memory_usage_file="../res-${timestamp}/${d}/SIMPLE-1-res-mem.log"
+    # monitor_memory_usage $pid
+    # wait
 
-  if [ "$d" != "GDELT" ]; then
-    nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-2.yml" &>../res-${timestamp}/${d}/SIMPLE-2-res.log &
+    nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-2.yml" &>../res-${timestamp}/${d}/SIMPLE-2-${model}-res.log &
     pid=$!
-    memory_usage_file="../res-${timestamp}/${d}/SIMPLE-2-res-mem.log"
+    memory_usage_file="../res-${timestamp}/${d}/SIMPLE-2-${model}-res-mem.log"
     monitor_memory_usage $pid
     wait
-  fi
+    
 
 
+    done
 done

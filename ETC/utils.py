@@ -32,7 +32,13 @@ def load_feat(d):
     return node_feats, edge_feats
 
 def load_graph(d):
-    df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+    file_path = '/raid/guorui/DG/dataset/{}/edges.csv'.format(d)
+    if (d in ['BITCOIN']):
+        df = pd.read_csv(file_path, sep=' ', names=['src', 'dst', 'time'])
+        df['Unnamed: 0'] = range(0, len(df))
+    else:
+        df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
+
     g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
     return g, df
 

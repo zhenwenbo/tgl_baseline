@@ -1,5 +1,5 @@
 {
-    "use_valid_edge": true,  
+    "use_valid_edge": false,  
     "use_ayscn_prefetch": true,
     "pre_sample_size": 60000,
     "part_neg_sample": false,

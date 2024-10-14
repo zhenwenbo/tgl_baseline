@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TimeSGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='WIKI')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -36,6 +36,11 @@ def set_seed(seed):
 node_feats, edge_feats = load_feat(args.data, args.rand_edge_features, args.rand_node_features)
 g, df = load_graph(args.data)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+
+
+if (args.data == 'BITCOIN'):
+    train_param['epoch'] = 1
+
 if (args.data in ['BITCOIN']):
     train_edge_end = 86063713
     val_edge_end = 110653345

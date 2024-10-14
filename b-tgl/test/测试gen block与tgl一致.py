@@ -19,7 +19,17 @@ import pandas as pd
 import time
 from utils import *
 from sampler.sampler import *
+import random
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    dgl.seed(seed)
+    print(f"设置随机种子{seed}")
+
+set_seed(0)
 
 d = 'TALK'
 batch_size = 2000
@@ -38,7 +48,7 @@ else:
 
 
 from sampler.sampler_gpu import *
-fan_nums = [10,10]
+fan_nums = [10]
 layers = len(fan_nums)
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 
@@ -67,7 +77,7 @@ left = 0
 right = 0
 cur_batch = 0
 
-reverse = True
+reverse = False
 
 while True:
     
@@ -79,8 +89,10 @@ while True:
     rows = df[left:right]
     # break
 
-    root_nodes = np.concatenate([rows.src.values, rows.dst.values]).astype(np.int32)
-    root_ts = np.concatenate([rows.time.values, rows.time.values]).astype(np.float32)
+    root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
+    root_ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
+    print(root_ts)
+    print(root_nodes)
     root_nodes = torch.from_numpy(root_nodes).cuda()
     root_ts = torch.from_numpy(root_ts).cuda()
     start = time.time()
@@ -97,7 +109,7 @@ while True:
     #     dst = dst[mask]
     #     outeid = outeid[mask]
     #     outts = outts[mask]
-    mfgs = sampler_gpu.gen_mfgs(ret_list, reverse=reverse)
+    mfgs = sampler_gpu.gen_mfgs(ret_list)
     gen_time = time.time() - gen_start
 
 
@@ -109,17 +121,19 @@ while True:
 
 
 
+
+
     sampler.sample(root_nodes.cpu().numpy(), root_ts.cpu().numpy())
     ret_tgl = sampler.get_ret()
-
-    # emptyCache()
     
     # mfgs = sampler_gpu.gen_mfgs(ret_list)
 
-    mfgs_tgl = to_dgl_blocks(ret_tgl, sample_param['history'], reverse=reverse)
+    mfgs_tgl = to_dgl_blocks(ret_tgl, sample_param['history'])
 
     b1 = mfgs[0][0]
     b2 = mfgs_tgl[0][0]
+    print(f"node num: {b1.num_nodes()} edge num: {b1.num_edges()}")
+    print(f"node num: {b2.num_nodes()} edge num: {b2.num_edges()}")
 
     if (reverse):
         print(torch.sum(b1.dstdata['ID'] != b2.dstdata['ID']))

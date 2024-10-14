@@ -58,7 +58,7 @@ def saveBin(tensor,savePath,addSave=False):
     tensor_info = {
         'dtype': str(tensor.dtype).replace('torch.',''),
         'device': str(tensor.device),
-        'shape': (tensor.shape)
+        'shape': list(tensor.shape)
     }
 
     try:
@@ -67,14 +67,25 @@ def saveBin(tensor,savePath,addSave=False):
     except (FileNotFoundError, json.JSONDecodeError):
         config = {}
     
+    if addSave:
+        if savePath in config and config[savePath]['shape'] is not None:
+            tensor_info['shape'][0] += config[savePath]['shape'][0]
     config[savePath] = tensor_info
+
     with open(json_path, 'w') as f:
         json.dump(config, f, indent=4)
 
-    if isinstance(tensor, torch.Tensor):
-        tensor.cpu().numpy().tofile(savePath)
-    elif isinstance(tensor, np.ndarray):
-        tensor.tofile(savePath)
+    if addSave :
+        with open(savePath, 'ab') as f:
+            if isinstance(tensor, torch.Tensor):
+                tensor.numpy().tofile(f)
+            elif isinstance(tensor, np.ndarray):
+                tensor.tofile(f)
+    else:
+        if isinstance(tensor, torch.Tensor):
+            tensor.cpu().numpy().tofile(savePath)
+        elif isinstance(tensor, np.ndarray):
+            tensor.tofile(savePath)
 
 
 
@@ -104,7 +115,7 @@ def loadBin(path):
         res = res.to(torch.float32)
     return res
 
-def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=512, use_slice = False):
+def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=128000, use_slice = False):
     # 利用 numpy 的内存映射函数来映射整个文件
     use_slice = False
     data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
@@ -230,7 +241,7 @@ def load_graph(d):
     file_path = '/raid/guorui/DG/dataset/{}/edges.csv'.format(d)
     if (d in ['BITCOIN']):
         df = pd.read_csv(file_path, sep=' ', names=['src', 'dst', 'time'])
-        df['Unnamed: 0'] = range(1, len(df) + 1)
+        df['Unnamed: 0'] = range(0, len(df))
     else:
         df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
 
@@ -359,7 +370,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                 i += 1
             else:
                 # srch = node_feats[b.srcdata['ID'].long()].float()
-                if (feat_buffer != None and feat_buffer.mode == 'train'):
+                if (feat_buffer != None and (feat_buffer.mode == 'train' or feat_buffer.use_b_test)):
                     srch = feat_buffer.get_n_feat(b.srcdata['ID'])
                 else:
                     if (feat_buffer != None and feat_buffer.prefetch_conn != None):
@@ -381,7 +392,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                         b.edata['f'] = efeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
                         i += 1
                     else:
-                        if (feat_buffer != None and feat_buffer.mode == 'train'):
+                        if (feat_buffer != None and (feat_buffer.mode == 'train' or feat_buffer.use_b_test)):
                             srch = feat_buffer.get_e_feat(b.edata['ID'])
                         else:
                             if (feat_buffer != None and feat_buffer.prefetch_conn != None):

@@ -10,3 +10,4 @@ intervals*/
 build/
 __pycache__/
 *.log
+test_set/*

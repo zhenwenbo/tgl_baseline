@@ -10,38 +10,88 @@ from utils import *
 
 class NegLinkSampler:
 
-    def __init__(self, num_nodes):
+    def __init__(self, num_nodes, num_edges):
         self.num_nodes = num_nodes
+        self.test_nodes = None
+        self.num_edges = num_edges
 
     def sample(self, n):
         return np.random.randint(self.num_nodes, size=n)
+    
+    def load_test(self):
+        if (not os.path.exists(f'/home/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')):
+            res = np.random.randint(self.num_nodes, size=self.num_edges, dtype = np.int32)
+            res.tofile(f'/home/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')
+        else:
+            res = np.fromfile(f'/home/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin', dtype = np.int32)
+        
+        self.test_nodes = res
+    def sample_test(self, left, right):
+        if (self.test_nodes is None):
+            #加载
+            self.load_test()
+        return self.test_nodes[left:right]
     
 
 class ReNegLinkSampler:
 
     pre_res = None
+    pre_ttl = None
     ratio = 1
 
     def __init__(self, num_nodes, ratio):
         self.ratio = ratio
+        self.pre_res = None
         print(f"重放负采样，重放比例为 {self.ratio}")
         self.num_nodes = num_nodes
 
     def sample(self, n):
+
+        if (self.ratio <= 0 or (self.pre_res is not None and n < self.pre_res.shape[0])):
+            return np.random.randint(self.num_nodes, size=n)
         
-        cur_res = np.random.randint(self.num_nodes, size=n)
+        cur_res = np.zeros(n, dtype = np.int32)
+        cur_ttl = np.zeros(n, dtype = np.int32)
+        if (self.pre_res is None):
+            cur_res[:] = np.random.randint(self.num_nodes, size=n)
+        else:
+            #从pre中取最小的那几个
+            reuse_num = int(self.pre_res.shape[0] * self.ratio)
+            pre_ttl_ind = np.argsort(self.pre_ttl)
+            pre_reuse_ind = pre_ttl_ind[:reuse_num]
+            cur_res[:reuse_num] = self.pre_res[pre_reuse_ind]
+            cur_ttl[:reuse_num] = self.pre_ttl[pre_reuse_ind] + 1
+            cur_res[reuse_num:] = np.random.randint(self.num_nodes, size=cur_res.shape[0] - reuse_num)
+            
+            ind = torch.randperm(cur_res.shape[0])
+            cur_res = cur_res[ind]
+            cur_ttl = cur_ttl[ind]
+            
+        sameNum = 0
         if (self.pre_res is not None):
-            #将上一次pre_res中的百分之k 随机替换到cur_res中
-            pre_ind = np.random.randint(self.pre_res.shape[0], size = int(cur_res.shape[0] * self.ratio))
-            cur_ind = torch.randperm((cur_res.shape[0]), dtype = torch.int32)[:int(cur_res.shape[0]  * self.ratio)].numpy()
-
-            cur_res[cur_ind] = self.pre_res[pre_ind]
-            # cur_res[]   
             sameNum = np.sum(np.isin(cur_res, self.pre_res))
-
-            # print(f'相同的负采样节点个数: {sameNum} 占比: {sameNum / n * 100:.2f}%')
         self.pre_res = cur_res
+        self.pre_ttl = cur_ttl
+
+        # print(f'相同的负采样节点个数: {sameNum} 占比: {sameNum / n * 100:.2f}%')
         return cur_res
+    
+        # print(f"结果为: {cur_res}")
+
+        # cur_res = np.random.randint(self.num_nodes, size=n)
+        # # print(cur_res)
+        # if (self.ratio > 0 and self.pre_res is not None):
+        #     #将上一次pre_res中的百分之k 随机替换到cur_res中
+        #     pre_ind = np.random.randint(self.pre_res.shape[0], size = int(cur_res.shape[0] * self.ratio))
+        #     cur_ind = torch.randperm((cur_res.shape[0]), dtype = torch.int32)[:int(cur_res.shape[0]  * self.ratio)].numpy()
+
+        #     cur_res[cur_ind] = self.pre_res[pre_ind]
+        #     # cur_res[]   
+        #     sameNum = np.sum(np.isin(cur_res, self.pre_res))
+
+        #     # print(f'相同的负采样节点个数: {sameNum} 占比: {sameNum / n * 100:.2f}%')
+        # self.pre_res = cur_res
+        # return cur_res
 
 import math
 from config.train_conf import *

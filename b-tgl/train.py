@@ -13,15 +13,16 @@ from utils import emptyCache
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
-parser.add_argument('--train_conf', type=str, default='basic_conf_disk', help='name of stored model')
+parser.add_argument('--reuse_ratio', type=float, default=0, help='reuse_ratio')
+parser.add_argument('--train_conf', type=str, default='basic_eval', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -46,6 +47,15 @@ if (config.use_disk):
     if (args.data == 'MAG'):
         args.pre_sample_size = 600000
         
+if (args.data == 'GDELT' and sample_param['layer'] == 2):
+    sample_param['neighbor'] = [8, 8]
+    train_param['epoch'] = 1
+    print(f"GDELT二跳修改邻域为8,8")
+
+if (args.data == 'BITCOIN'):
+    train_param['epoch'] = 2
+print(sample_param)
+print(train_param)
 
 print(f"实际的block大小为: {args.pre_sample_size}")
 # args.pre_sample_size = config.pre_sample_size
@@ -225,9 +235,6 @@ if __name__ == '__main__':
     
     g, datas, df_conf = load_graph_bin(args.data)
 
-    #TODO GDELT改fanout为[7,7]
-    # sample_param['neighbor'] = [7,7]
-
     train_edge_end = df_conf['train_edge_end']
     val_edge_end = df_conf['val_edge_end']
 
@@ -282,7 +289,7 @@ if __name__ == '__main__':
         print("inductive nodes", len(inductive_nodes))
         neg_link_sampler = NegLinkInductiveSampler(inductive_nodes)
     else:
-        neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1)
+        neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1, g['indptr'][-1])
 
     #TODO presample_batch = 100
     emb_buffer = None
@@ -375,7 +382,7 @@ if __name__ == '__main__':
     if (config.part_neg_sample):
         train_neg_sampler = TrainNegLinkSampler(g['indptr'].shape[0] - 1, g['indptr'][-1])
     elif (hasattr(config, 'reuse_neg_sample') and config.reuse_neg_sample):
-        train_neg_sampler = ReNegLinkSampler(node_num, config.reuse_neg_sample)
+        train_neg_sampler = ReNegLinkSampler(node_num, args.reuse_ratio)
     else:
         train_neg_sampler = neg_link_sampler
         

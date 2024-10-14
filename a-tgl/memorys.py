@@ -74,6 +74,16 @@ class MailBox():
             nid = nid[:num_true_src_dst].to(self.device)
             memory = memory[:num_true_src_dst].to(self.device)
             ts = ts[:num_true_src_dst].to(self.device)
+
+
+            uni, inv = torch.unique(nid, return_inverse=True)
+            perm = torch.arange(inv.size(0), dtype=inv.dtype, device=inv.device)
+            perm = inv.new_empty(uni.size(0)).scatter_(0, inv, perm)
+            nid = uni
+            memory = memory[perm]
+            ts = ts[perm]
+
+
             self.node_memory[nid.long()] = memory
             self.node_memory_ts[nid.long()] = ts
 
@@ -98,17 +108,31 @@ class MailBox():
                     src_mail = torch.cat([mem_src, mem_dst], dim=1)
                     dst_mail = torch.cat([mem_dst, mem_src], dim=1)
                 mail = torch.cat([src_mail, dst_mail], dim=1).reshape(-1, src_mail.shape[1])
+                # print(mail)
                 nid = torch.cat([src.unsqueeze(1), dst.unsqueeze(1)], dim=1).reshape(-1)
                 mail_ts = torch.from_numpy(ts[:num_true_edges * 2]).to(self.device)
                 if mail_ts.dtype == torch.float64:
                     import pdb; pdb.set_trace()
                 # find unique nid to update mailbox
                 uni, inv = torch.unique(nid, return_inverse=True)
+                # print(uni)
+                # print(inv)
+                #TODO 下面两行在cpu和在cuda上执行的结果不一样
                 perm = torch.arange(inv.size(0), dtype=inv.dtype, device=inv.device)
                 perm = inv.new_empty(uni.size(0)).scatter_(0, inv, perm)
+                # print(nid)
+                # print(mail)
+                # print(mail_ts)
+                # perm = perm.cpu()
+                # print(perm)
                 nid = nid[perm]
                 mail = mail[perm]
                 mail_ts = mail_ts[perm]
+
+                # print(nid)
+                # print(mail)
+                # print(mail_ts)
+
                 if self.memory_param['mail_combine'] == 'last':
                     self.mailbox[nid.long(), self.next_mail_pos[nid.long()]] = mail
                     self.mailbox_ts[nid.long(), self.next_mail_pos[nid.long()]] = mail_ts

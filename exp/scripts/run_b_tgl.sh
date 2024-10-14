@@ -75,9 +75,10 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "GDELT")
-models=("TGN" "TGAT")
+ds=("BITCOIN")
+models=("TGAT" "TimeSGN")
+models=("TGAT")
 
-block_size=600000
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
@@ -97,13 +98,11 @@ for model in "${models[@]}"; do
     monitor_memory_usage $pid
     wait
 
-    if [ "$d" != "GDELT" ]; then
-        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
-        pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
-        monitor_memory_usage $pid
-        wait
-    fi
+    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
+    pid=$!
+    memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
+    monitor_memory_usage $pid
+    wait
 
 
     done

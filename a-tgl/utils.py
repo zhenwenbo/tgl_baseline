@@ -15,6 +15,82 @@ def emptyCache():
     torch.cuda.empty_cache()
     gc.collect()
 
+import json
+
+
+def model_structure(model):
+    blank = ' '
+    print('-' * 90)
+    print('|' + ' ' * 11 + 'weight name' + ' ' * 10 + '|' \
+          + ' ' * 15 + 'weight shape' + ' ' * 15 + '|' \
+          + ' ' * 3 + 'number' + ' ' * 3 + '|')
+    print('-' * 90)
+    num_para = 0
+    type_size = 1  # 如果是浮点数就是4
+
+    for index, (key, w_variable) in enumerate(model.named_parameters()):
+        if len(key) <= 30:
+            key = key + (30 - len(key)) * blank
+        shape = str(w_variable.shape)
+        if len(shape) <= 40:
+            shape = shape + (40 - len(shape)) * blank
+        each_para = 1
+        for k in w_variable.shape:
+            each_para *= k
+        num_para += each_para
+        str_num = str(each_para)
+        if len(str_num) <= 10:
+            str_num = str_num + (10 - len(str_num)) * blank
+
+        print('| {} | {} | {} |'.format(key, shape, str_num))
+    print('-' * 90)
+    print('The total number of parameters: ' + str(num_para))
+    print('The parameters of Model {}: {:4f}M'.format(model._get_name(), num_para * type_size / 1000 / 1000))
+    print('-' * 90)
+
+
+def saveBin(tensor,savePath,addSave=False):
+
+    savePath = savePath.replace('.pt','.bin')
+    dir = os.path.dirname(savePath)
+    if(not os.path.exists(dir)):
+        os.makedirs(dir)
+    json_path = dir + '/saveBinConf.json'
+    
+    tensor_info = {
+        'dtype': str(tensor.dtype).replace('torch.',''),
+        'device': str(tensor.device),
+        'shape': list(tensor.shape)
+    }
+
+    try:
+        with open(json_path, 'r') as f:
+            config = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        config = {}
+    
+    if addSave:
+        if savePath in config and config[savePath]['shape'] is not None:
+            tensor_info['shape'][0] += config[savePath]['shape'][0]
+    config[savePath] = tensor_info
+
+    with open(json_path, 'w') as f:
+        json.dump(config, f, indent=4)
+
+    if addSave :
+        with open(savePath, 'ab') as f:
+            if isinstance(tensor, torch.Tensor):
+                tensor.numpy().tofile(f)
+            elif isinstance(tensor, np.ndarray):
+                tensor.tofile(f)
+    else:
+        if isinstance(tensor, torch.Tensor):
+            tensor.cpu().numpy().tofile(savePath)
+        elif isinstance(tensor, np.ndarray):
+            tensor.tofile(savePath)
+
+
+
 def load_feat(d, rand_de=0, rand_dn=0):
     node_feats = None
     if os.path.exists('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d)):

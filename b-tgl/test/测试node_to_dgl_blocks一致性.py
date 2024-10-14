@@ -38,7 +38,7 @@ else:
 
 
 from sampler.sampler_gpu import *
-fan_nums = [10,10]
+fan_nums = [10]
 layers = len(fan_nums)
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 

@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', default='TALK', type=str, help='dataset name')
-parser.add_argument('--config', default='/home/guorui/workspace/dgnn/ETC/config/TimeSGN-2.yml', type=str, help='path to config file')
+parser.add_argument('--data', default='GDELT', type=str, help='dataset name')
+parser.add_argument('--config', default='/home/guorui/workspace/dgnn/ETC/config/TGN-2.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -58,8 +58,23 @@ if __name__ == '__main__':
     g, df = load_graph(args.data)
     print('load initial data finish.')
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+
+    if (args.data == 'GDELT' and sample_param['layer'] == 2):
+        sample_param['neighbor'] = [8, 8]
+        train_param['epoch'] = 1
+        print(f"GDELT二跳修改邻域为8,8")
+    
+    if (args.data == 'BITCOIN'):
+        train_param['epoch'] = 1
+    print(sample_param)
+    print(train_param)
+
+    if (args.data in ['BITCOIN']):
+        train_edge_end = 86063713
+        val_edge_end = 110653345
+    else:
+        train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+        val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
     gnn_dim_node = 0 if node_feats is None else node_feats.shape[1]
     gnn_dim_edge = 0 if edge_feats is None else edge_feats.shape[1]
