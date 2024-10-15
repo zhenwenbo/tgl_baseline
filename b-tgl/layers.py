@@ -127,6 +127,8 @@ class TransfomerAttentionLayer(torch.nn.Module):
                 Q += self.w_q_t(zero_time_feat)[b.edges()[1]]
                 K += self.w_k_t(time_feat)
                 V += self.w_v_t(time_feat)
+
+
             Q = torch.reshape(Q, (Q.shape[0], self.num_head, -1))
             K = torch.reshape(K, (K.shape[0], self.num_head, -1))
             V = torch.reshape(V, (V.shape[0], self.num_head, -1))
@@ -160,14 +162,40 @@ class TransfomerAttentionLayer(torch.nn.Module):
                 Q = self.w_q(torch.cat([b.srcdata['h'][:b.num_dst_nodes()], zero_time_feat], dim=1))[b.edges()[1]]
                 K = self.w_k(torch.cat([b.srcdata['h'][b.num_dst_nodes():], b.edata['f'], time_feat], dim=1))
                 V = self.w_v(torch.cat([b.srcdata['h'][b.num_dst_nodes():], b.edata['f'], time_feat], dim=1))
+
+
             Q = torch.reshape(Q, (Q.shape[0], self.num_head, -1))
             K = torch.reshape(K, (K.shape[0], self.num_head, -1))
             V = torch.reshape(V, (V.shape[0], self.num_head, -1))
             att = dgl.ops.edge_softmax(b, self.att_act(torch.sum(Q*K, dim=2)))
+
+            # num_edges, num_heads = att.size()
+            # # 创建一个新的张量来存储修改后的注意力权重
+            # masked_att = att.clone()
+
+            # # 对于每一个注意力头
+            # for head_idx in range(num_heads):
+            #     # 获取当前头的注意力权重
+            #     current_att = att[:, head_idx]
+                
+            #     # 计算要置零的元素数量
+            #     num_elements_to_mask = max(int(num_edges * 0.5), 1)  # 至少置零一个元素
+                
+            #     # 获取注意力权重的降序索引
+            #     _, indices = torch.sort(current_att, descending=True)
+                
+            #     # 将最后10%的注意力权重置为0
+            #     masked_att[indices[-num_elements_to_mask:], head_idx] = 0
+
+            # # 继续后续的操作
+            # att = masked_att
+
             att = self.att_dropout(att)
             V = torch.reshape(V*att[:, :, None], (V.shape[0], -1))
             b.srcdata['v'] = torch.cat([torch.zeros((b.num_dst_nodes(), V.shape[1]), device=torch.device('cuda:0')), V], dim=0)
             b.update_all(dgl.function.copy_src('v', 'm'), dgl.function.sum('m', 'h'))
+
+
         if self.dim_node_feat != 0:
             rst = torch.cat([b.dstdata['h'], b.srcdata['h'][:b.num_dst_nodes()]], dim=1)
         else:

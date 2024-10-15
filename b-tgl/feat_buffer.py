@@ -499,7 +499,7 @@ class Feat_buffer:
             except RuntimeError as e:
                 if (flag):
                     print(f"清除Cache仍然无法分配显存...")
-                    exit(-1)
+                    raise RuntimeError("Failed to allocate GPU memory even after clearing cache.") from e
                 print(f"显存OOM, 尝试清除cache")
                 emptyCache()
                 res.append(self.move_to_gpu([data], flag=True, use_pin=use_pin)[0])

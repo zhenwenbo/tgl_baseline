@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', default='LASTFM', type=str, help='dataset name')
+parser.add_argument('--data', default='TALK', type=str, help='dataset name')
 parser.add_argument('--config', default='/home/guorui/workspace/dgnn/exp/scripts/TGN-test-1.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -46,6 +46,15 @@ def preparation(ret_list, node_list, ts_list, node_feats, edge_feats, history, t
         
         q.put((mfgs, uni_node, inv_node, uni_edge, inv_edge, uni_node_r, inv_node_r, edge_r, node_data, edge_data))
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    dgl.seed(seed)
+    print(f"设置随机种子为{seed}")
+
+set_seed(42)
 
 if __name__ == '__main__':
     def set_seed(seed):
@@ -259,6 +268,7 @@ if __name__ == '__main__':
         creterion = torch.nn.BCEWithLogitsLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=train_param['lr'])
         for e in range(train_param['epoch']):
+            epo_start = time.time()
             print('Epoch {:d}:'.format(e))
             ret_list = []
             neg_list = []
@@ -412,8 +422,8 @@ if __name__ == '__main__':
 
             model_eval = True
 
-            ap, auc = eval(group_indices, 'val')
-            val_ap.append(f'{ap:.6f}')
+            # ap, auc = eval(group_indices, 'val')
+            # val_ap.append(f'{ap:.6f}')
             
             
             args.model_eval = True
@@ -436,6 +446,8 @@ if __name__ == '__main__':
                     #     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
                     test_ap.append(f'{ap:.6f}')
             print(f'val: {val_ap}; test: {test_ap}')
+
+            print(f"单个epoch用时: {time.time() - epo_start:.4f}s")
 
         total_val_res.append(val_ap)
         total_test_res.append(test_ap)
