@@ -93,7 +93,7 @@ for layer in "${layers[@]}"; do
             echo "处理 $d"
             mkdir -p "../res-test-${timestamp}/${d}"
 
-            nohup python -u /home/guorui/workspace/dgnn/ETC/train_test.py --data=${d}  --config="/home/guorui/workspace/dgnn/exp/scripts/${model}-test-${layer}.yml" &>../res-test-${timestamp}/${d}/ETC-${model}-${layer}_res.log &
+            nohup python -u /raid/guorui/workspace/dgnn/ETC/train_test.py --data=${d}  --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-${layer}.yml" &>../res-test-${timestamp}/${d}/ETC-${model}-${layer}_res.log &
             pid=$!
             memory_usage_file="../res-test-${timestamp}/${d}/ETC-${model}-${layer}_res_mem.log"
             monitor_memory_usage $pid

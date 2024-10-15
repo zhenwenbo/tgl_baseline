@@ -494,7 +494,7 @@ if __name__ == '__main__':
             for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
                 # if (batch_num == 30):
                     
-                #     torch.save(feat_buffer.get_mailbox(torch.arange(1980, dtype = torch.int32, device = 'cuda:0')), '/home/guorui/workspace/dgnn/b-tgl/mailbox_b')
+                #     torch.save(feat_buffer.get_mailbox(torch.arange(1980, dtype = torch.int32, device = 'cuda:0')), '/raid/guorui/workspace/dgnn/b-tgl/mailbox_b')
 
                 loopTime = time.time()
                 t_tot_s = time.time()
@@ -525,8 +525,8 @@ if __name__ == '__main__':
 
                 root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_sample_nodes]).astype(np.int32)
                 ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
-                # saveBin(torch.from_numpy(root_nodes), '/home/guorui/workspace/dgnn/b-tgl/test/test-acc/b-node.bin')
-                # saveBin(torch.from_numpy(ts), '/home/guorui/workspace/dgnn/b-tgl/test/test-acc/b-ts.bin')
+                # saveBin(torch.from_numpy(root_nodes), '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-node.bin')
+                # saveBin(torch.from_numpy(ts), '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-ts.bin')
                 t_sample_s = time.time()
                 if (use_gpu_sample):
                     
@@ -597,7 +597,7 @@ if __name__ == '__main__':
                 #     print(mfgs[0][0].ndata['mem']['_N'])
                 #     print(mfgs[0][0].edata['f'])
                 #     print(mfgs[0][0].ndata['ID']['_N'])
-                #     torch.save(feat_buffer.get_mailbox(torch.arange(1980, dtype = torch.int32, device = 'cuda:0')), '/home/guorui/workspace/dgnn/b-tgl/mailbox_b')
+                #     torch.save(feat_buffer.get_mailbox(torch.arange(1980, dtype = torch.int32, device = 'cuda:0')), '/raid/guorui/workspace/dgnn/b-tgl/mailbox_b')
                 # print(model.memory_updater.updater.weight_ih)
 
                 pred_pos, pred_neg = model(mfgs)
@@ -662,7 +662,7 @@ if __name__ == '__main__':
                    loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
             feat_buffer.refresh_memory()
             # total_memory = feat_buffer.select_index('memory', torch.arange(1980, dtype = torch.int64))
-            # torch.save(total_memory, '/home/guorui/workspace/dgnn/b-tgl/test/test-acc/mem_b.bin')
+            # torch.save(total_memory, '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/mem_b.bin')
             # print(total_memory)
 
             args.model_eval = True

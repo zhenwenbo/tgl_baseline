@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', default='TALK', type=str, help='dataset name')
-parser.add_argument('--config', default='/home/guorui/workspace/dgnn/exp/scripts/TGN-test-1.yml', type=str, help='path to config file')
+parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/exp/scripts/TGN-test-1.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')

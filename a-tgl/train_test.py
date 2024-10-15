@@ -244,10 +244,10 @@ for i in range(test_epo):
             root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
             
             pos_root_end = root_nodes.shape[0] * 2 // 3
-            # saveBin(torch.from_numpy(root_nodes), '/home/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-node.bin')
+            # saveBin(torch.from_numpy(root_nodes), '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-node.bin')
 
             ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
-            # saveBin(torch.from_numpy(ts), '/home/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-ts.bin')
+            # saveBin(torch.from_numpy(ts), '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-ts.bin')
         
             if sampler is not None:
                 if 'no_neg' in sample_param and sample_param['no_neg']:
@@ -293,8 +293,8 @@ for i in range(test_epo):
             #     print(mfgs[0][0].ndata['mem']['_N'])
             #     print(mfgs[0][0].edata['f'])
             #     print(mfgs[0][0].ndata['ID']['_N'])
-            #     mfgs1 = torch.load('/home/guorui/workspace/dgnn/b-tgl/mfgs')
-            #     mailbox_b = torch.load('/home/guorui/workspace/dgnn/b-tgl/mailbox_b')
+            #     mfgs1 = torch.load('/raid/guorui/workspace/dgnn/b-tgl/mfgs')
+            #     mailbox_b = torch.load('/raid/guorui/workspace/dgnn/b-tgl/mailbox_b')
             #     ds = torch.nonzero(mailbox_b.cpu().reshape(1980, -1) != mailbox.mailbox.reshape(1980, -1))
             #     print(ds.reshape(-1)[:1000])
             #     print(f"mailbox: {torch.sum(mailbox_b.cpu().reshape(-1,300) != mailbox.mailbox.reshape(-1,300))}")

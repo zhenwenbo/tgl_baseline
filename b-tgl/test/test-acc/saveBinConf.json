@@ -1,40 +1,40 @@
 {
-    "/home/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-neg.bin": {
+    "/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-neg.bin": {
         "dtype": "int32",
         "device": "cpu",
         "shape": [
             262000
         ]
     },
-    "/home/guorui/workspace/dgnn/b-tgl/test/test-acc/b-neg.bin": {
+    "/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-neg.bin": {
         "dtype": "int64",
         "device": "cpu",
         "shape": [
             262000
         ]
     },
-    "/home/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-node.bin": {
+    "/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-node.bin": {
         "dtype": "int32",
         "device": "cpu",
         "shape": [
             6000
         ]
     },
-    "/home/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-ts.bin": {
+    "/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/tgl-ts.bin": {
         "dtype": "float32",
         "device": "cpu",
         "shape": [
             6000
         ]
     },
-    "/home/guorui/workspace/dgnn/b-tgl/test/test-acc/b-node.bin": {
+    "/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-node.bin": {
         "dtype": "int32",
         "device": "cpu",
         "shape": [
             6000
         ]
     },
-    "/home/guorui/workspace/dgnn/b-tgl/test/test-acc/b-ts.bin": {
+    "/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-ts.bin": {
         "dtype": "float32",
         "device": "cpu",
         "shape": [

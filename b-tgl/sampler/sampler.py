@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
+# from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 from utils import *
 
 class NegLinkSampler:
@@ -19,11 +19,11 @@ class NegLinkSampler:
         return np.random.randint(self.num_nodes, size=n)
     
     def load_test(self):
-        if (not os.path.exists(f'/home/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')):
+        if (not os.path.exists(f'/raid/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')):
             res = np.random.randint(self.num_nodes, size=self.num_edges, dtype = np.int32)
-            res.tofile(f'/home/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')
+            res.tofile(f'/raid/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')
         else:
-            res = np.fromfile(f'/home/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin', dtype = np.int32)
+            res = np.fromfile(f'/raid/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin', dtype = np.int32)
         
         self.test_nodes = res
     def sample_test(self, left, right):

@@ -42,7 +42,7 @@ fan_nums = [10]
 layers = len(fan_nums)
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 
-sample_param, memory_param, gnn_param, train_param = parse_config('/home/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+sample_param, memory_param, gnn_param, train_param = parse_config('/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 sample_param['layer'] = len(fan_nums)
 sample_param['neighbor'] = fan_nums
 sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),

@@ -9,7 +9,7 @@ file_size_bytes = file_size_gb * 1024 * 1024 * 1024
 data = np.random.rand(file_size_bytes // 4).astype(np.int32)  # 使用int32类型，每个元素4字节
 
 ts = time.time()
-file_path = f'/home/guorui/DG/test_write_{ts}.bin'
+file_path = f'/raid/guorui/DG/test_write_{ts}.bin'
 
 # 写入文件
 write_start_time = time.time()

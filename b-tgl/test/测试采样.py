@@ -25,7 +25,7 @@ from sampler.sampler import *
 from sampler.sampler_gpu import *
 fan_nums = [3]
 layers = len(fan_nums)
-sample_param, memory_param, gnn_param, train_param = parse_config('/home/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+sample_param, memory_param, gnn_param, train_param = parse_config('/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 sample_param['layer'] = len(fan_nums)
 sample_param['neighbor'] = fan_nums
 

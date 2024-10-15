@@ -47,7 +47,7 @@ else:
 
 
 fan_nums = [10]
-sample_param, memory_param, gnn_param, train_param = parse_config('/home/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+sample_param, memory_param, gnn_param, train_param = parse_config('/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 sample_param['layer'] = len(fan_nums)
 sample_param['neighbor'] = fan_nums
 sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),

@@ -41,4 +41,4 @@ def find_and_process_log_files(directory):
 
 if __name__ == "__main__":
     # Replace 'your_directory_here' with the path to the directory you want to search.
-    find_and_process_log_files('/home/guorui/workspace/dgnn/exp/准确率结果')
+    find_and_process_log_files('/raid/guorui/workspace/dgnn/exp/准确率结果')

@@ -218,8 +218,8 @@ cur batch: 0, start pre sample and analyze...
 Traceback (most recent call last):
   File "train.py", line 368, in <module>
     pred_pos, pred_neg = model(mfgs)
-  File "/home/guorui/anaconda3/envs/sgnn/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+  File "/raid/guorui/anaconda3/envs/sgnn/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
     return forward_call(*input, **kwargs)
-  File "/home/guorui/workspace/dgnn/tgl/modules.py", line 66, in forward
+  File "/raid/guorui/workspace/dgnn/tgl/modules.py", line 66, in forward
     mfgs[l + 1][h].srcdata['h'] = rst
 IndexError: list index out of range

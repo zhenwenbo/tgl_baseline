@@ -94,7 +94,7 @@ for model in "${models[@]}"; do
 
 
     for r in "${ratios[@]}"; do
-        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/home/guorui/workspace/dgnn/exp/scripts/${model}-test-1.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-1_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-1.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-1_res.log &
         pid=$!
         memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-1_res_mem.log"
         monitor_memory_usage $pid
@@ -116,7 +116,7 @@ for model in "${models[@]}"; do
 
 
     for r in "${ratios[@]}"; do
-        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/home/guorui/workspace/dgnn/exp/scripts/${model}-test-2.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-2_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-2.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-2_res.log &
         pid=$!
         memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-2_res_mem.log"
         monitor_memory_usage $pid
