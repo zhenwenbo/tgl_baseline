@@ -42,16 +42,16 @@ class MailBox():
         for i, b in enumerate(mfg):
             uni_mem = self.node_memory[uni_node.long()]
             uni_mem = uni_mem.cuda()
-            b.srcdata['mem'] = uni_mem[inv_node]
+            b.srcdata['mem'] = uni_mem[inv_node[i]]
             uni_mem_ts = self.node_memory_ts[uni_node.long()]
             uni_mem_ts = uni_mem_ts.cuda()
-            b.srcdata['mem_ts'] = uni_mem_ts[inv_node]
+            b.srcdata['mem_ts'] = uni_mem_ts[inv_node[i]]
             uni_mem_input = self.mailbox[uni_node.long()]
             uni_mem_input = uni_mem_input.cuda()
-            b.srcdata['mem_input'] = uni_mem_input[inv_node].reshape(b.srcdata['ID'].shape[0], -1)
+            b.srcdata['mem_input'] = uni_mem_input[inv_node[i]].reshape(b.srcdata['ID'].shape[0], -1)
             uni_mail_ts = self.mailbox_ts[uni_node.long()]
             uni_mail_ts = uni_mail_ts.cuda()
-            b.srcdata['mail_ts'] = uni_mail_ts[inv_node]             
+            b.srcdata['mail_ts'] = uni_mail_ts[inv_node[i]]             
                 
     def prep_input_mails_selection(self, mfg, uni_node):
         for i, b in enumerate(mfg):

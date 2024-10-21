@@ -285,7 +285,7 @@ if __name__ == '__main__':
         test_epo = 1
 
     cur_version = f"{time.time():.0f}"
-    directory = f'/home/guorui/capsule/src/train/model/ETC_{cur_version}'
+    directory = f'/raid/guorui/capsule/src/train/model/ETC_{cur_version}'
     if not os.path.exists(directory):
         os.makedirs(directory)
     try:
