@@ -3,7 +3,7 @@ import os
 import json
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', default='LASTFM', type=str, help='dataset name')
-parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/exp/scripts/TGAT-test-2.yml', type=str, help='path to config file')
+parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/exp/scripts/TGN-test-2.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -288,210 +288,213 @@ if __name__ == '__main__':
     directory = f'/home/guorui/capsule/src/train/model/ETC_{cur_version}'
     if not os.path.exists(directory):
         os.makedirs(directory)
-            
-    for test_i in range(test_epo):
-        val_ap, test_ap = [], []
+    try:
+        for test_i in range(test_epo):
+            val_ap, test_ap = [], []
 
-        model = GeneralModel(gnn_dim_node, gnn_dim_edge, sample_param, memory_param, gnn_param, train_param, combined=combine_first).cuda()
-        mailbox = MailBox(memory_param, g['indptr'].shape[0] - 1, gnn_dim_edge) if memory_param['type'] != 'none' else None
-        creterion = torch.nn.BCEWithLogitsLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=train_param['lr'])
-        for e in range(train_param['epoch']):
-            epo_start = time.time()
-            print('Epoch {:d}:'.format(e))
-            ret_list = []
-            neg_list = []
-            node_list = []
-            ts_list = []
-            time_sample = 0
-            time_prep = 0
-            time_tot = 0
-            time_per_batch = 0
+            model = GeneralModel(gnn_dim_node, gnn_dim_edge, sample_param, memory_param, gnn_param, train_param, combined=combine_first).cuda()
+            mailbox = MailBox(memory_param, g['indptr'].shape[0] - 1, gnn_dim_edge) if memory_param['type'] != 'none' else None
+            creterion = torch.nn.BCEWithLogitsLoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=train_param['lr'])
+            for e in range(train_param['epoch']):
+                epo_start = time.time()
+                print('Epoch {:d}:'.format(e))
+                ret_list = []
+                neg_list = []
+                node_list = []
+                ts_list = []
+                time_sample = 0
+                time_prep = 0
+                time_tot = 0
+                time_per_batch = 0
 
-            time_total_prep = 0
-            time_total_strategy = 0
-            time_total_compute = 0
-            time_total_update = 0
-            time_total_epoch = 0
-            time_total_epoch_s = time.time()
+                time_total_prep = 0
+                time_total_strategy = 0
+                time_total_compute = 0
+                time_total_update = 0
+                time_total_epoch = 0
+                time_total_epoch_s = time.time()
 
-            total_loss = 0
-            # training
-            model.train()
-            if sampler is not None:
-                sampler.reset()
-            if mailbox is not None:
-                mailbox.reset()
-                model.memory_updater.last_updated_nid = None
-            #sample for all
-            t_start = time.time()
-
-            time_total_prep_s = time.time()
-            for _, rows in df[:train_edge_end].groupby(train_group_index):
-                t0 = time.time()
-                neg = neg_link_sampler.sample(len(rows))
-                root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg]).astype(np.int32)
-                ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
-                t1 = time.time()
+                total_loss = 0
+                # training
+                model.train()
                 if sampler is not None:
-                    if 'no_neg' in sample_param and sample_param['no_neg']:
-                        pos_root_end = root_nodes.shape[0] * 2 // 3
-                        sampler.sample(root_nodes[:pos_root_end], ts[:pos_root_end])
-                        ret = sampler.get_ret()
-                        t2 = time.time()
-                        ret_list.append(ret)
+                    sampler.reset()
+                if mailbox is not None:
+                    mailbox.reset()
+                    model.memory_updater.last_updated_nid = None
+                #sample for all
+                t_start = time.time()
+
+                time_total_prep_s = time.time()
+                for _, rows in df[:train_edge_end].groupby(train_group_index):
+                    t0 = time.time()
+                    neg = neg_link_sampler.sample(len(rows))
+                    root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg]).astype(np.int32)
+                    ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
+                    t1 = time.time()
+                    if sampler is not None:
+                        if 'no_neg' in sample_param and sample_param['no_neg']:
+                            pos_root_end = root_nodes.shape[0] * 2 // 3
+                            sampler.sample(root_nodes[:pos_root_end], ts[:pos_root_end])
+                            ret = sampler.get_ret()
+                            t2 = time.time()
+                            ret_list.append(ret)
+                            node_list.append(root_nodes)
+                            ts_list.append(ts)
+                            flag1 = True
+                            time_sample += t2 - t1
+                        else:
+                            sampler.sample(root_nodes, ts)
+                            ret = sampler.get_ret()
+                            t2 = time.time()
+                            ret_list.append(ret)
+                            node_list.append(root_nodes)
+                            ts_list.append(ts)
+                            time_sample += t2 - t1
+                    else:
                         node_list.append(root_nodes)
                         ts_list.append(ts)
                         flag1 = True
-                        time_sample += t2 - t1
-                    else:
-                        sampler.sample(root_nodes, ts)
-                        ret = sampler.get_ret()
-                        t2 = time.time()
-                        ret_list.append(ret)
-                        node_list.append(root_nodes)
-                        ts_list.append(ts)
-                        time_sample += t2 - t1
+                
+                if sampler is not None:
+                    total = len(ret_list)
                 else:
-                    node_list.append(root_nodes)
-                    ts_list.append(ts)
-                    flag1 = True
-            
-            if sampler is not None:
-                total = len(ret_list)
-            else:
-                total = len(node_list)
-            t_prep_s = time.time()
-            print('sample & finish, start the subthread.')
-            prep_thread = threading.Thread(target = preparation, args = \
-            (ret_list, node_list, ts_list, node_feats, edge_feats, sample_param['history'], total, flag1, flag2, q,))
-            prep_thread.start()
-            t_end_s = time.time()
-            time_prep += t_prep_s - t_start
-            time_tot += t_end_s - t_start
-            
-            #start the main computation
-            count = 0
-            time_total_prep += time.time() - time_total_prep_s
-            batch_edge_count = 0
-            for batch_num, rows in df[:train_edge_end].groupby(train_group_index):
+                    total = len(node_list)
+                t_prep_s = time.time()
+                print('sample & finish, start the subthread.')
+                prep_thread = threading.Thread(target = preparation, args = \
+                (ret_list, node_list, ts_list, node_feats, edge_feats, sample_param['history'], total, flag1, flag2, q,))
+                prep_thread.daemon = True
+                prep_thread.start()
+                t_end_s = time.time()
+                time_prep += t_prep_s - t_start
+                time_tot += t_end_s - t_start
+                
+                #start the main computation
+                count = 0
+                time_total_prep += time.time() - time_total_prep_s
+                batch_edge_count = 0
+                for batch_num, rows in df[:train_edge_end].groupby(train_group_index):
 
-                batch_edge_count += len(rows)
-                if (batch_num % 1000 == 0):
-                    print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / batch_edge_count * (train_edge_end)):.3f}s")
-                    print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
+                    batch_edge_count += len(rows)
+                    if (batch_num % 1000 == 0):
+                        print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / batch_edge_count * (train_edge_end)):.3f}s")
+                        print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
-                    time_per_batch = 0
-                    batch_edge_count = 0
-                t0 = time.time()
-                root_nodes = node_list[count]
-                ts = ts_list[count]
-                count += 1
-                #get_data
-                mfgs, uni_node, inv_node, uni_edge, inv_edge, uni_node_r, inv_node_r, edge_r, node_data, edge_data = q.get()
-                #refresh uni_mem
-                if mailbox is not None:
-                    uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
-                    mailbox.prep_input_mails_selection(mfgs[0], uni_node)
-                # to_cuda 
-                if flag2:
-                    if node_data is not None:
-                        node_data = node_data.cuda()
-                    if edge_data is not None:
-                        edge_data = edge_data.cuda()
-                if mailbox is not None: 
-                    uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
-                    uni_mem.cuda(), uni_mem_ts.cuda(), uni_mem_input.cuda(), uni_mail_ts.cuda()
-                t3 = time.time()
-                #reconstruct input
-                mfgs = feat_reconstruct(mfgs, node_data, edge_data, inv_node, inv_edge)
-                if mailbox is not None:
-                    mailbox.reconstruct(mfgs[0], uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts, inv_node)
-                t1 = time.time()
-                time_prep += t1-t0
-                time_total_prep += t1-t0
-
-                time_total_compute_s = time.time()
-                #start pipelining
-                optimizer.zero_grad()
-                pred_pos, pred_neg = model(mfgs)
-                loss = creterion(pred_pos, torch.ones_like(pred_pos))
-                loss += creterion(pred_neg, torch.zeros_like(pred_neg))
-                total_loss += float(loss) * train_param['batch_size']
-                loss.backward()
-                if (batch_num % 100 == 0):
-                    print(f"loss:{loss.item()}")
-                optimizer.step()
-                del mfgs[0]
-                t2 = time.time()
-                time_total_compute += time.time() - time_total_compute_s
-
-                if mailbox is not None:      
-                    mem_edge_feats = edge_feats[rows['Unnamed: 0'].values].cuda()
-                    root_nodes_gpu = torch.from_numpy(root_nodes).cuda()
-                    ts_gpu = torch.from_numpy(ts).cuda()
-                    #push update to GPU
-                    mail_nid, mail, mail_ts = mailbox.push_update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes_gpu, ts_gpu, mem_edge_feats, edge_r, uni_node_r, inv_node_r)
-                    mem_nid, mem, mem_ts = mailbox.push_update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes_gpu, model.memory_updater.last_updated_ts)
-                    #transfer the update result back to CPU
-                    mailbox.update_mailbox_trans(mail_nid, mail, mail_ts)
-                    mailbox.update_memory_trans(mem_nid, mem, mem_ts)
-                t3 = time.time()
-                time_prep += t3-t2
-                time_total_update += t3-t2
-                time_tot += t3-t0
-
-                time_per_batch += time.time() - t0
-            prep_thread.join()
-            print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s'.format(time_tot, time_prep, time_sample))
-
-            time_total_epoch += time.time() - time_total_epoch_s
-            time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
-            print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
-            print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
-
-
-            model_eval = True
-
-            # ap, auc = eval(group_indices, 'val')
-            # val_ap.append(f'{ap:.6f}')
-            
-            
-            args.model_eval = True
-            test_per_epoch = True
-            only_save_model = False
-            if (test_per_epoch):
-                if (only_save_model):
-                    print(f"只保留模型不做验证")
-                    torch.save(model.state_dict(), f'{directory}/ETC_{test_i}_{e}.pth')
-                    continue
-
-                print(f"测试集验证")
-                if (args.model_eval):
-                    model.eval()
-
-                    if sampler is not None:
-                        sampler.reset()
+                        time_per_batch = 0
+                        batch_edge_count = 0
+                    t0 = time.time()
+                    root_nodes = node_list[count]
+                    ts = ts_list[count]
+                    count += 1
+                    #get_data
+                    mfgs, uni_node, inv_node, uni_edge, inv_edge, uni_node_r, inv_node_r, edge_r, node_data, edge_data = q.get()
+                    #refresh uni_mem
                     if mailbox is not None:
-                        mailbox.reset()
-                        model.memory_updater.last_updated_nid = None
-                        eval(group_indices, 'train')
-                        eval(group_indices, 'val')
-                    ap, auc = eval(group_indices, 'test')
-                    # if args.eval_neg_samples > 1:
-                    #     print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
-                    # else:
-                    #     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
-                    test_ap.append(f'{ap:.6f}')
-            print(f'val: {val_ap}; test: {test_ap}')
+                        uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
+                        mailbox.prep_input_mails_selection(mfgs[0], uni_node)
+                    # to_cuda 
+                    if flag2:
+                        if node_data is not None:
+                            node_data = node_data.cuda()
+                        if edge_data is not None:
+                            edge_data = edge_data.cuda()
+                    if mailbox is not None: 
+                        uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
+                        uni_mem.cuda(), uni_mem_ts.cuda(), uni_mem_input.cuda(), uni_mail_ts.cuda()
+                    t3 = time.time()
+                    #reconstruct input
+                    mfgs = feat_reconstruct(mfgs, node_data, edge_data, inv_node, inv_edge)
+                    if mailbox is not None:
+                        mailbox.reconstruct(mfgs[0], uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts, inv_node)
+                    t1 = time.time()
+                    time_prep += t1-t0
+                    time_total_prep += t1-t0
 
-            print(f"单个epoch用时: {time.time() - epo_start:.4f}s")
+                    time_total_compute_s = time.time()
+                    #start pipelining
+                    optimizer.zero_grad()
+                    pred_pos, pred_neg = model(mfgs)
+                    loss = creterion(pred_pos, torch.ones_like(pred_pos))
+                    loss += creterion(pred_neg, torch.zeros_like(pred_neg))
+                    total_loss += float(loss) * train_param['batch_size']
+                    loss.backward()
+                    if (batch_num % 100 == 0):
+                        print(f"loss:{loss.item()}")
+                    optimizer.step()
+                    del mfgs[0]
+                    t2 = time.time()
+                    time_total_compute += time.time() - time_total_compute_s
 
-        total_val_res.append(val_ap)
-        total_test_res.append(test_ap)
+                    if mailbox is not None:      
+                        mem_edge_feats = edge_feats[rows['Unnamed: 0'].values].cuda()
+                        root_nodes_gpu = torch.from_numpy(root_nodes).cuda()
+                        ts_gpu = torch.from_numpy(ts).cuda()
+                        #push update to GPU
+                        mail_nid, mail, mail_ts = mailbox.push_update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes_gpu, ts_gpu, mem_edge_feats, edge_r, uni_node_r, inv_node_r)
+                        mem_nid, mem, mem_ts = mailbox.push_update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes_gpu, model.memory_updater.last_updated_ts)
+                        #transfer the update result back to CPU
+                        mailbox.update_mailbox_trans(mail_nid, mail, mail_ts)
+                        mailbox.update_memory_trans(mem_nid, mem, mem_ts)
+                    t3 = time.time()
+                    time_prep += t3-t2
+                    time_total_update += t3-t2
+                    time_tot += t3-t0
 
-        print(total_val_res)
-        print(total_test_res)
-    
+                    time_per_batch += time.time() - t0
+                prep_thread.join()
+                print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s'.format(time_tot, time_prep, time_sample))
+
+                time_total_epoch += time.time() - time_total_epoch_s
+                time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+                print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+                print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
+
+
+                model_eval = True
+
+                # ap, auc = eval(group_indices, 'val')
+                # val_ap.append(f'{ap:.6f}')
+                
+                
+                args.model_eval = True
+                test_per_epoch = True
+                only_save_model = False
+                if (test_per_epoch):
+                    if (only_save_model):
+                        print(f"只保留模型不做验证")
+                        torch.save(model.state_dict(), f'{directory}/ETC_{test_i}_{e}.pth')
+                        continue
+
+                    print(f"测试集验证")
+                    if (args.model_eval):
+                        model.eval()
+
+                        if sampler is not None:
+                            sampler.reset()
+                        if mailbox is not None:
+                            mailbox.reset()
+                            model.memory_updater.last_updated_nid = None
+                            eval(group_indices, 'train')
+                            eval(group_indices, 'val')
+                        ap, auc = eval(group_indices, 'test')
+                        # if args.eval_neg_samples > 1:
+                        #     print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
+                        # else:
+                        #     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
+                        test_ap.append(f'{ap:.6f}')
+                print(f'val: {val_ap}; test: {test_ap}')
+
+                print(f"单个epoch用时: {time.time() - epo_start:.4f}s")
+
+            total_val_res.append(val_ap)
+            total_test_res.append(test_ap)
+
+            print(total_val_res)
+            print(total_test_res)
+    except RuntimeError:
+        print(f"出现runtime Error")
+        exit(1) 
     print(f"total_val_res: {total_val_res}")
     print(f"total_test_res: {total_test_res}")
