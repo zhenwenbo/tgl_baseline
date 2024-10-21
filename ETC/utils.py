@@ -157,22 +157,23 @@ def prepare_input(mfgs, node_feats, edge_feats, uni_node, inv_node, uni_edge, in
     t_write = 0
     i = 0
     if node_feats is not None:
-        for b in mfgs[0]:
-            if pinned:
-                if nids is not None:
-                    idx = nids[i]
+        for i,mfg in enumerate(mfgs):
+            for b in mfg:
+                if pinned:
+                    if nids is not None:
+                        idx = nids[i]
+                    else:
+                        idx = b.srcdata['ID'].cpu().long()
+                    torch.index_select(node_feats, 0, idx, out=nfeat_buffs[i][:idx.shape[0]])
+                    b.srcdata['h'] = nfeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
+                    i += 1
                 else:
-                    idx = b.srcdata['ID'].cpu().long()
-                torch.index_select(node_feats, 0, idx, out=nfeat_buffs[i][:idx.shape[0]])
-                b.srcdata['h'] = nfeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
-                i += 1
-            else:
-                srch = node_feats[uni_node.long()].float()
-                srch = srch.cuda()
-                b.srcdata['h'] = srch[inv_node]
+                    srch = node_feats[uni_node.long()].float()
+                    srch = srch.cuda()
+                    b.srcdata['h'] = srch[inv_node[i]]
     i = 0
     if edge_feats is not None:
-        for mfg in mfgs:
+        for i,mfg in enumerate(mfgs):
             for b in mfg:
                 if b.num_src_nodes() > b.num_dst_nodes():
                     if pinned:
@@ -186,7 +187,7 @@ def prepare_input(mfgs, node_feats, edge_feats, uni_node, inv_node, uni_edge, in
                     else:
                         srch = edge_feats[uni_edge.long()].float()
                         srch = srch.cuda()
-                        b.edata['f'] = srch[inv_edge]
+                        b.edata['f'] = srch[inv_edge[i]]
                         
     return mfgs
 

@@ -13,8 +13,8 @@ from utils import emptyCache
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -22,7 +22,7 @@ parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--reuse_ratio', type=float, default=0, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='basic_conf', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='basic_conf_disk', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')

@@ -31,7 +31,7 @@ def saveBin(tensor,savePath,addSave=False):
         tensor.cpu().numpy().tofile(savePath)
     elif isinstance(tensor, np.ndarray):
         tensor.tofile(savePath)
-data = 'TALK'
+data = 'BITCOIN'
 path = f'/raid/guorui/DG/dataset/{data}/edge_features.pt'
 tensor = torch.load(path)
 if (tensor.dtype == torch.bool):
