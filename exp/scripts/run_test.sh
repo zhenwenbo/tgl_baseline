@@ -75,14 +75,14 @@ monitor_memory_usage() {
 
 
 ds=("TALK" "STACK")
-ds=("BITCOIN")
+ds=("LASTFM")
 models=("TGN" "TimeSGN" "TGAT")
-models=("TGAT" "TGN" "TimeSGN")
+# models=("TimeSGN")
 layers=("1")
 layers=("1" "2")
 
 ratios=("0" "0.9")
-ratios=("0" "0.9")
+# ratios=("0.9")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-test-${timestamp}"

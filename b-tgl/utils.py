@@ -47,9 +47,15 @@ def emptyCache():
     gc.collect()
 
 #在当前目录下保存这个tensor的数据类型以及所处容器(cpu or cuda)以便恢复
-def saveBin(tensor,savePath,addSave=False):
+def saveBin(tensor,savePath,addSave=False, use_pt = False):
 
-    savePath = savePath.replace('.pt','.bin')
+    if (not use_pt):
+        savePath = savePath.replace('.pt','.bin')
+
+    if (use_pt):
+        torch.save(tensor, savePath)
+        return
+    
     dir = os.path.dirname(savePath)
     if(not os.path.exists(dir)):
         os.makedirs(dir)
@@ -184,13 +190,13 @@ def loadBinDisk(path, ind, use_slice = False):
     # print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape}")
     return res
 
-def gen_feat(d, rand_de=0, rand_dn=0):
+def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):
     path = f'/raid/guorui/DG/dataset/{d}'
     node_feats = None
     edge_feats = None
 
     if d == 'LASTFM':
-        edge_feats = torch.randn(1293103, rand_de)
+        edge_feats = torch.randn(1293103, 128)
     elif d == 'MOOC':
         edge_feats = torch.randn(411749, rand_de)
     elif d == 'STACK':
@@ -201,7 +207,7 @@ def gen_feat(d, rand_de=0, rand_dn=0):
         edge_feats = torch.randn(122948162, 172)
 
     if d == 'LASTFM':
-        node_feats = torch.randn(1980, rand_dn)
+        node_feats = torch.randn(1980, 128)
     elif d == 'MOOC':
         node_feats = torch.randn(7144, rand_dn)
     elif d == 'STACK':
@@ -212,9 +218,9 @@ def gen_feat(d, rand_de=0, rand_dn=0):
     #     node_feats = torch.randn(24575383, 172)
     
     if (edge_feats != None):
-        saveBin(edge_feats, path + '/edge_features.pt')
+        saveBin(edge_feats, path + '/edge_features.pt', use_pt = use_pt)
     if (node_feats != None):
-        saveBin(node_feats, path + '/node_features.pt')
+        saveBin(node_feats, path + '/node_features.pt', use_pt = use_pt)
 
 
 

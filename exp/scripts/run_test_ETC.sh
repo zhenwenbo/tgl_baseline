@@ -74,12 +74,12 @@ monitor_memory_usage() {
 
 
 
-ds=("TALK" "STACK")
-ds=("LASTFM" "TALK" "STACK" "BITCOIN")
-models=("TGN" "TimeSGN" "TGAT")
-models=("TGAT" "TGN" "TimeSGN")
+ds=("BITCOIN")
+# ds=("LASTFM" "TALK" "STACK" "BITCOIN")
+# models=("TimeSGN")
+models=("TimeSGN")
 layers=("1")
-layers=("1" "2")
+layers=("1")
 
 
 timestamp=$(date +%Y%m%d-%H%M%S)

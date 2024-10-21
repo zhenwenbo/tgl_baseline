@@ -31,7 +31,18 @@ def saveBin(tensor,savePath,addSave=False):
         tensor.cpu().numpy().tofile(savePath)
     elif isinstance(tensor, np.ndarray):
         tensor.tofile(savePath)
-data = 'TALK'
+data = 'LASTFM'
+
+
+import sys
+
+root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+from utils import *
+
+gen_feat(data, use_pt = True)
+
 path = f'/raid/guorui/DG/dataset/{data}/edge_features.pt'
 tensor = torch.load(path)
 if (tensor.dtype == torch.bool):
@@ -45,12 +56,6 @@ if (tensor.dtype == torch.bool):
 saveBin(tensor, path)
 
 
-import sys
-
-root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
-if root_dir not in sys.path:
-    sys.path.append(root_dir)
-from utils import *
 
 g, df = load_graph(data)
 
