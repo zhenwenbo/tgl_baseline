@@ -1,6 +1,6 @@
 import argparse
 import os
-
+import json
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', default='LASTFM', type=str, help='dataset name')
 parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/exp/scripts/TGAT-test-2.yml', type=str, help='path to config file')
@@ -72,12 +72,23 @@ if __name__ == '__main__':
         sample_param['neighbor'] = [8, 8]
         train_param['epoch'] = 1
         print(f"GDELT二跳修改邻域为8,8")
+    if (args.data == 'GDELT' or args.data == 'BITCOIN'):
+        print(f"GDELT和BITCOIN只跑5个epoch")
+        train_param['epoch'] = 5
     print(sample_param)
     print(train_param)
+    
 
-    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+    # train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+    # val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
+    json_path = f'/raid/guorui/DG/dataset/{args.data}/df-conf.json'
+    
+    with open(json_path, 'r') as f:
+        df_conf = json.load(f)
+    train_edge_end = df_conf['train_edge_end']
+    val_edge_end = df_conf['val_edge_end']
+    
     gnn_dim_node = 0 if node_feats is None else node_feats.shape[1]
     gnn_dim_edge = 0 if edge_feats is None else edge_feats.shape[1]
     combine_first = False
@@ -147,7 +158,7 @@ if __name__ == '__main__':
                                   sample_param['num_thread'], 1, sample_param['layer'], sample_param['neighbor'],
                                   sample_param['strategy']=='recent', sample_param['prop_time'],
                                   sample_param['history'], float(sample_param['duration']))
-    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1)
+    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1, g['indptr'][-1])
     print('initialize sampler finish.')
     def eval(group_indices,mode='val'):
         neg_samples = 1
@@ -169,8 +180,11 @@ if __name__ == '__main__':
             elif mode == 'test':
                 group_index = group_indices[2]
             total_loss = 0
+
+            left, right = 0, 0
             for _, rows in eval_df.groupby(group_index):
-                root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows) * neg_samples)]).astype(np.int32)
+                right += len(rows) * neg_samples
+                root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample_test(left, right)]).astype(np.int32)
                 ts = np.tile(rows.time.values, neg_samples + 2).astype(np.float32)
                 if sampler is not None:
                     if 'no_neg' in sample_param and sample_param['no_neg']:
@@ -208,6 +222,9 @@ if __name__ == '__main__':
                         block = block[0][0]
                     mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes_gpu, ts_gpu, mem_edge_feats, block, neg_samples=neg_samples)
                     mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts, neg_samples=neg_samples)
+                
+
+                left = right
             if mode == 'val':
                 val_losses.append(float(total_loss))
         ap = float(torch.tensor(aps).mean())
@@ -259,8 +276,20 @@ if __name__ == '__main__':
     total_val_res = []
     total_test_res = []
     test_epo = 2
+    if (args.data == 'GDELT'):
+        print(f"GDELT数据集改为只测一轮...")
+        test_epo = 1
 
-    for i in range(test_epo):
+    if (args.data == 'BITCOIN'):
+        print(f"BITCOIN数据集改为只测一轮...")
+        test_epo = 1
+
+    cur_version = f"{time.time():.0f}"
+    directory = f'/home/guorui/capsule/src/train/model/ETC_{cur_version}'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+            
+    for test_i in range(test_epo):
         val_ap, test_ap = [], []
 
         model = GeneralModel(gnn_dim_node, gnn_dim_edge, sample_param, memory_param, gnn_param, train_param, combined=combine_first).cuda()
@@ -390,6 +419,8 @@ if __name__ == '__main__':
                 loss += creterion(pred_neg, torch.zeros_like(pred_neg))
                 total_loss += float(loss) * train_param['batch_size']
                 loss.backward()
+                if (batch_num % 100 == 0):
+                    print(f"loss:{loss.item()}")
                 optimizer.step()
                 del mfgs[0]
                 t2 = time.time()
@@ -428,7 +459,14 @@ if __name__ == '__main__':
             
             args.model_eval = True
             test_per_epoch = True
+            only_save_model = False
             if (test_per_epoch):
+                if (only_save_model):
+                    print(f"只保留模型不做验证")
+                    torch.save(model.state_dict(), f'{directory}/ETC_{test_i}_{e}.pth')
+                    continue
+
+                print(f"测试集验证")
                 if (args.model_eval):
                     model.eval()
 

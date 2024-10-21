@@ -247,8 +247,8 @@ if __name__ == '__main__':
 
     if (args.use_ayscn_prefetch):
         if (args.data == 'LASTFM'):
-            gnn_dim_edge = 100
-            gnn_dim_node = 100
+            gnn_dim_edge = 128
+            gnn_dim_node = 128
         elif (args.data == 'TALK'):
             gnn_dim_edge = 172
             gnn_dim_node = 172

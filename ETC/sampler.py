@@ -6,14 +6,30 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from sampler_core import ParallelSampler, TemporalGraphBlock
-
+import os
 class NegLinkSampler:
 
-    def __init__(self, num_nodes):
+    def __init__(self, num_nodes, num_edges):
         self.num_nodes = num_nodes
+        self.test_nodes = None
+        self.num_edges = num_edges
 
     def sample(self, n):
         return np.random.randint(self.num_nodes, size=n)
+    
+    def load_test(self):
+        if (not os.path.exists(f'/raid/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')):
+            res = np.random.randint(self.num_nodes, size=self.num_edges, dtype = np.int32)
+            res.tofile(f'/raid/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin')
+        else:
+            res = np.fromfile(f'/raid/guorui/workspace/dgnn/test_set/{self.num_nodes}.bin', dtype = np.int32)
+        
+        self.test_nodes = res
+    def sample_test(self, left, right):
+        if (self.test_nodes is None):
+            #加载
+            self.load_test()
+        return self.test_nodes[left:right]
 
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
