@@ -3,7 +3,7 @@ import os
 import json
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', default='LASTFM', type=str, help='dataset name')
-parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/exp/scripts/TGAT-test-2.yml', type=str, help='path to config file')
+parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/exp/scripts/TGN-test-2.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -285,7 +285,7 @@ if __name__ == '__main__':
         test_epo = 1
 
     cur_version = f"{time.time():.0f}"
-    directory = f'/home/guorui/capsule/src/train/model/ETC_{cur_version}'
+    directory = f'/raid/guorui/capsule/src/train/model/ETC_{cur_version}'
     if not os.path.exists(directory):
         os.makedirs(directory)
             
