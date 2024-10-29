@@ -491,7 +491,7 @@ class Pre_fetch:
         dis_ind = torch.isin(neg_nodes, pos_node_map, assume_unique=True,invert=True)
         dis_neg_nodes = neg_nodes[dis_ind]
 
-
+        # time.sleep(0.1)
         # 此处为负节点邻域涉及的节点，新加一个判断：这个节点集合是否在上一个block训练的所有节点集合中，若在则后续在下一个block接收时再填充他们的特征。
         # 验证：当使用负节点采样重用时，这个操作是否能减少大部分的IO开销？
         dd_ind = torch.isin(dis_neg_nodes, part_node_map, assume_unique=True,invert=True)

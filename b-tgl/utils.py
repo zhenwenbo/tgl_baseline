@@ -121,32 +121,46 @@ def loadBin(path):
         res = res.to(torch.float32)
     return res
 
-def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=128000, use_slice = False):
+import concurrent.futures
+
+def read_data_from_file_concurrent(file_path, indices, shape, dtype=np.float32, batch_size=8192, use_slice = False):
+    # 利用 numpy 的内存映射函数来映射整个文件
+    data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
+    result = []
+    
+    # 定义读取批次数据的函数
+    def read_batch(batch_indices):
+        batch_data = data[batch_indices, :]
+        return torch.tensor(batch_data).reshape(-1)
+    
+    # 使用多线程池读取数据
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # 分批次并行提交任务
+        futures = []
+        for i in range(0, len(indices), batch_size):
+            batch_indices = indices[i:i+batch_size]
+            futures.append(executor.submit(read_batch, batch_indices))
+        
+        # 收集读取结果
+        for future in concurrent.futures.as_completed(futures):
+            result.append(future.result())
+    
+    # 将结果合并成一个tensor
+    if len(result) == 0:
+        return torch.from_numpy(np.empty(0, dtype=dtype))
+    return torch.cat(result, dim=0).reshape(-1, shape[1])
+
+def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=4096, use_slice = False):
     # 利用 numpy 的内存映射函数来映射整个文件
     use_slice = False
     data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
     result = []
-    if (use_slice):
-        print(f"预处理slice")
-        batch_slice = torch.nonzero(torch.diff(indices) > 24).reshape(-1) + 1
-        left = 0
-        for right in batch_slice:
-            batch_indices = indices[left:right]
-            # 批量读取
-            batch_data = data[batch_indices, :]
-            result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
-            left = right
-
-        batch_indices = indices[left:indices.shape[0]]
+    
+    for i in range(0, len(indices), batch_size):
+        batch_indices = indices[i:i+batch_size]
+        # 批量读取
         batch_data = data[batch_indices, :]
         result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
-        left = right
-    else:
-        for i in range(0, len(indices), batch_size):
-            batch_indices = indices[i:i+batch_size]
-            # 批量读取
-            batch_data = data[batch_indices, :]
-            result.append(torch.tensor(batch_data).reshape(-1))  # 转换为torch tensor
     
     # 将结果合并成一个tensor
     if (len(result) == 0):
@@ -184,7 +198,7 @@ def loadBinDisk(path, ind, use_slice = False):
     read_disk_s = time.time()
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
     
-    res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
+    res = read_data_from_file_concurrent(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
     if (cur_conf['dtype'] == 'float16'):
         res = res.to(torch.float32)
     # print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape}")

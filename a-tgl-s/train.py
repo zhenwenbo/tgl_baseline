@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl-s/config/APAN.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/home/gr/workspace/dgnn/exp/scripts/TGN-test-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -35,6 +35,7 @@ def set_seed(seed):
 node_feats, edge_feats = load_feat(args.data, args.rand_edge_features, args.rand_node_features)
 g, df = load_graph(args.data)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+print(train_param)
 train_edge_end = df[df['ext_roll'].gt(0)].index[0]
 val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
@@ -212,14 +213,14 @@ for e in range(train_param['epoch']):
             mfgs = node_to_dgl_blocks(root_nodes, ts)
 
         # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
-        mfgs = prepare_input(mfgs, node_feats, edge_feats, combine_first=combine_first)
+        mfgs, seperate_data = prepare_input(mfgs, node_feats, edge_feats, combine_first=combine_first)
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0])
         time_prep += time.time() - t_prep_s
 
 
         optimizer.zero_grad()
-        pred_pos, pred_neg = model(mfgs)
+        pred_pos, pred_neg = model(mfgs, seperate_data = seperate_data)
         loss = creterion(pred_pos, torch.ones_like(pred_pos))
         loss += creterion(pred_neg, torch.zeros_like(pred_neg))
         total_loss += float(loss) * train_param['batch_size']
@@ -241,26 +242,26 @@ for e in range(train_param['epoch']):
 
         time_tot += time.time() - t_tot_s
         time_per_batch += time.time() - t_tot_s
-    ap, auc = eval('val')
-    if e > 2 and ap > best_ap:
-        best_e = e
-        best_ap = ap
-        torch.save(model.state_dict(), path_saver)
-    print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
+    # ap, auc = eval('val')
+    # if e > 2 and ap > best_ap:
+    #     best_e = e
+    #     best_ap = ap
+    #     torch.save(model.state_dict(), path_saver)
+    # print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
     print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
 
-print('Loading model at epoch {}...'.format(best_e))
-model.load_state_dict(torch.load(path_saver))
-model.eval()
-if sampler is not None:
-    sampler.reset()
-if mailbox is not None:
-    mailbox.reset()
-    model.memory_updater.last_updated_nid = None
-    eval('train')
-    eval('val')
-ap, auc = eval('test')
-if args.eval_neg_samples > 1:
-    print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
-else:
-    print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
+# print('Loading model at epoch {}...'.format(best_e))
+# model.load_state_dict(torch.load(path_saver))
+# model.eval()
+# if sampler is not None:
+#     sampler.reset()
+# if mailbox is not None:
+#     mailbox.reset()
+#     model.memory_updater.last_updated_nid = None
+#     eval('train')
+#     eval('val')
+# ap, auc = eval('test')
+# if args.eval_neg_samples > 1:
+#     print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
+# else:
+#     print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))

@@ -115,6 +115,12 @@ def prepare_input(mfgs, node_feats, edge_feats, combine_first=False, pinned=Fals
     t_idx = 0
     t_cuda = 0
     i = 0
+    seperate = True
+    if (seperate):
+        eid_uni = []
+        ef_uni = []
+        eid_inv = []
+        seperate_data = {}
     if node_feats is not None: 
         for b in mfgs[0]:
             if pinned:
@@ -142,9 +148,15 @@ def prepare_input(mfgs, node_feats, edge_feats, combine_first=False, pinned=Fals
                         b.edata['f'] = efeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
                         i += 1
                     else:
-                        srch = edge_feats[b.edata['ID'].long()].float()
+                        eids = b.edata['ID']
+                        eid_uni, eid_inv = torch.unique(eids, return_inverse = True)
+                        ef_uni = edge_feats[eid_uni.long()].float().cuda()
+                        srch = ef_uni[eid_inv]
+                        a = torch.sum(srch != edge_feats[b.edata['ID'].long()].cuda())
+
+                        # srch = edge_feats[b.edata['ID'].long()].float()
                         b.edata['f'] = srch.cuda()
-    return mfgs
+    return mfgs, {'eid_uni': eid_uni, 'eid_inv': eid_inv, 'ef_uni': ef_uni}
 
 def get_ids(mfgs, node_feats, edge_feats):
     nids = list()
