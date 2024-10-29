@@ -45,7 +45,7 @@ class GeneralModel(torch.nn.Module):
         if 'combine' in gnn_param and gnn_param['combine'] == 'rnn':
             self.combiner = torch.nn.RNN(gnn_param['dim_out'], gnn_param['dim_out'])
     
-    def forward(self, mfgs, neg_samples=1):
+    def forward(self, mfgs, seperate_data = None, neg_samples=1):
         if self.memory_param['type'] == 'node':
             self.memory_updater(mfgs[0])
         out = list()

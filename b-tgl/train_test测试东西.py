@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -11,7 +11,7 @@ parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 parser.add_argument('--use_gpu_sampler', action='store_true', default=True)
 
-parser.add_argument('--train_conf', type=str, default='basic_conf_disk', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='basic_eval', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--reuse_ratio', type=float, default=0, help='reuse_ratio')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
@@ -75,8 +75,70 @@ def get_inductive_links(df, train_edge_end, val_edge_end):
     print('Inductive links', len(inductive_inds), len(test_df))
     return [i for i in range(val_edge_end)] + inductive_inds
 
+import numpy as np
+import matplotlib.pyplot as plt
+
+cur_version = f'{time.time():.0f}'
+os.makedirs(f'./test_model/{cur_version}')
+
+def paint(ac_log, mode):
+    # 获取总的 batch 数量
+    n_batches = len(ac_log)
+
+    # 用于绘制的坐标
+    x = []  # 存储所有预测错误的样本索引
+    y = []  # 存储对应的 batch 索引
+
+    # 遍历 ac_log 来构建 x 和 y
+    for batch_idx, indices in enumerate(ac_log):
+        x.extend(indices)
+        y.extend([batch_idx] * len(indices))
+
+    plt.figure(figsize=(10, 6))
+    plt.scatter(x, y,s=10, alpha= 0.5, edgecolor='none')
+    plt.xlabel('Sample Index within Batch')
+    plt.ylabel('Batch Number')
+    plt.title('Prediction Errors per Batch')
+    plt.grid(True)
+    plt.savefig(f'./test_model/{cur_version}/{e}_{mode}.png')
+
+def paint_re(acc_log, mode):
+    # 计算 batch 数
+    num_batches = len(acc_log)
+
+    # 收集所有的索引
+    all_indices = [index for batch_indices in acc_log for index in batch_indices]
+    min_index = min(all_indices)
+    max_index = max(all_indices)
+
+    # 设置分段数量
+    num_bins = 20
+    x_bins = np.linspace(min_index, max_index, num_batches + 1)
+    y_bins = np.linspace(0, num_batches, num_bins + 1)
+    # 扁平化 acc_log 以获得 y 轴的对应 batch 数
+    y_values = []
+    x_values = []
+
+    for batch_index, indices in enumerate(acc_log):
+        y_values.extend([batch_index] * len(indices))  # 每个错误的索引对应当前 batch
+        x_values.extend(indices)  # 将错误的索引添加到 x_values
+
+    # 生成热力图数据
+    heatmap, x_edges, y_edges = np.histogram2d(x_values, y_values, bins=[x_bins, y_bins])
+    import matplotlib.pyplot as plt
+
+    # 绘制热力图
+    plt.figure(figsize=(12, 6))
+    plt.imshow(heatmap.T, origin='lower', aspect='auto', cmap='hot', 
+            extent=[min_index, max_index, 0, num_batches])
+    plt.colorbar(label='Frequency')
+    plt.xlabel('Index')
+    plt.ylabel('Batch Number')
+    plt.title('Heatmap of Prediction Errors by Batch and Index')
+    plt.savefig(f'./test_model/{cur_version}/{e}_{mode}_热力图.png')
 
 def eval(mode='val'):
+    ac_log = []
     set_mode(mode)
     if (emb_buffer):
         emb_buffer.cur_mode = 'val'
@@ -181,6 +243,14 @@ def eval(mode='val'):
                 print(f"正边loss:{pos_loss:.10f} 负边loss:{neg_loss:.10f}")
             y_pred = torch.cat([pred_pos, pred_neg], dim=0).sigmoid().cpu()
             y_true = torch.cat([torch.ones(pred_pos.size(0)), torch.zeros(pred_neg.size(0))], dim=0)
+
+
+            y_pred_sort, ind = torch.sort(y_pred.reshape(-1), descending=True)
+            res = ind[torch.nonzero((ind[ind.shape[0] // 2:] <= ind.shape[0] // 2)) .reshape(-1)+ ind.shape[0] // 2]
+
+            ac_log.append(res.tolist())
+            # print(f"mode: {mode}, cur_ap: {cur_ap}, 标签准确率: {torch.sum(pred_label == y_true) / y_true.shape[0]}")
+
             aps.append(average_precision_score(y_true, y_pred))
             if neg_samples > 1:
                 aucs_mrrs.append(torch.reciprocal(torch.sum(pred_pos.squeeze() < pred_neg.squeeze().reshape(neg_samples, -1), dim=0) + 1).type(torch.float))
@@ -205,6 +275,9 @@ def eval(mode='val'):
         auc_mrr = float(torch.cat(aucs_mrrs).mean())
     else:
         auc_mrr = float(torch.tensor(aucs_mrrs).mean())
+
+    # paint(ac_log, mode)
+    paint_re(ac_log, mode)
     return ap, auc_mrr
 
 def count_judge(src_node, dst_node):
@@ -250,7 +323,7 @@ if __name__ == '__main__':
     
     total_val_res = []
     total_test_res = []
-    test_epo = 2
+    test_epo = 1
     if (args.data == 'GDELT'):
         print(f"GDELT数据集改为只测一轮...")
         test_epo = 1
@@ -457,7 +530,7 @@ if __name__ == '__main__':
 
         val_ap, test_ap = [], []
 
-        for e in range(train_param['epoch']):
+        for e in range(20):
             epoch_s = time.time()
             print('Epoch {:d}:'.format(e))
             time_sample = 0
@@ -491,8 +564,187 @@ if __name__ == '__main__':
             #TODO 此处reorder是干嘛的?
             # ap, auc = eval('val')
             feat_buffer.cur_block = 0
+            for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
+                # if (batch_num == 30):
+                    
+                #     torch.save(feat_buffer.get_mailbox(torch.arange(1980, dtype = torch.int32, device = 'cuda:0')), '/raid/guorui/workspace/dgnn/b-tgl/mailbox_b')
 
-            model.load_state_dict(torch.load(f"/home/guorui/capsule/src/train/model/ETC_1728996687/ETC_0_{e}.pth"))
+                loopTime = time.time()
+                t_tot_s = time.time()
+                time_presample_s = time.time()
+                feat_buffer.run_batch(batch_num)
+
+                if (args.data in ['GDELT', 'STACK', 'TALK'] and batch_num % 1000 == 0):
+                    print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+                    print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
+                        loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+                    if (feat_buffer):
+                        feat_buffer.print_time()
+                    time_per_batch = 0
+
+                if (emb_buffer and emb_buffer.use_buffer):
+                    emb_buffer.cur_mode = 'presample'
+                    emb_buffer.run_batch(batch_num)
+
+                    emb_buffer.cur_mode = 'train'
+                time_presample += time.time() - time_presample_s
+
+                # emptyCache()
+                
+                #此处和预采样用一样的负节点
+                neg_start = (batch_num % feat_buffer.presample_batch) * train_param['batch_size']
+                neg_end = min(feat_buffer.neg_sample_nodes.shape[0], ((batch_num % feat_buffer.presample_batch) + 1) * train_param['batch_size'])
+                neg_sample_nodes = feat_buffer.neg_sample_nodes[neg_start: neg_end]
+
+                root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_sample_nodes]).astype(np.int32)
+                ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
+                # print(neg_sample_nodes)
+                # saveBin(torch.from_numpy(root_nodes), '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-node.bin')
+                # saveBin(torch.from_numpy(ts), '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/b-ts.bin')
+                t_sample_s = time.time()
+                if (use_gpu_sample):
+                    
+                    root_nodes = torch.from_numpy(root_nodes).cuda()
+                    root_ts = torch.from_numpy(ts).cuda()
+                    # print(root_nodes)
+                    # print(root_ts)
+                    ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
+                else:
+                    if sampler is not None:
+                        if no_neg:
+                            pos_root_end = root_nodes.shape[0] * 2 // 3
+                            sampler.sample(root_nodes[:pos_root_end], ts[:pos_root_end])
+                        else:
+                            sampler.sample(root_nodes, ts)
+                        ret = sampler.get_ret()
+                        # time_sample += ret[0].sample_time()
+                
+                time_sample += time.time() - t_sample_s
+                # if (_ == 10):
+                #     np.save(f"./sample_res_epo{e}", {"col": ret[0].col(),"row": ret[0].row(),"eid": ret[0].eid(), "ts": ret[0].ts()})
+
+                # print(f"one loop time1: {time.time() - loopTime:.4f}")
+                time1 = time.time()
+                t_gen_dgl_s = time.time()
+                t_prep_s = time.time()
+                if (use_gpu_sample):
+                    mfgs = sampler_gpu.gen_mfgs(ret)
+                    root_nodes = root_nodes.cpu().numpy()
+                else:
+                    if gnn_param['arch'] != 'identity':
+                        mfgs = to_dgl_blocks(ret, sample_param['history'])
+                    else:
+                        mfgs = node_to_dgl_blocks(root_nodes, ts)  
+                # emptyCache()
+                # print(f"root_nodes: {root_nodes}, ts: {ts}")
+                # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
+                time_gen_dgl += time.time() - t_gen_dgl_s
+                #对依赖进行分析
+                # node_num = rows.src.values.shape[0]
+                # src_node = torch.tensor(root_nodes[:node_num]).to(torch.int32)
+                # dst_node = torch.tensor(root_nodes[node_num:node_num * 2]).to(torch.int32)
+                # count_judge(src_node, dst_node)
+
+                time_feat_s = time.time()
+                mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
+                # print(f"feat时间0: {time.time() - time_feat_s:.7f}s")
+                if mailbox is not None:
+                    mailbox.prep_input_mails(mfgs[0])
+
+                # print(mfgs[0][0].edata)
+                # print(mfgs[0][0].ndata)
+
+                time_prep += time.time() - t_prep_s
+                time_feat += time.time() - time_feat_s
+                # print(f"feat时间: {time.time() - time_feat_s:.7f}s")
+
+                optimizer.zero_grad()
+                # print(f"数据转dgl图流程: {time.time() - time1:.4f}")
+                
+                time1 = time.time()
+
+                time_model_s = time.time()
+                # if (batch_num == 30):
+                    
+                #     print(mfgs[0][0].srcdata['ID'])
+                #     print(mfgs[0][0].ndata['mem_input']['_N'])
+                #     print(mfgs[0][0].ndata['mem']['_N'])
+                #     print(mfgs[0][0].edata['f'])
+                #     print(mfgs[0][0].ndata['ID']['_N'])
+                #     torch.save(feat_buffer.get_mailbox(torch.arange(1980, dtype = torch.int32, device = 'cuda:0')), '/raid/guorui/workspace/dgnn/b-tgl/mailbox_b')
+                # print(model.memory_updater.updater.weight_ih)
+
+                pred_pos, pred_neg = model(mfgs)
+                # model_structure(model)
+                # print(f"模型传播流程: {time.time() - time1:.4f}")
+                time_model += time.time() - time_model_s
+
+                time_opt_s = time.time()
+                # print(pred_pos)
+                # print(pred_neg)
+                loss = creterion(pred_pos, torch.ones_like(pred_pos))
+                loss += creterion(pred_neg, torch.zeros_like(pred_neg))
+                if (batch_num % 100 == 0):
+                    # print(root_nodes)
+                    print(f"loss: {loss.item()}")
+                total_loss += float(loss.item()) * train_param['batch_size']
+                # print(f"one loop time2.1: {time.time() - loopTime:.4f}")
+                loss.backward()
+                optimizer.step()
+                time_opt += time.time() - time_opt_s
+
+                # print(f"one loop time3: {time.time() - loopTime:.4f}")
+                t_prep_s = time.time()
+                
+                if mailbox is not None:
+                    
+                    
+                    # eid = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
+                    eid = torch.arange(batch_num * 2000, batch_num * 2000+root_nodes.shape[0] // 3, dtype = torch.int32, device = 'cuda:0')
+                    t_prep_s = time.time()
+                    mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
+                    # if (batch_num == 29):
+                    #     print(eid)
+                    #     print(mem_edge_feats)
+                    t_prep_s = time.time()
+                    # print(model.memory_updater.last_updated_nid)
+                    # print(model.memory_updater.last_updated_memory)
+                    # print(root_nodes)
+                    # print(ts)
+                    # print(block)
+                    block = None
+                    if memory_param['deliver_to'] == 'neighbors':
+                        # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                        block = mfgs[0][0]
+
+                    time_upd_s = time.time()
+                    mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
+                    time_update_mail += time.time() - time_upd_s
+
+                    time_upd_s = time.time()
+                    mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
+                    time_update_mem += time.time() - time_upd_s
+
+                time_prep += time.time() - t_prep_s
+                time_tot += time.time() - t_tot_s
+                # print(f"one loop time: {time.time() - loopTime:.4f}")
+
+                time_per_batch += time.time() - t_tot_s
+
+            # print(f"total loop use time: {time.time() - startTime:.4f}")
+            print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
+                   loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+            feat_buffer.refresh_memory()
+            # total_memory = feat_buffer.select_index('memory', torch.arange(1980, dtype = torch.int64))
+            # torch.save(total_memory, '/raid/guorui/workspace/dgnn/b-tgl/test/test-acc/mem_b.bin')
+            # print(total_memory)
+
+            args.model_eval = True
+            if (not args.model_eval):
+                continue
+            eval_time_s = time.time()
+            # ap, auc = eval('val')
+            # val_ap.append(f'{ap:.6f}')
             
             test_per_epoch = True
             args.model_eval = True

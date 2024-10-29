@@ -34,7 +34,7 @@ class EdgePredictor(torch.nn.Module):
         h_neg_edge = torch.nn.functional.relu(h_src.tile(neg_samples, 1) + h_neg_dst)
         return self.out_fc(h_pos_edge), self.out_fc(h_neg_edge)
 
-
+import time
 class TransfomerAttentionLayer(torch.nn.Module):
 
     def __init__(self, dim_node_feat, dim_edge_feat, dim_time, num_head, dropout, att_dropout, dim_out, combined=False):
@@ -50,27 +50,83 @@ class TransfomerAttentionLayer(torch.nn.Module):
         self.combined = combined
         if dim_time > 0:
             self.time_enc = TimeEncode(dim_time)
-        if combined:
-            if dim_node_feat > 0:
-                self.w_q_n = torch.nn.Linear(dim_node_feat, dim_out)
-                self.w_k_n = torch.nn.Linear(dim_node_feat, dim_out)
-                self.w_v_n = torch.nn.Linear(dim_node_feat, dim_out)
-            if dim_edge_feat > 0:
-                self.w_k_e = torch.nn.Linear(dim_edge_feat, dim_out)
-                self.w_v_e = torch.nn.Linear(dim_edge_feat, dim_out)
-            if dim_time > 0:
-                self.w_q_t = torch.nn.Linear(dim_time, dim_out)
-                self.w_k_t = torch.nn.Linear(dim_time, dim_out)
-                self.w_v_t = torch.nn.Linear(dim_time, dim_out)
-        else:
-            if dim_node_feat + dim_time > 0:
-                self.w_q = torch.nn.Linear(dim_node_feat + dim_time, dim_out)
-            self.w_k = torch.nn.Linear(dim_node_feat + dim_edge_feat + dim_time, dim_out)
-            self.w_v = torch.nn.Linear(dim_node_feat + dim_edge_feat + dim_time, dim_out)
+
+        self.w_q = torch.nn.Linear(dim_node_feat + dim_time, dim_out)
+        self.w_k = torch.nn.Linear(dim_node_feat + dim_edge_feat + dim_time, dim_out)
+        self.w_v = torch.nn.Linear(dim_node_feat + dim_edge_feat + dim_time, dim_out)
+
+        self.w_q_t = torch.nn.Linear(dim_time, dim_out // 2)
+        self.w_k_t = torch.nn.Linear(dim_time , dim_out // 2)
+        # self.w_v_t = torch.nn.Linear(dim_time, dim_out)
+        self.w_q_e = torch.nn.Linear(dim_node_feat, dim_out // 2)
+        self.w_k_e = torch.nn.Linear(dim_node_feat + dim_edge_feat, dim_out // 2)
+        # self.w_v_e = torch.nn.Linear(dim_node_feat + dim_edge_feat, dim_out) 
+        
+
         self.w_out = torch.nn.Linear(dim_node_feat + dim_out, dim_out)
         self.layer_norm = torch.nn.LayerNorm(dim_out)
 
+    def uni_inv(self, tensor):
+        uni, inv = torch.unique(tensor, return_inverse=True)
+        uni, inv = uni.cpu(), inv.cpu()
+        perm = torch.arange(inv.size(0), dtype=inv.dtype, device=inv.device)
+        perm = inv.new_empty(uni.size(0)).scatter_(0, inv, perm)
+
+        return uni,inv,perm
+    
+
+    def forward_1(self, b):
+        assert(self.dim_time + self.dim_node_feat + self.dim_edge_feat > 0)
+        if b.num_edges() == 0:
+            return torch.zeros((b.num_dst_nodes(), self.dim_out), device=torch.device('cuda:0'))
+        if self.dim_time > 0:
+            time_feat = self.time_enc(b.edata['dt'])
+            zero_time_feat = self.time_enc(torch.zeros(b.num_dst_nodes(), dtype=torch.float32, device=torch.device('cuda:0')))
+
+        torch.cuda.synchronize()
+        start = time.time()
+        eid_uni, eid_inv, eid_perm = self.uni_inv(b.edata['ID'])
+        torch.cuda.synchronize()
+        print(f"uni_inv用时{time.time() - start}")
+
+        # torch.cuda.synchronize()
+        # start = time.time()
+        Q_t = self.w_q_t(zero_time_feat)[b.edges()[1]]
+        K_t = self.w_k_t(time_feat)
+        Q_e = self.w_q_e(b.srcdata['h'][:b.num_dst_nodes()])[b.edges()[1]][eid_perm]
+        K_e = self.w_k_e(torch.cat([b.srcdata['h'][b.num_dst_nodes():][eid_perm], b.edata['f'][eid_perm]], dim=1))
+        V = self.w_v(torch.cat([b.srcdata['h'][b.num_dst_nodes():], b.edata['f'], time_feat], dim=1))
+
+        Q_e = torch.reshape(Q_e, (Q_e.shape[0], self.num_head, -1))
+        K_e = torch.reshape(K_e, (K_e.shape[0], self.num_head, -1))
+
+        Q_t = torch.reshape(Q_t, (Q_t.shape[0], self.num_head, -1))
+        K_t = torch.reshape(K_t, (K_t.shape[0], self.num_head, -1))
+        V = torch.reshape(V, (V.shape[0], self.num_head, -1))
+        
+        QK = torch.cat([(Q_e * K_e)[eid_inv], Q_t * K_t] , dim = 2)
+        att = dgl.ops.edge_softmax(b, self.att_act(torch.sum(QK, dim=2)))
+        att = self.att_dropout(att)
+        V = torch.reshape(V*att[:, :, None], (V.shape[0], -1))
+        b.srcdata['v'] = torch.cat([torch.zeros((b.num_dst_nodes(), V.shape[1]), device=torch.device('cuda:0')), V], dim=0)
+        b.update_all(dgl.function.copy_src('v', 'm'), dgl.function.sum('m', 'h'))
+
+        # torch.cuda.synchronize()
+        # print(f"模型前向传播用时{time.time() - start:.6f}s")
+
+        if self.dim_node_feat != 0:
+            rst = torch.cat([b.dstdata['h'], b.srcdata['h'][:b.num_dst_nodes()]], dim=1)
+        else:
+            rst = b.dstdata['h']
+        rst = self.w_out(rst)
+        rst = torch.nn.functional.relu(self.dropout(rst))
+        return self.layer_norm(rst)
+
+
     def forward(self, b):
+        seperate = False
+        if (seperate):
+            return self.forward_1(b)
         assert(self.dim_time + self.dim_node_feat + self.dim_edge_feat > 0)
         if b.num_edges() == 0:
             return torch.zeros((b.num_dst_nodes(), self.dim_out), device=torch.device('cuda:0'))
@@ -140,6 +196,8 @@ class TransfomerAttentionLayer(torch.nn.Module):
         rst = self.w_out(rst)
         rst = torch.nn.functional.relu(self.dropout(rst))
         return self.layer_norm(rst)
+
+
 
 class IdentityNormLayer(torch.nn.Module):
 
