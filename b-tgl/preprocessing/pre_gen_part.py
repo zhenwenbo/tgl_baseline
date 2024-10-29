@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -78,7 +78,10 @@ if __name__ == '__main__':
             val_edge_end = df_conf['val_edge_end']
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
 
-
+    if (args.data == 'GDELT' and sample_param['layer'] == 2):
+        sample_param['neighbor'] = [8, 8]
+        train_param['epoch'] = 1
+        print(f"GDELT二跳修改邻域为8,8")
         
     # gnn_dim_node = 0 if (node_feats.shape[0] == 0) else node_feats.shape[1]
     # gnn_dim_edge = 0 if (edge_feats is None or edge_feats.shape[0] == 0) else edge_feats.shape[1]

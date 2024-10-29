@@ -634,6 +634,7 @@ class Pre_fetch:
         t9 = time.time() - t0
         t0 = time.time()
 
+        # time.sleep(0.05)
 
         self.prefetch_after([pos_node_map, node_feats, pos_edge_map, edge_feats, part_memory,\
                               part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes, node_d_map, edge_d_map])

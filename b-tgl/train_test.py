@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -46,6 +46,7 @@ from utils import *
 from sklearn.metrics import average_precision_score, roc_auc_score
 from utils import emptyCache
 import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 import torch.multiprocessing as multiprocessing
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 def set_seed(seed):
@@ -266,14 +267,16 @@ if __name__ == '__main__':
         if (not args.use_ayscn_prefetch):
             node_feats, edge_feats = load_feat(args.data)
         sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-        if (args.data == 'GDELT' or args.data == 'BITCOIN'):
-            print(f"GDELT和BITCOIN只跑5个epoch")
+        if (args.data == 'GDELT' or args.data == 'BITCOIN' or args.data == 'STACK'):
+            print(f"GDELT和BITCOIN和STACK只跑5个epoch")
             train_param['epoch'] = 5
         g, df = load_graph(args.data)
 
-        #TODO GDELT改fanout为[7,7]
-        # sample_param['neighbor'] = [7,7]
-        
+        if (args.data == 'GDELT' and sample_param['layer'] == 2):
+            sample_param['neighbor'] = [8, 8]
+            
+            train_param['epoch'] = 5
+            print(f"GDELT二跳修改邻域为8,8, 只跑3个epoch")
         # train_edge_end = df[df['ext_roll'].gt(0)].index[0]
         # val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 

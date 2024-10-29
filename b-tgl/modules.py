@@ -47,10 +47,10 @@ class GeneralModel(torch.nn.Module):
                     self.layers['l0h' + str(h) + 't'] = JODIETimeEmbedding(gnn_param['dim_out'])
         elif gnn_param['arch'] == 'DTMP_attention':
             for h in range(sample_param['history']):
-                self.layers['l0h' + str(h)] = DTMPLayer(self.dim_node_input, dim_edge, gnn_param['dim_time'], gnn_param['att_head'], train_param['dropout'], train_param['att_dropout'], gnn_param['dim_out'], seperate = False)
+                self.layers['l0h' + str(h)] = DTMPLayer(self.dim_node_input, dim_edge, gnn_param['dim_time'], gnn_param['att_head'], train_param['dropout'], train_param['att_dropout'], gnn_param['dim_out'], seperate = True)
             for l in range(1, gnn_param['layer']):
                 for h in range(sample_param['history']):
-                    self.layers['l' + str(l) + 'h' + str(h)] = DTMPLayer(gnn_param['dim_out'], dim_edge, gnn_param['dim_time'], gnn_param['att_head'], train_param['dropout'], train_param['att_dropout'], gnn_param['dim_out'], seperate = False)
+                    self.layers['l' + str(l) + 'h' + str(h)] = DTMPLayer(gnn_param['dim_out'], dim_edge, gnn_param['dim_time'], gnn_param['att_head'], train_param['dropout'], train_param['att_dropout'], gnn_param['dim_out'], seperate = True)
         else:
             raise NotImplementedError
         self.edge_predictor = EdgePredictor(gnn_param['dim_out'])

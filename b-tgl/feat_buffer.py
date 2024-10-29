@@ -91,8 +91,8 @@ class Feat_buffer:
         # self.pipe = multiprocessing.Pipe(duplex=False)
         # if (d == 'STACK' or d == ''):
 
-        self.share_edge_num = 2200000 #TODO 动态扩容share tensor
-        self.share_node_num = 500000
+        self.share_edge_num = 3200000 #TODO 动态扩容share tensor
+        self.share_node_num = 800000
 
         if (d == 'MAG'):
             self.share_edge_num = 10000000
@@ -499,7 +499,8 @@ class Feat_buffer:
             except RuntimeError as e:
                 if (flag):
                     print(f"清除Cache仍然无法分配显存...")
-                    raise RuntimeError("Failed to allocate GPU memory even after clearing cache.") from e
+                    print(e)
+                    raise e
                 print(f"显存OOM, 尝试清除cache")
                 emptyCache()
                 res.append(self.move_to_gpu([data], flag=True, use_pin=use_pin)[0])
@@ -525,8 +526,11 @@ class Feat_buffer:
         
         
         if (self.edge_feat_dim > 0):
-            part_edge_map, part_edge_feats = self.move_to_gpu([self.share_part_edge_map[:edge_num], self.share_part_edge_feats[:edge_num]])
-            part_edge_feats[edge_d_ind] = self.get_e_feat(part_edge_map[edge_d_ind])
+            part_edge_map = self.move_to_gpu([self.share_part_edge_map[:edge_num]])[0]
+            edge_d_feat = self.get_e_feat(part_edge_map[edge_d_ind])
+            self.part_edge_feats = None
+            part_edge_feats = self.move_to_gpu([self.share_part_edge_feats[:edge_num]])[0]
+            part_edge_feats[edge_d_ind] = edge_d_feat
             self.part_edge_map, self.part_edge_feats = part_edge_map, part_edge_feats
 
         part_node_map, part_node_feats = self.share_part_node_map[:node_num].cuda(), self.share_part_node_feats[:node_num].cuda()

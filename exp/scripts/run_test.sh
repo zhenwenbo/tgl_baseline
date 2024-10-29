@@ -75,11 +75,11 @@ monitor_memory_usage() {
 
 
 ds=("TALK" "STACK")
-ds=("LASTFM")
-models=("TGN" "TimeSGN" "TGAT")
+ds=("STACK")
+models=("TimeSGN" "TGAT")
 # models=("TimeSGN")
 layers=("1")
-layers=("1" "2")
+layers=("2")
 
 ratios=("0" "0.9")
 # ratios=("0.9")
@@ -89,8 +89,8 @@ mkdir -p "../res-test-${timestamp}"
 
 for layer in "${layers[@]}"; do
     for d in "${ds[@]}"; do
-        for r in "${ratios[@]}"; do
-            for model in "${models[@]}"; do
+        for model in "${models[@]}"; do
+            for r in "${ratios[@]}"; do
 
                 echo "处理 $d"
                 mkdir -p "../res-test-${timestamp}/${d}"

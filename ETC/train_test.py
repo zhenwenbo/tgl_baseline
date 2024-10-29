@@ -493,8 +493,9 @@ if __name__ == '__main__':
 
             print(total_val_res)
             print(total_test_res)
-    except RuntimeError:
+    except RuntimeError as e:
         print(f"出现runtime Error")
+        print(e)
         exit(1) 
     print(f"total_val_res: {total_val_res}")
     print(f"total_test_res: {total_test_res}")
