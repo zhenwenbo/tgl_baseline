@@ -167,6 +167,20 @@ def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=
         return torch.from_numpy(np.empty(0, dtype=dtype))
     return torch.cat(result, dim=0).reshape(-1, shape[1])
 
+def update_data_to_file(file_path, values, indices, shape, dtype=np.float32, batch_size=4096, use_slice = False):
+    # 利用 numpy 的内存映射函数来映射整个文件
+    use_slice = False
+    data = np.memmap(file_path, dtype=dtype, mode='r+', shape=shape)
+    result = []
+    
+    for i in range(0, len(indices), batch_size):
+        batch_indices = indices[i:i+batch_size]
+        # 批量写入
+        data[batch_indices, :] = values[i:i+batch_size]
+        
+    # data.flush()
+    del data 
+
 def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float32):
 
     shape = (feat_len,)
@@ -198,11 +212,26 @@ def loadBinDisk(path, ind, use_slice = False):
     read_disk_s = time.time()
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
     
-    res = read_data_from_file_concurrent(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
+    res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
     if (cur_conf['dtype'] == 'float16'):
         res = res.to(torch.float32)
-    # print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape}")
+    if ('memory' in path):
+        print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape} path: {path}")
     return res
+
+def updateBinDisk(path, values, ind, use_slice = False):
+    path = path.replace('.pt', '.bin')
+    directory = os.path.dirname(path)
+    if directory not in confs:
+        loadConf(path)
+
+    cur_conf = confs[directory][path]
+    ind = ind.cpu()
+    update_disk_s = time.time()
+    # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
+    
+    update_data_to_file(file_path=path, values=values, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
+    # print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
 
 def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):
     path = f'/raid/guorui/DG/dataset/{d}'

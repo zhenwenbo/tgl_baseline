@@ -245,7 +245,7 @@ def test():
             dis_nodes = src_nodes[~torch.isin(src_nodes, pre_src_nodes)]
         else:
             dis_nodes = src_nodes
-        src_nodes_mem = load_mem(dis_nodes, True)
+        src_nodes_mem = load_mem(dis_nodes, False)
         pre_src_nodes = src_nodes
         # block_his.append(src_nodes)
         # block_his_len += src_nodes.shape[0]

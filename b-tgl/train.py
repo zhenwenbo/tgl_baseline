@@ -11,9 +11,11 @@ from utils import *
 from sklearn.metrics import average_precision_score, roc_auc_score
 from utils import emptyCache
 import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
+#TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
+
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -79,7 +81,9 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
+    dgl.seed(seed)
+    print(f"设置随机种子为{seed}")
+set_seed(42)
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]
@@ -553,6 +557,9 @@ if __name__ == '__main__':
             loss = creterion(pred_pos, torch.ones_like(pred_pos))
             loss += creterion(pred_neg, torch.zeros_like(pred_neg))
             total_loss += float(loss.item()) * train_param['batch_size']
+            if (batch_num % 100 == 0):
+                # print(root_nodes)
+                print(f"loss: {loss.item()}")
             # print(f"one loop time2.1: {time.time() - loopTime:.4f}")
             loss.backward()
             optimizer.step()
@@ -596,6 +603,8 @@ if __name__ == '__main__':
         print(f"total loop use time: {time.time() - startTime:.4f}")
         print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
                loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")
+        if (feat_buffer):
+            feat_buffer.print_time()
         feat_buffer.mode = 'val'
         feat_buffer.refresh_memory()
 

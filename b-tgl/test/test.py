@@ -544,3 +544,16 @@ print(data1.shape)
 # memmap有额外内存开销速度快，尤其是针对数据比较连续的情况下更快 （但是也有可能memmap走了系统缓存，纯离散读没有走）
 # 后面两者都测试一遍... （也许也可以写论文里?）
 
+import torch
+
+def test(tensor):
+    tensor = torch.zeros(100)
+
+tensor = torch.empty(0)
+test(tensor)
+print(tensor)
+
+import numpy as np
+test = [100,1,172,1]
+test = np.array(test, dtype = np.int32)
+test = np.cumsum(test)

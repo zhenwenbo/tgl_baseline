@@ -295,6 +295,14 @@ class Feat_buffer:
         return self.part_mailbox[table2].reshape(nid.shape[0], -1).cuda()
        
 
+    def get_mails(self, nid):
+
+        table1 = torch.zeros_like(self.part_memory_map) - 1
+        table2 = torch.zeros_like(nid) - 1
+        dgl.findSameIndex(self.part_memory_map, nid, table1, table2)
+        table2 = table2.to(torch.int64)
+
+        return[self.part_memory[table2].cuda(), self.part_memory_ts[table2].cuda(),self.part_mailbox[table2].cuda(),self.part_mailbox_ts[table2].cuda()]
 
     def input_mails(self, b):
 
@@ -385,7 +393,7 @@ class Feat_buffer:
         res = self.part_edge_feats[table2.to(torch.int64)]
         if (self.err_detection):
             err_num = torch.sum(res.cpu() != self.det_edge_feats[eid.long().cpu()])
-            print(f"edge缓存...与非缓存对比不一致的个数: {err_num}")
+            # print(f"edge缓存...与非缓存对比不一致的个数: {err_num}")
             if (err_num + torch.nonzero(table2 == -1).shape[0]):
                 raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
 
@@ -404,7 +412,7 @@ class Feat_buffer:
             err_num = torch.sum(res.cpu() != self.det_node_feats[nid.long().cpu()])
             if (err_num + torch.nonzero(table2 == -1).shape[0]):
                 print(f"节点缓存...与非缓存对比不一致的个数: {err_num}")
-                # raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
+                raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
         
         # print(f"get_n_feat时间{time.time() - start:.8f}")
         return res.cuda()
@@ -588,6 +596,15 @@ class Feat_buffer:
 
             else:
                 #使用异步策略 此处memory info应当是pre_block的信息，需要在cur_block运行时并行的将pre_block的memory信息刷入内存
+                start = ((self.cur_block - 1) * self.batch_num) * self.train_batch_size
+                end = min(self.train_edge_end, (((self.cur_block - 1) * self.batch_num) + self.batch_num) * self.train_batch_size)
+                # if (self.part_node_map is None or self.config.model_eval):
+                #     memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+                # else:
+                #     root_nodes = (torch.cat((self.datas['src'][start:end], self.datas['dst'][start:end]))).cuda()
+                #     root_nodes = torch.unique(root_nodes)
+                #     memory_info = (root_nodes, *self.get_mails(root_nodes))
+
                 memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
 
                 if (self.cur_block == 0 or test_block > 0):

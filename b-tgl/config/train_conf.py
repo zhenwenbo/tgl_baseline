@@ -7,8 +7,15 @@ class GlobalConfig:
 
     conf_path = '/raid/guorui/workspace/dgnn/b-tgl/config/train_conf'
 
+    
 
     def __init__(self):
+        self.data_incre = True
+        self.memory_disk = False
+        self.model_eval = False
+        
+
+
         filename = f'{self.conf_path}/{self.conf}'
         # 打开并读取JSON文件
         with open(filename, 'r') as file:
