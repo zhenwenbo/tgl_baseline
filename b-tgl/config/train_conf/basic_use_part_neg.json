@@ -1,6 +1,6 @@
 {
     "use_valid_edge": false,  
-    "use_ayscn_prefetch": true,
+    "use_async_prefetch": true,
     "pre_sample_size": 600000,
     "part_neg_sample": true,
     "model_eval": true

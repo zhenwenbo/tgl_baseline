@@ -19,6 +19,7 @@ class Pre_fetch:
         self.use_disk = self.config.use_disk
         self.data_incre = self.config.data_incre
         self.memory_disk = self.config.memory_disk
+        self.use_async_IO = self.config.use_async_IO
         print(f"pre_fetch: 是否使用disk: {self.use_disk}")
 
         if (self.use_valid_edge and self.use_disk):
@@ -29,6 +30,7 @@ class Pre_fetch:
 
         self.async_load_dic = {}
         self.async_load_flag = {}
+
 
     def init_share_tensor(self, shared_tensor):
 
@@ -103,7 +105,9 @@ class Pre_fetch:
         else:
             raise RuntimeError(f'pre_fetch {name} error')
 
-
+    def init_IO_load(self, conn):
+        self.IO_conn = conn
+        print(f"pre_fetch文件获取conn")
 
 
     def self_select(self, name, indices,  use_slice = False):
@@ -118,9 +122,13 @@ class Pre_fetch:
             raise RuntimeError(f'pre_fetch {name} error')
     
 
+
+
+
     def mem_select(self, indices, base_ind = None,  base_mems = None):
         names = ['memory', 'memory_ts', 'mailbox', 'mailbox_ts']
         if (self.memory_disk):
+            # indices = torch.arange(indices[0], indices[0] + indices.shape[0], dtype=indices.dtype)
             pre_mem_s = time.time()
             mem_total = torch.zeros((indices.shape[0], self.mem_total_shape), dtype = torch.float32)
 
@@ -225,6 +233,15 @@ class Pre_fetch:
             self.mem_flag = torch.zeros((num_nodes), dtype = torch.bool)
             self.mem_total_shape = (1 * self.mem_dim) + (1) + (1 * self.mail_size * (2 * self.mem_dim + dim_edge_feat)) + (1 * self.mail_size)
             self.mem_diff_shape = np.cumsum(np.array([0, (1 * self.mem_dim) , (1) , (1 * self.mail_size * (2 * self.mem_dim + dim_edge_feat)) , (1 * self.mail_size)]))
+
+
+            # self.node_cache_num = 1000000
+            # self.node_cache_path = f'/raid/guorui/DG/dataset/{self.dataset}/pre_{self.node_cache_num}.bin'
+            # self.node_cache_flag = torch.zeros((num_nodes), dtype = torch.int32)
+            # self.node_cache_flag[loadBin(self.node_cache_path)] = torch.arange(0, self.node_cache_num, dtype = torch.int32)
+            
+            # self.mem_cache = torch.zeros((self.node_cache_num, self.mem_total_shape), dtype = torch.float32)
+
             if (not os.path.exists(self.mem_path)):
                 print(f"首次做mem_disk训练，初始化mem_disk文件")
                 memory = torch.randn((num_nodes, memory_param['dim_out']), dtype=torch.float32).reshape(num_nodes, -1)
@@ -343,6 +360,8 @@ class Pre_fetch:
             thread.start()
     
     def async_load(self, paths, tags):
+        # self.IO_conn.send(('init_shared_tensor', (None,)))
+        # self.IO_conn.recv()
         thread = threading.Thread(target=self.load_file, args=(paths, tags, 0))
         self.async_load_flag[tags[0]] = thread
         thread.start()
@@ -530,7 +549,7 @@ class Pre_fetch:
 
     def pre_fetch(self, block_num, memory_info, neg_info, part_node_map, part_edge_map, conf):
         #1.out-of-core
-
+        total_s = time.time()
         has_ef = (self.use_valid_edge) or self.edge_feats.shape[0] > 0
         has_nf = self.node_feats.shape[0] > 0
         t0 = time.time()
@@ -563,14 +582,18 @@ class Pre_fetch:
             part_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = memory_info
             # part_map是上一个block的数据，这里memory刷入只需要刷入part_map中不在part_node_map的部分
             # part_map = torch.unique(part_map)
-            part_map = part_map.cpu()
-            part_dis_ind = torch.isin(part_map, part_node_map, assume_unique=True, invert = True)
+            part_map = part_map.cpu().long()
+            part_memory = part_memory.cpu()
+            part_memory_ts = part_memory_ts.cpu()
+            part_mailbox = part_mailbox.cpu()
+            part_mailbox_ts = part_mailbox_ts.cpu()
+            # part_dis_ind = torch.isin(part_map, part_node_map, assume_unique=True, invert = True)
             
-            part_map = part_map[part_dis_ind].long()
-            part_memory = part_memory[part_dis_ind].cpu()
-            part_memory_ts = part_memory_ts[part_dis_ind].cpu()
-            part_mailbox = part_mailbox[part_dis_ind].cpu()
-            part_mailbox_ts = part_mailbox_ts[part_dis_ind].cpu()
+            # part_map = part_map[part_dis_ind].long()
+            # part_memory = part_memory[part_dis_ind].cpu()
+            # part_memory_ts = part_memory_ts[part_dis_ind].cpu()
+            # part_mailbox = part_mailbox[part_dis_ind].cpu()
+            # part_mailbox_ts = part_mailbox_ts[part_dis_ind].cpu()
             t1 = time.time() - t0
             t0 = time.time()
 
@@ -682,8 +705,9 @@ class Pre_fetch:
         
         nodes = pos_node_map.long()
         if (hasattr(self, 'memory') or self.memory_disk):
-            pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map) #mask形式的
-            cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu())
+            pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map, assume_unique = True) #mask形式的
+            cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu(), assume_unique = True)
+            # print(f"寻找pre和cur: {time.time() - t0:.6f}s")
             if (not self.data_incre):
                 # 不做增量加载
                 part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = self.mem_select(nodes)
@@ -696,10 +720,11 @@ class Pre_fetch:
                 part_memory_ts = torch.empty((nodes.shape[0]), dtype = self.mem_dtype)
                 part_mailbox = torch.empty((nodes.shape[0], self.mail_size, self.mail_dim), dtype = self.mem_dtype)
                 part_mailbox_ts = torch.empty((nodes.shape[0], self.mail_size), dtype = self.mem_dtype)
-
+                # print(f"开辟memory: {time.time() - t0:.6f}s")
                 dis_nodes = ~cur_same_nodes #表示下一个bucket中有但是当前bucket没有的，需要去做额外的读取操作
                 dis_nodes_ind = pos_node_map[dis_nodes].long()
                 
+                # print(f"反向和ind: {time.time() - t0:.6f}s")
                 part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = self.mem_select(dis_nodes_ind, base_ind = dis_nodes, base_mems=[part_memory, part_memory_ts,part_mailbox, part_mailbox_ts])
 
                 # part_memory[dis_nodes] = self.mem_select('memory',dis_nodes_ind)
@@ -775,9 +800,11 @@ class Pre_fetch:
         #                                 'memory_update_info': [pre_same_nodes, cur_same_nodes]})
         t10 = time.time() - t0
         t0 = time.time()
+
+        tt = time.time() - total_s
         #nodes做sort + unique找出最终的indices
 
-        print(f" t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
+        print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
         print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
         # print(f"pre fetch over...")
 

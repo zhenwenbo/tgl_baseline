@@ -68,12 +68,14 @@ class Feat_buffer:
         self.time_refresh = 0
 
         self.err_num = 0
-        self.err_detection = False
+        use_detection = False
+
+        self.err_detection = use_detection
         if (self.err_detection):
             self.det_node_feats, self.det_edge_feats = load_feat(self.d)
 
 
-        self.mem_detection = False
+        self.mem_detection = use_detection
         if (self.mem_detection):
             self.det_memory = torch.zeros((node_num, memory_param['dim_out']), dtype=torch.float32)
             self.det_memory_ts = torch.zeros((node_num), dtype=torch.float32)
@@ -118,7 +120,7 @@ class Feat_buffer:
                 self.mailbox_ts_shape = [memory_param['mailbox_size']]
         
 
-        self.use_ayscn = self.config.use_ayscn_prefetch
+        self.use_async = self.config.use_async_prefetch
 
 
         #下面是过期时间特征淘汰策略
@@ -302,7 +304,7 @@ class Feat_buffer:
         dgl.findSameIndex(self.part_memory_map, nid, table1, table2)
         table2 = table2.to(torch.int64)
 
-        return[self.part_memory[table2].cuda(), self.part_memory_ts[table2].cuda(),self.part_mailbox[table2].cuda(),self.part_mailbox_ts[table2].cuda()]
+        return[self.part_memory[table2], self.part_memory_ts[table2],self.part_mailbox[table2],self.part_mailbox_ts[table2]]
 
     def input_mails(self, b):
 
@@ -584,7 +586,7 @@ class Feat_buffer:
             # print(f"cur batch: {cur_batch}, start pre sample and analyze...")
             
 
-            if (not self.use_ayscn):
+            if (not self.use_async):
                 time_load_s = time.time()
                 self.load_part(cur_batch // self.batch_num)
                 self.time_load += time.time() - time_load_s
@@ -598,14 +600,14 @@ class Feat_buffer:
                 #使用异步策略 此处memory info应当是pre_block的信息，需要在cur_block运行时并行的将pre_block的memory信息刷入内存
                 start = ((self.cur_block - 1) * self.batch_num) * self.train_batch_size
                 end = min(self.train_edge_end, (((self.cur_block - 1) * self.batch_num) + self.batch_num) * self.train_batch_size)
-                # if (self.part_node_map is None or self.config.model_eval):
-                #     memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
-                # else:
-                #     root_nodes = (torch.cat((self.datas['src'][start:end], self.datas['dst'][start:end]))).cuda()
-                #     root_nodes = torch.unique(root_nodes)
-                #     memory_info = (root_nodes, *self.get_mails(root_nodes))
+                if (self.part_node_map is None or self.config.model_eval):
+                    memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+                else:
+                    root_nodes = (torch.cat((self.datas['src'][start:end], self.datas['dst'][start:end]))).cuda()
+                    root_nodes = torch.unique(root_nodes)
+                    memory_info = (root_nodes, *self.get_mails(root_nodes))
 
-                memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+                # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
 
                 if (self.cur_block == 0 or test_block > 0):
                     self.cur_block = test_block
@@ -798,7 +800,7 @@ class Feat_buffer:
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
-        if (self.use_ayscn and self.use_disk):
+        if (self.use_async and self.use_disk):
             #当异步加载且disk时，仅第一个block需要在当前类给出memory，此时后面block的都在part_memory
             self.part_memory = torch.zeros([nodes.shape[0]] + self.memory_shape, dtype = torch.float32, device = 'cuda:0')
             self.part_memory_ts = torch.zeros([nodes.shape[0]], dtype = torch.float32, device = 'cuda:0')

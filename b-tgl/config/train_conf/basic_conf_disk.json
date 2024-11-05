@@ -1,6 +1,6 @@
 {
     "use_valid_edge": false,  
-    "use_ayscn_prefetch": true,
+    "use_async_prefetch": true,
     "pre_sample_size": 60000,
     "part_neg_sample": false,
     "use_pin_memory": false,
@@ -9,7 +9,8 @@
     "use_disk": true,
     "reuse_neg_sample": 0.9,
     "data_incre": true,
-    "memory_disk": true
+    "memory_disk": true,
+    "use_async_IO": true
     
 
 }

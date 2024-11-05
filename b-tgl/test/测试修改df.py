@@ -33,7 +33,7 @@ sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
 from config.train_conf import *
 GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
-args.use_ayscn_prefetch = config.use_ayscn_prefetch
+args.use_async_prefetch = config.use_async_prefetch
 
 if (sample_param['layer'] == 1):
     args.pre_sample_size = 600000
@@ -62,7 +62,7 @@ print(f"训练配置: {config.config_data}")
 
 global node_feats, edge_feats
 node_feats, edge_feats = None,None
-if (not args.use_ayscn_prefetch):
+if (not args.use_async_prefetch):
     node_feats, edge_feats = load_feat(args.data)
 
 g, df = load_graph(args.data)

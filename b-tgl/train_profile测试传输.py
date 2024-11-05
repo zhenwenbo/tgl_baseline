@@ -32,7 +32,7 @@ sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
 from config.train_conf import *
 GlobalConfig.conf = args.train_conf + '.json'
 config = GlobalConfig()
-args.use_ayscn_prefetch = config.use_ayscn_prefetch
+args.use_async_prefetch = config.use_async_prefetch
 
 if (config.use_disk):
     if (sample_param['layer'] == 1):
@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
     global node_feats, edge_feats
     node_feats, edge_feats = None,None
-    if (not args.use_ayscn_prefetch):
+    if (not args.use_async_prefetch):
         node_feats, edge_feats = load_feat(args.data)
     
     g, datas, df_conf = load_graph_bin(args.data)
@@ -238,7 +238,7 @@ if __name__ == '__main__':
     gnn_dim_node = 0 if node_feats is None else node_feats.shape[1]
     gnn_dim_edge = 0 if edge_feats is None else edge_feats.shape[1]
 
-    if (args.use_ayscn_prefetch):
+    if (args.use_async_prefetch):
         if (args.data == 'LASTFM'):
             gnn_dim_edge = 128
             gnn_dim_node = 128
@@ -298,11 +298,11 @@ if __name__ == '__main__':
     import torch.multiprocessing as multiprocessing
     multiprocessing.set_start_method("spawn")
     from pre_fetch import *
-    use_ayscn_prefetch = args.use_ayscn_prefetch
+    use_async_prefetch = args.use_async_prefetch
 
     parent_conn = None
     prefetch_conn = None
-    if (use_ayscn_prefetch):
+    if (use_async_prefetch):
         parent_conn, child_conn = multiprocessing.Pipe()
         prefetch_conn, prefetch_child_conn = multiprocessing.Pipe()
 
@@ -381,7 +381,7 @@ if __name__ == '__main__':
         
     feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
                               sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
-    if (not use_ayscn_prefetch):
+    if (not use_async_prefetch):
         feat_buffer.init_feat(node_feats, edge_feats)
     # feat_buffer.gen_part()
 
@@ -659,7 +659,7 @@ if __name__ == '__main__':
             print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
 
     print(f"训练完成，退出子进程")
-    if (use_ayscn_prefetch):
+    if (use_async_prefetch):
         parent_conn.send(('EXIT', ()))
         p.terminate()
 

@@ -10,7 +10,7 @@ parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--only_gen_part', action='store_true', default=False)
-parser.add_argument('--use_ayscn_prefetch', action='store_true', default=False)
+parser.add_argument('--use_async_prefetch', action='store_true', default=False)
 parser.add_argument('--use_stream', action='store_true', default=False)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
@@ -130,11 +130,11 @@ if __name__ == '__main__':
     import torch.multiprocessing as multiprocessing
     multiprocessing.set_start_method("spawn")
     from pre_fetch import *
-    use_ayscn_prefetch = args.use_ayscn_prefetch
+    use_async_prefetch = args.use_async_prefetch
 
     parent_conn = None
     prefetch_conn = None
-    if (use_ayscn_prefetch):
+    if (use_async_prefetch):
         parent_conn, child_conn = multiprocessing.Pipe()
         prefetch_conn, prefetch_child_conn = multiprocessing.Pipe()
 
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     else:
         feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],sampler_gpu,neg_link_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
         feat_buffer.train_edge_end = train_edge_end
-        if (not use_ayscn_prefetch):
+        if (not use_async_prefetch):
             feat_buffer.init_feat(node_feats, edge_feats)
         feat_buffer.gen_part_stream()
 

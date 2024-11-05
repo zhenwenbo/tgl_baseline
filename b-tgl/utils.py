@@ -169,17 +169,38 @@ def read_data_from_file(file_path, indices, shape, dtype=np.float32, batch_size=
 
 def update_data_to_file(file_path, values, indices, shape, dtype=np.float32, batch_size=4096, use_slice = False):
     # 利用 numpy 的内存映射函数来映射整个文件
-    use_slice = False
     data = np.memmap(file_path, dtype=dtype, mode='r+', shape=shape)
-    result = []
     
     for i in range(0, len(indices), batch_size):
         batch_indices = indices[i:i+batch_size]
         # 批量写入
         data[batch_indices, :] = values[i:i+batch_size]
         
-    # data.flush()
-    del data 
+import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+
+def update_data_to_file_concurrent(file_path, values, indices, shape, dtype=np.float32, batch_size=4096, use_slice=False, num_threads=4):
+    # Use numpy's memory mapping to map the entire file into memory
+    data = np.memmap(file_path, dtype=dtype, mode='r+', shape=shape)
+    
+    def write_batch(batch_indices, batch_values):
+        # Batch write operation in a separate thread
+        data[batch_indices, :] = batch_values
+
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+        
+        for i in range(0, len(indices), batch_size):
+            batch_indices = indices[i:i + batch_size]
+            batch_values = values[i:i + batch_size]
+            futures.append(executor.submit(write_batch, batch_indices, batch_values))
+
+        # Ensure all threads complete
+        for future in futures:
+            future.result()  # Wait for each thread to complete
+
+    # Flush changes to disk
+    data.flush()
 
 def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float32):
 
@@ -203,6 +224,9 @@ def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float3
 
 def loadBinDisk(path, ind, use_slice = False):
     path = path.replace('.pt', '.bin')
+    # if ('memory' in path):
+    #     print(f"注意！！！！！！ 将读取memory改为纯顺序")
+    #     ind = torch.arange(ind[10], ind[10] + ind.shape[0], dtype = ind.dtype)
     directory = os.path.dirname(path)
     if directory not in confs:
         loadConf(path)
@@ -215,8 +239,10 @@ def loadBinDisk(path, ind, use_slice = False):
     res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
     if (cur_conf['dtype'] == 'float16'):
         res = res.to(torch.float32)
-    if ('memory' in path):
-        print(f"读取disk用时 {time.time() - read_disk_s:.4f}s shape:{res.shape} path: {path}")
+
+    time_use = time.time() - read_disk_s
+    
+    print(f"读取disk用时 {time_use:.4f}s shape:{res.shape} {res.numel() * 4 / 1024 ** 2 / time_use:.2f}MB/s path: {path}")
     return res
 
 def updateBinDisk(path, values, ind, use_slice = False):
@@ -225,13 +251,16 @@ def updateBinDisk(path, values, ind, use_slice = False):
     if directory not in confs:
         loadConf(path)
 
+    # print(f"将写入改为纯顺序")
+    # ind = torch.arange(ind[0], ind[0] +ind.shape[0], dtype = ind.dtype)
+
     cur_conf = confs[directory][path]
     ind = ind.cpu()
     update_disk_s = time.time()
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
     
     update_data_to_file(file_path=path, values=values, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
-    # print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
+    print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
 
 def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):
     path = f'/raid/guorui/DG/dataset/{d}'
