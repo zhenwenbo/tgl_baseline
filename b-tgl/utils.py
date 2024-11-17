@@ -175,6 +175,8 @@ def update_data_to_file(file_path, values, indices, shape, dtype=np.float32, bat
         batch_indices = indices[i:i+batch_size]
         # 批量写入
         data[batch_indices, :] = values[i:i+batch_size]
+
+    data.flush()
         
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
@@ -225,8 +227,9 @@ def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float3
 def loadBinDisk(path, ind, use_slice = False):
     path = path.replace('.pt', '.bin')
     # if ('memory' in path):
-    #     print(f"注意！！！！！！ 将读取memory改为纯顺序")
-    #     ind = torch.arange(ind[10], ind[10] + ind.shape[0], dtype = ind.dtype)
+    #     print(f"注意！！！！！！ 将读取memory的一半改为纯顺序")
+    #     ind[:ind.shape[0] // 2] = torch.arange(ind[10], ind[10] + ind.shape[0] // 2, dtype = ind.dtype)
+    #     # ind = torch.arange(ind[10], ind[10] + ind.shape[0], dtype = ind.dtype)
     directory = os.path.dirname(path)
     if directory not in confs:
         loadConf(path)
@@ -251,8 +254,11 @@ def updateBinDisk(path, values, ind, use_slice = False):
     if directory not in confs:
         loadConf(path)
 
-    # print(f"将写入改为纯顺序")
-    # ind = torch.arange(ind[0], ind[0] +ind.shape[0], dtype = ind.dtype)
+    # print(f"注意！！！！ 将写入的一半改为纯顺序")
+    # ind[:ind.shape[0] // 2] = torch.arange(ind[0], ind[0] +ind.shape[0] // 2, dtype = ind.dtype)
+
+    # ind = torch.stack((ind[:ind.shape[0]]))
+
 
     cur_conf = confs[directory][path]
     ind = ind.cpu()

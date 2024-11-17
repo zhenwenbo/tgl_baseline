@@ -605,6 +605,12 @@ class Feat_buffer:
                 else:
                     root_nodes = (torch.cat((self.datas['src'][start:end], self.datas['dst'][start:end]))).cuda()
                     root_nodes = torch.unique(root_nodes)
+
+                    # next_start = ((self.cur_block) * self.batch_num) * self.train_batch_size
+                    # next_end = min(self.train_edge_end, (((self.cur_block) * self.batch_num) + self.batch_num) * self.train_batch_size)
+                    # next_root_nodes = (torch.cat((self.datas['src'][next_start:next_end], self.datas['dst'][next_start:next_end]))).cuda()
+                    # next_root_nodes = torch.unique(next_root_nodes)
+                    # root_nodes = root_nodes[torch.isin(root_nodes, next_root_nodes, invert=True, assume_unique=True)]
                     memory_info = (root_nodes, *self.get_mails(root_nodes))
 
                 # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)

@@ -13,6 +13,8 @@ class GlobalConfig:
         self.data_incre = True
         self.memory_disk = False
         self.model_eval = False
+        self.node_cache = False
+        self.node_reorder = False
         
 
 

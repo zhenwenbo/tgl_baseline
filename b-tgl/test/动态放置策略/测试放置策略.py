@@ -155,10 +155,75 @@ blocks = torch.cat(block_info)
 blocks_ptr = torch.tensor(blocks_ptr, dtype = torch.int32)
 blocks_ptr = torch.cumsum(blocks_ptr, dim = 0)
 
+blocks_ptr = torch.cat((torch.zeros(1, dtype = torch.int32, device = blocks_ptr.device), blocks_ptr))
+blocks_ptr_diff = torch.diff(blocks_ptr)
+blocks_ind = torch.repeat_interleave(torch.arange(0, blocks_ptr_diff.shape[0]), blocks_ptr_diff)
 
+dis_node = node_count_sort_ind[:1000000]
 dis_ind = torch.isin(blocks, node_count_sort_ind[:1000000])
-blocks[dis_ind] = -1
-#将blocks中去除node_count_sort_ind前n项
+blocks = blocks[~dis_ind]
+blocks_ind = blocks_ind[~dis_ind]
+
+blocks_sort, blocks_sort_ind = torch.sort(blocks)
+node_info = blocks_ind[blocks_sort_ind]
+
+node = blocks_sort.cpu()
+block = node_info.cpu()
+# torch.save(node, '/home/guorui/workspace/tmp/node.pt')
+# torch.save(block, '/home/guorui/workspace/tmp/block.pt')
+import math
+import torch
+import dgl
+node = torch.load('/home/guorui/workspace/tmp/node.pt').cuda().to(torch.int32)
+block = torch.load('/home/guorui/workspace/tmp/block.pt').cuda().to(torch.int32)
+bit_num = math.ceil((torch.max(block) + 1) / 32)
+bitmap = torch.zeros((torch.max(node) + 1, bit_num), dtype = torch.int32, device = 'cuda:0').reshape(-1)
+import time
+start = time.time()
+dgl.init_bitmap(node, block, bitmap, bit_num)
+torch.cuda.synchronize()
+print(f"init bitmap use time:{time.time() - start:.6f}s")
+bitmap = bitmap.reshape(-1, bit_num)
+print(bitmap)
+
+
+
+node = node[:10]
+block = block[:10].to(torch.int32)
+bit_num = math.ceil((torch.max(block) + 1) / 32)
+bitmap = torch.zeros((torch.max(node) + 1, bit_num), dtype = torch.int32, device = 'cuda:0').reshape(-1)
+
+dgl.init_bitmap(node, block, bitmap, bit_num)
+bitmap = bitmap.reshape(-1, bit_num)
+print(bitmap)
+# 找出node中指定次数的位置
+label = torch.zeros(torch.max(blocks_sort), dtype = torch.int32, device = 'cuda:0')
+dgl.bincount(blocks_sort, label)
+label = label[1:]
+label_cum = torch.cumsum(label, dim = 0)
+
+def get_freq(freq, label, label_cum, node_info):
+    label_freq = torch.nonzero(label == freq).reshape(-1)
+    res = None
+
+    for i in range(freq):
+        if (res is None):
+            res = node_info[label_cum[label_freq] - freq]
+        else:
+            res = torch.stack((res, node_info[label_cum[label_freq] - freq + i]), dim = 0)
+
+    return res.T if freq > 1 else res
+
+res = get_freq(2, label, label_cum, node_info).cuda()
+res_uni, res_count = torch.unique(res, return_counts = True, dim = 0)
+
+
+
+
+res = res.to(torch.int32).cuda()
+res_label = torch.zeros(torch.max(res), dtype = torch.int32, device = 'cuda:0')
+res_count = dgl.bincount(res, res_label)
+
 
 
 def block2node(blocks, blocks_ptr, node_info):
@@ -178,6 +243,15 @@ def block2node(blocks, blocks_ptr, node_info):
 node_info = [None] * node_num
 
 block2node(blocks, blocks_ptr, node_info)
+node_len = []
+for i in range(len(node_info)):
+    node_len.append(0 if node_info[i] is None else len(node_info[i]))
+node_len = torch.tensor(node_len)
+node_len = node_len.cuda()
+node_dif = torch.cat((torch.zeros(1, dtype = torch.int32, device = 'cuda:0'),torch.cumsum(node_len, dim = 0)))
+
+label = torch.zeros(node_num, dtype = torch.int32).cuda()
+dgl.bincount(blocks, label)
 
 from datasketch import MinHash, MinHashLSH
 def create_minhash(data):

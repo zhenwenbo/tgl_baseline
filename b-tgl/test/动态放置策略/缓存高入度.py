@@ -37,5 +37,24 @@ d = inDegree + outDegree
 inDegree_sort, inDegree_sort_ind = torch.sort(inDegree, descending=True)
 d_sort, d_sort_ind = torch.sort(d, descending=True)
 
+print(f"d < 10的节点有 {torch.sum(d_sort < 10)}")
+
+# 对于更新mem进行分析
+left = 0
+right = 0
+while True:
+    right += 60000
+    if (right >= train_edge_end):
+        break
+    cur_src = t_src[left:right]
+    cur_dst = t_dst[left:right]
+    rn = torch.cat((cur_src, cur_dst))
+    rn = torch.unique(rn)
+    rn_d = d[rn.long()]
+    print(f"{left}:{right} rn num:{rn.shape[0]} d<2:{torch.sum(rn_d < 10)}")
+
+    left = right
+
+
 saveBin(inDegree_sort_ind[:1000000], f'/raid/guorui/DG/dataset/{data}/ind_1000000.bin')
 saveBin(d_sort_ind[:1000000], f'/raid/guorui/DG/dataset/{data}/d_1000000.bin')

@@ -20,12 +20,14 @@ class Pre_fetch:
         self.data_incre = self.config.data_incre
         self.memory_disk = self.config.memory_disk
         self.use_async_IO = self.config.use_async_IO
+        self.node_cache = self.config.node_cache
+        self.node_reorder = self.config.node_reorder
         print(f"pre_fetch: 是否使用disk: {self.use_disk}")
 
         if (self.use_valid_edge and self.use_disk):
             print(f"无法同时使用过期边淘汰和diskGNN！将过期边淘汰取消.")
             self.use_valid_edge = False
-        
+
 
 
         self.async_load_dic = {}
@@ -137,8 +139,19 @@ class Pre_fetch:
             pre_mem_t = time.time() - pre_mem_s
             # print(f"mem 预处理 {time.time() - pre_mem_s:.6f}s")
 
+            if (self.node_cache and load_ind.shape[0] > 0):
+                load_ind_cache_flag = self.node_cache_flag[indices[load_ind]].long()
+                load_ind_cached_ind = torch.nonzero(load_ind_cache_flag).reshape(-1).long()
+                mem_total[load_ind[load_ind_cached_ind]] = self.cache_memory[load_ind_cache_flag[load_ind_cached_ind]]
+                load_ind = load_ind[torch.nonzero(load_ind_cache_flag == 0).reshape(-1)]
+
             if (load_ind.shape[0] > 0):
-                mem_load = loadBinDisk(self.mem_path, indices[load_ind])
+                if (self.node_reorder):
+                    print(f"读取node memory时重排序")
+                    mem_ind = self.node_reorder_map[indices[load_ind].long()]
+                else:
+                    mem_ind = indices[load_ind]
+                mem_load = loadBinDisk(self.mem_path, mem_ind)
                 mem_total[load_ind] = mem_load
 
 
@@ -193,9 +206,26 @@ class Pre_fetch:
             for i in range(len(mems)):
                 mems[i] = mems[i].reshape(base_shape, -1)
             total_mem = torch.cat(mems, dim = 1)
-            
-            updateBinDisk(self.mem_path, total_mem, indices)
+
             self.mem_flag[indices] = True
+            if (self.node_cache):
+                load_ind_cache_flag = self.node_cache_flag[indices].long()
+                load_ind_cached_ind = torch.nonzero(load_ind_cache_flag).reshape(-1).long()
+                self.cache_memory[load_ind_cache_flag[load_ind_cached_ind]] = total_mem[load_ind_cached_ind]
+
+                no_cache_indices = torch.nonzero(load_ind_cache_flag == 0).reshape(-1)
+                indices = indices[no_cache_indices]
+                total_mem = total_mem[no_cache_indices]
+
+
+            if (self.node_reorder):
+                print(f"写入node memory时重排序")
+                mem_ind = self.node_reorder_map[indices.long()]
+            else:
+                mem_ind = indices
+
+            updateBinDisk(self.mem_path, total_mem, mem_ind)
+            
         
 
     def update_index(self, name, indices, conf):
@@ -234,7 +264,15 @@ class Pre_fetch:
             self.mem_total_shape = (1 * self.mem_dim) + (1) + (1 * self.mail_size * (2 * self.mem_dim + dim_edge_feat)) + (1 * self.mail_size)
             self.mem_diff_shape = np.cumsum(np.array([0, (1 * self.mem_dim) , (1) , (1 * self.mail_size * (2 * self.mem_dim + dim_edge_feat)) , (1 * self.mail_size)]))
 
-
+                    
+            if (self.node_reorder):
+                self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_reorder_map.bin')
+            
+            if (self.node_cache):
+                cache_nodes = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_cache_map.bin')
+                self.cache_memory = torch.zeros((cache_nodes.shape[0] + 1, self.mem_total_shape), dtype = torch.float32)
+                self.node_cache_flag = torch.zeros(num_nodes + 1, dtype = torch.int32)
+                self.node_cache_flag[cache_nodes.long()] = torch.arange(1, cache_nodes.shape[0] + 1, dtype = torch.int32)
             # self.node_cache_num = 1000000
             # self.node_cache_path = f'/raid/guorui/DG/dataset/{self.dataset}/pre_{self.node_cache_num}.bin'
             # self.node_cache_flag = torch.zeros((num_nodes), dtype = torch.int32)
@@ -263,6 +301,8 @@ class Pre_fetch:
             self.mailbox_ts = torch.zeros((num_nodes, memory_param['mailbox_size']), dtype=torch.float32)
         
     def reset_memory(self):
+        if (self.node_cache):
+            self.cache_memory.fill_(0)
         if (self.memory_disk):
             self.mem_flag.fill_(0)
         else:

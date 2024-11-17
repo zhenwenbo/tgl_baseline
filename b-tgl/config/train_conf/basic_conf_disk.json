@@ -10,7 +10,9 @@
     "reuse_neg_sample": 0.9,
     "data_incre": true,
     "memory_disk": true,
-    "use_async_IO": true
+    "use_async_IO": false,
+    "node_cache": true,
+    "node_reorder": true
     
 
 }
