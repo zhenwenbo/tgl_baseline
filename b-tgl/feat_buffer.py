@@ -67,6 +67,8 @@ class Feat_buffer:
         self.time_neg_analyze = 0
         self.time_refresh = 0
 
+
+
         self.err_num = 0
         use_detection = False
 
@@ -85,7 +87,7 @@ class Feat_buffer:
             
         self.config = GlobalConfig()
         self.use_disk = self.config.use_disk
-
+        self.data_incre = self.config.data_incre
         #下面是运行时做异步处理的部分
         self.preFetchExecutor = concurrent.futures.ThreadPoolExecutor(2)  # 线程池
         # ctx = multiprocessing.get_context("spawn")
@@ -93,8 +95,19 @@ class Feat_buffer:
         # self.pipe = multiprocessing.Pipe(duplex=False)
         # if (d == 'STACK' or d == ''):
 
-        self.share_edge_num = 3200000 #TODO 动态扩容share tensor
-        self.share_node_num = 800000
+        if (d == 'LASTFM'):
+            self.share_edge_num = 500000
+            self.share_node_num = 20000
+            self.tmp_tensor_num = 20000000
+        elif (d == 'TALK'):
+            self.share_edge_num = 800000 #TODO 动态扩容share tensor
+            self.share_node_num = 200000
+            self.tmp_tensor_num = 50000000
+        else:
+            self.share_edge_num = 3200000 #TODO 动态扩容share tensor
+            self.share_node_num = 1000000
+            self.tmp_tensor_num = 300000000
+
 
         if (d == 'MAG'):
             self.share_edge_num = 10000000
@@ -200,7 +213,7 @@ class Feat_buffer:
 
         #TODO 这里预先开辟1GB内存的 共享内存用于select_index
         #TODO 为APAN的mailbox，这里提高10倍给mailbox用
-        self.share_tmp_tensor = torch.zeros(300000000).share_memory_()
+        self.share_tmp_tensor = torch.zeros(self.tmp_tensor_num).share_memory_()
         shared_tensor = (*shared_tensor, self.share_tmp_tensor)
 
         
@@ -229,7 +242,7 @@ class Feat_buffer:
         elif (name in ['node_feats', 'edge_feats'] and self.use_disk):
             result = loadBinDisk(getattr(self, f'{name}_path'), indices)
         else:
-            self.prefetch_conn.send(('select_index', (name, indices)))
+            self.prefetch_conn.send(('select_index', (name, indices.cpu())))
             dim, shape = self.prefetch_conn.recv()
             result = self.share_tmp_tensor[:shape].reshape(dim)
         return result
@@ -255,6 +268,9 @@ class Feat_buffer:
     def print_time(self):
         print(f"feat_buffer time: IO load: {self.time_load:.3f}s 异步阻塞: {self.time_async:.3f}s presample and analyze: {self.time_analyze:.3f}s 预采样: {self.time_presample:.3f}s, 预采样负采样:{self.time_pre_neg_sample:.3f}s\
               记忆刷入和更新:{self.time_exec_mem:.3f}s 纯刷入时间:{self.time_refresh:.3f}s 负采样分析: {self.time_neg_analyze:.3f}s")
+        
+        # self.prefetch_conn.send(('print_time', ()))
+        # self.prefetch_conn.recv()
 
 
     def reset(self):
@@ -286,6 +302,11 @@ class Feat_buffer:
             self.det_mailbox.zero_()
             self.det_mailbox_ts.zero_()
 
+        if (self.prefetch_conn is not None and (self.config.use_valid_edge and not self.config.use_disk)):
+            self.prefetch_conn.send(('reset_valid_edge', ()))
+            self.prefetch_conn.recv()
+        
+
 
     def get_mailbox(self, nid):
 
@@ -304,7 +325,7 @@ class Feat_buffer:
         dgl.findSameIndex(self.part_memory_map, nid, table1, table2)
         table2 = table2.to(torch.int64)
 
-        return[self.part_memory[table2], self.part_memory_ts[table2],self.part_mailbox[table2],self.part_mailbox_ts[table2]]
+        return[self.part_memory[table2].cpu(), self.part_memory_ts[table2].cpu(),self.part_mailbox[table2].cpu(),self.part_mailbox_ts[table2].cpu()]
 
     def input_mails(self, b):
 
@@ -547,6 +568,14 @@ class Feat_buffer:
         part_node_feats[node_d_ind] = self.get_n_feat(part_node_map[node_d_ind])
         self.part_node_map, self.part_node_feats = part_node_map, part_node_feats
 
+
+        # part_node_map = self.share_part_node_map[:node_num].cuda()
+        # node_d_feat = self.get_n_feat(part_node_map[node_d_ind])
+        # self.part_node_feats = None
+        # part_node_feats =  self.share_part_node_feats[:node_num].cuda()
+        # part_node_feats[node_d_ind] = node_d_feat
+        # self.part_node_map, self.part_node_feats = part_node_map, part_node_feats
+
         # print(f"disk带来的额外开销 {time.time() - disk_s:.6f}s")
         
 
@@ -586,82 +615,98 @@ class Feat_buffer:
             # print(f"cur batch: {cur_batch}, start pre sample and analyze...")
             
 
-            if (not self.use_async):
-                time_load_s = time.time()
-                self.load_part(cur_batch // self.batch_num)
-                self.time_load += time.time() - time_load_s
+            # if (not self.use_async):
+            #     time_load_s = time.time()
+            #     self.load_part(cur_batch // self.batch_num)
+            #     self.time_load += time.time() - time_load_s
 
-                time_ana_s = time.time()
-                self.analyze()
-                self.time_analyze += time.time() - time_ana_s
-                self.neg_sample_nodes = self.neg_sample_nodes_async
+            #     time_ana_s = time.time()
+            #     self.analyze()
+            #     self.time_analyze += time.time() - time_ana_s
+            #     self.neg_sample_nodes = self.neg_sample_nodes_async
 
+            # else:
+
+            #使用异步策略 此处memory info应当是pre_block的信息，需要在cur_block运行时并行的将pre_block的memory信息刷入内存
+            start = ((self.cur_block - 1) * self.batch_num) * self.train_batch_size
+            end = min(self.train_edge_end, (((self.cur_block - 1) * self.batch_num) + self.batch_num) * self.train_batch_size)
+            if (not self.use_memory):
+                memory_info = None
             else:
-                #使用异步策略 此处memory info应当是pre_block的信息，需要在cur_block运行时并行的将pre_block的memory信息刷入内存
-                start = ((self.cur_block - 1) * self.batch_num) * self.train_batch_size
-                end = min(self.train_edge_end, (((self.cur_block - 1) * self.batch_num) + self.batch_num) * self.train_batch_size)
-                if (self.part_node_map is None or self.config.model_eval):
+                if ((self.part_node_map is None or self.config.model_eval)):
                     memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
                 else:
                     root_nodes = (torch.cat((self.datas['src'][start:end], self.datas['dst'][start:end]))).cuda()
                     root_nodes = torch.unique(root_nodes)
 
-                    # next_start = ((self.cur_block) * self.batch_num) * self.train_batch_size
-                    # next_end = min(self.train_edge_end, (((self.cur_block) * self.batch_num) + self.batch_num) * self.train_batch_size)
-                    # next_root_nodes = (torch.cat((self.datas['src'][next_start:next_end], self.datas['dst'][next_start:next_end]))).cuda()
-                    # next_root_nodes = torch.unique(next_root_nodes)
-                    # root_nodes = root_nodes[torch.isin(root_nodes, next_root_nodes, invert=True, assume_unique=True)]
-                    memory_info = (root_nodes, *self.get_mails(root_nodes))
+                    next_start = ((self.cur_block) * self.batch_num) * self.train_batch_size
+                    next_end = min(self.train_edge_end, (((self.cur_block) * self.batch_num) + self.batch_num) * self.train_batch_size)
+                    next_root_nodes = (torch.cat((self.datas['src'][next_start:next_end], self.datas['dst'][next_start:next_end]))).cuda()
+                    next_root_nodes = torch.unique(next_root_nodes)
+                    root_nodes = root_nodes[torch.isin(root_nodes, next_root_nodes, invert=True, assume_unique=True)]
+                    memory_info = (root_nodes.cpu(), *self.get_mails(root_nodes))
 
-                # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+            # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
 
-                if (self.cur_block == 0 or test_block > 0):
-                    self.cur_block = test_block
-                    #第一个块使用同步加载
-                    time_first = time.time()
-                    time_load_s = time.time()
-                    if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
-                        self.load_part_pin(cur_batch // self.batch_num)
-                    else:
-                        self.load_part(self.cur_block)
-                    self.time_load += time.time() - time_load_s
-
-                    time_ana_s = time.time()
-                    self.analyze()
-                    self.time_analyze += time.time() - time_ana_s
-                    print(f"第一个块的加载时间: {time.time() - time_first:.3f}s")
-
-                    
+            if (self.cur_block == 0 or test_block > 0):
+                self.cur_block = test_block
+                #第一个块使用同步加载
+                time_first = time.time()
+                time_load_s = time.time()
+                if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
+                    self.load_part_pin(cur_batch // self.batch_num)
                 else:
-                    #后面的块直接加载异步的Queue队列信息并做进一步处理
+                    self.load_part(self.cur_block)
+                self.time_load += time.time() - time_load_s
+
+                time_ana_s = time.time()
+                self.analyze()
+                self.time_analyze += time.time() - time_ana_s
+                print(f"第一个块的加载时间: {time.time() - time_first:.3f}s")
+
+                
+            else:
+                #后面的块直接加载异步的Queue队列信息并做进一步处理
+                if (self.use_async):
                     time_load_s = time.time()
                     flag = self.prefetch_only_conn.recv()
                     self.time_async += time.time() - time_load_s
-
-                    if (flag is not None and 'extension' in flag):
-                        print(f"{flag} 子程序需要扩容,主程序进行share tensor扩容")
-
-                    self.prefetch_after()
-
-                    self.time_load += time.time() - time_load_s
-
-                time_ana_s = time.time()
-                self.neg_sample_nodes = self.neg_sample_nodes_async
-                
-                #此时开始运行当前块，我们异步的加载下一个块的信息
-
-                # print(f"运行子进程，传入memory_info")
-                # self.pool.apply_async(self.pre_fetch, args=(self.cur_block + 1, memory_info, self.pipe[1]))
-
-                neg_info = self.pre_neg_sample(self.cur_block + 1)
-                if (neg_info is not None):
-                    
-                    self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map, self.part_edge_map,\
+                else:
+                    # print(f"串行预取")
+                    time_load_s = time.time()
+                    self.prefetch_conn.send(('pre_fetch', (self.cur_block,self.memory_info,self.neg_info, self.part_node_map.cpu(), self.part_edge_map.cpu(),\
                                         (self.path, self.batch_size, self.sampler.fan_nums))))
-                    
-                # self.preFetchExecutor.submit(self.pre_fetch,self.cur_block + 1,\
-                #      memory_info)
-                self.time_analyze += time.time() - time_ana_s
+                    flag = self.prefetch_only_conn.recv()
+                if (flag is not None and 'extension' in flag):
+                    print(f"{flag} 子程序需要扩容,主程序进行share tensor扩容")
+
+                self.prefetch_after()
+
+                self.time_load += time.time() - time_load_s
+
+            time_ana_s = time.time()
+            self.neg_sample_nodes = self.neg_sample_nodes_async
+            
+            #此时开始运行当前块，我们异步的加载下一个块的信息
+
+            # print(f"运行子进程，传入memory_info")
+            # self.pool.apply_async(self.pre_fetch, args=(self.cur_block + 1, memory_info, self.pipe[1]))
+
+            neg_info = self.pre_neg_sample(self.cur_block + 1)
+            if (neg_info is not None):
+                neg_info = [neg_info[0].cpu(), neg_info[1].cpu()]
+            if (self.use_async):
+                if (neg_info is not None):
+                    self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map.cpu(), self.part_edge_map.cpu(),\
+                                        (self.path, self.batch_size, self.sampler.fan_nums))))
+            else:
+                if (neg_info is not None):
+                    self.memory_info = memory_info
+                    self.neg_info = neg_info
+                
+            # self.preFetchExecutor.submit(self.pre_fetch,self.cur_block + 1,\
+            #      memory_info)
+            self.time_analyze += time.time() - time_ana_s
 
 
 
@@ -790,7 +835,7 @@ class Feat_buffer:
             return
         
         if (self.part_memory) != None:
-            part_map = self.part_memory_map.long()
+            part_map = self.part_memory_map.long().cpu()
             self.update_index('memory', part_map, self.part_memory.cpu())
             self.update_index('memory_ts', part_map, self.part_memory_ts.cpu())
             self.update_index('mailbox', part_map, self.part_mailbox.cpu())
@@ -806,7 +851,7 @@ class Feat_buffer:
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
-        if (self.use_async and self.use_disk):
+        if (self.use_disk):
             #当异步加载且disk时，仅第一个block需要在当前类给出memory，此时后面block的都在part_memory
             self.part_memory = torch.zeros([nodes.shape[0]] + self.memory_shape, dtype = torch.float32, device = 'cuda:0')
             self.part_memory_ts = torch.zeros([nodes.shape[0]], dtype = torch.float32, device = 'cuda:0')
@@ -857,7 +902,7 @@ class Feat_buffer:
         dis_ind = table1 == -1
         dis_neg_nodes = neg_nodes[dis_ind]
         if (self.node_feat_dim > 0):
-            dis_neg_nodes_feat = self.select_index('node_feats', dis_neg_nodes.to(torch.int64)).cuda()
+            dis_neg_nodes_feat = self.select_index('node_feats', dis_neg_nodes.cpu().to(torch.int64)).cuda()
             if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
                 dis_neg_nodes_feat = dis_neg_nodes_feat.cpu().pin_memory()
 
@@ -875,7 +920,7 @@ class Feat_buffer:
         dis_ind = table1 == -1
         dis_neg_eids = neg_eids[dis_ind]
         if (self.edge_feat_dim > 0):
-            dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.to(torch.int64)).cuda()
+            dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.cpu().to(torch.int64)).cuda()
             if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
                 dis_neg_eids_feat = dis_neg_eids_feat.cpu().pin_memory()
 
@@ -901,7 +946,7 @@ class Feat_buffer:
 
 
     
-    def gen_part(self, mode = ''):
+    def gen_part(self, mode = '', incre = False):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path
@@ -929,6 +974,8 @@ class Feat_buffer:
         group_indexes -= group_indexes[0]
         left, right = df_start, df_start
         batch_num = 0
+
+        pre_eid, pre_nid = None, None
         while True:
         # for batch_num, rows in df[df_start:df_end].groupby(group_indexes):
             # emptyCache()
@@ -971,25 +1018,66 @@ class Feat_buffer:
             #处理这个eid_uni，抽特征然后存就行。这里eid是个全局的
             #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
             #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
+            sample_time = time.time() - start
+            save_time = 0
 
-            eid_uni,_ = torch.sort(eid_uni)
-            if (self.edge_feats.shape[0] > 0):
-                cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
-                saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat{mode}.pt')
-            saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map{mode}.pt')
+            if (not incre or pre_eid is None):
+                eid_uni,_ = torch.sort(eid_uni)
+                if (self.edge_feats.shape[0] > 0):
+                    cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
+                    save_start = time.time()
+                    saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat{mode}.pt')
+                    save_time += time.time() - save_start
 
-            nid_uni,_ = torch.sort(nid_uni)
-            if (self.node_feats.shape[0] > 0):
-                cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
-                saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat{mode}.pt')
-            saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map{mode}.pt')
+                save_start = time.time()
+                saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map{mode}.pt')
+                save_time += time.time() - save_start
 
-            sampleTime = time.time() - start
+                nid_uni,_ = torch.sort(nid_uni)
+                if (self.node_feats.shape[0] > 0):
+                    cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
+                    save_start = time.time()
+                    saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat{mode}.pt')
+                    save_time += time.time() - save_start
+
+                save_start = time.time()
+                saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map{mode}.pt')
+                save_time += time.time() - save_start
+            else:
+                eid_uni,_ = torch.sort(eid_uni)
+                eid_incre_mask = torch.isin(eid_uni, pre_eid, assume_unique=True, invert = True)
+                cur_eid = eid_uni[eid_incre_mask]
+
+                if (self.edge_feats.shape[0] > 0):
+                    cur_edge_feat = self.select_index('edge_feats',cur_eid.to(torch.int64))
+                    save_start = time.time()
+                    saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat{mode}_incre.pt')
+                    save_time += time.time() - save_start
+                save_start = time.time()
+                saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map{mode}.pt')
+                saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map{mode}_incre_mask.pt')
+                save_time += time.time() - save_start
+
+                nid_uni,_ = torch.sort(nid_uni)
+                nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
+                cur_nid = nid_uni[nid_incre_mask]
+                if (self.node_feats.shape[0] > 0):
+                    cur_node_feat = self.select_index('node_feats',cur_nid.to(torch.int64))
+                    save_start = time.time()
+                    saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat{mode}_incre.pt')
+                    save_time += time.time() - save_start
+                save_start = time.time()
+                saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map{mode}.pt')
+                saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map{mode}_incre_mask.pt')
+                save_time += time.time() - save_start
             # mfgs = sampler.gen_mfgs(ret_list)
             
-            print(f"{root_nodes.shape}单层单block采样 + 转换block + 存储block数据 batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
+            print(f"edges: {cur_edge_feat.shape} nodes:{cur_node_feat.shape} batch: {batch_num} totalTime:{time.time() - start:.7f}s sampleTime: {sample_time:.2f}s saveTime: {save_time:.2f}s")
+            if (incre):
+                pre_eid = eid_uni
+                pre_nid = nid_uni
             del root_nodes,eid_uni,nid_uni,src,mask,eid,_
-
+            
 
             left = right
             batch_num += 1

@@ -13,6 +13,7 @@ class Pre_fetch:
     def __init__(self, conn, prefetch_child_conn):
         self.conn = conn
         self.prefetch_conn = prefetch_child_conn
+        self.use_memory = False
 
         self.config = GlobalConfig()
         self.use_valid_edge = self.config.use_valid_edge
@@ -21,7 +22,9 @@ class Pre_fetch:
         self.memory_disk = self.config.memory_disk
         self.use_async_IO = self.config.use_async_IO
         self.node_cache = self.config.node_cache
+        self.node_simple_cache = self.config.node_simple_cache
         self.node_reorder = self.config.node_reorder
+        self.use_bucket = self.config.use_bucket
         print(f"pre_fetch: 是否使用disk: {self.use_disk}")
 
         if (self.use_valid_edge and self.use_disk):
@@ -72,7 +75,7 @@ class Pre_fetch:
         self.part_edge_map[:self.shared_ret_len[2]] = prefetch_res[2]
         self.part_edge_feats[:self.shared_ret_len[3]] = prefetch_res[3]
 
-        if (hasattr(self, 'memory') or self.memory_disk):
+        if (self.use_memory):
             self.part_memory[:self.shared_ret_len[4]] = prefetch_res[4]
             self.part_memory_ts[:self.shared_ret_len[5]] = prefetch_res[5]
             self.part_mailbox[:self.shared_ret_len[6]] = prefetch_res[6]
@@ -113,6 +116,8 @@ class Pre_fetch:
 
 
     def self_select(self, name, indices,  use_slice = False):
+        if name == 'edge_feats' and self.use_valid_edge:
+            return self.get_ef_valid(indices)
         self_v = getattr(self,name,None)
         if (self_v is not None or self.use_disk):
             if (self.use_disk):
@@ -124,8 +129,8 @@ class Pre_fetch:
             raise RuntimeError(f'pre_fetch {name} error')
     
 
-
-
+    def print_time(self):
+        print_IO()
 
     def mem_select(self, indices, base_ind = None,  base_mems = None):
         names = ['memory', 'memory_ts', 'mailbox', 'mailbox_ts']
@@ -208,7 +213,7 @@ class Pre_fetch:
             total_mem = torch.cat(mems, dim = 1)
 
             self.mem_flag[indices] = True
-            if (self.node_cache):
+            if (self.node_cache and not self.node_simple_cache):
                 load_ind_cache_flag = self.node_cache_flag[indices].long()
                 load_ind_cached_ind = torch.nonzero(load_ind_cache_flag).reshape(-1).long()
                 self.cache_memory[load_ind_cache_flag[load_ind_cached_ind]] = total_mem[load_ind_cached_ind]
@@ -216,6 +221,27 @@ class Pre_fetch:
                 no_cache_indices = torch.nonzero(load_ind_cache_flag == 0).reshape(-1)
                 indices = indices[no_cache_indices]
                 total_mem = total_mem[no_cache_indices]
+            elif (self.node_simple_cache):
+                # 使用simple的动态缓存
+                cur_block = self.pre_fetch_block - 2
+                cur_end_flush_idx = self.end_flush_idx[self.end_flush_ptr[cur_block]:self.end_flush_ptr[cur_block + 1]].long()
+                self.node_cache_used[self.node_cache_flag[cur_end_flush_idx]] = False
+                self.node_cache_flag[cur_end_flush_idx] = 0
+
+                cur_start_cache_idx = self.start_cache_ind[self.start_cache_ptr[cur_block]: self.start_cache_ptr[cur_block + 1]]
+                cache_unused_idx = torch.nonzero(~self.node_cache_used)[:cur_start_cache_idx.shape[0]].reshape(-1)
+                cache_idx = indices[cur_start_cache_idx]
+                self.node_cache_flag[cache_idx] = cache_unused_idx
+                self.cache_memory[cache_unused_idx] = total_mem[cur_start_cache_idx]
+                self.node_cache_used[cache_unused_idx] = True
+                
+
+                cur_start_flush_idx = self.start_flush_ind[self.start_flush_ptr[cur_block]: self.start_flush_ptr[cur_block + 1]]
+                indices = indices[cur_start_flush_idx]
+                total_mem = total_mem[cur_start_flush_idx]
+
+                
+
 
 
             if (self.node_reorder):
@@ -253,10 +279,12 @@ class Pre_fetch:
         return None
 
     def init_memory(self, memory_param, num_nodes, dim_edge_feat):
+
         self.mem_dim = memory_param['dim_out']
         self.mail_dim = 2 * memory_param['dim_out'] + dim_edge_feat
         self.mail_size = memory_param['mailbox_size']
         self.mem_dtype = torch.float32
+        self.use_memory = True
 
         if (self.memory_disk):
             self.mem_path = f'/raid/guorui/DG/dataset/{self.dataset}/total_memory.bin'
@@ -266,19 +294,32 @@ class Pre_fetch:
 
                     
             if (self.node_reorder):
-                self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_reorder_map.bin')
+                # if (self.node_simple_cache):
+                self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_simple_reorder_map.bin')
+                # else:
+                # self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_reorder_map.bin')
             
-            if (self.node_cache):
+            if (self.node_cache and not self.node_simple_cache):
                 cache_nodes = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_cache_map.bin')
                 self.cache_memory = torch.zeros((cache_nodes.shape[0] + 1, self.mem_total_shape), dtype = torch.float32)
                 self.node_cache_flag = torch.zeros(num_nodes + 1, dtype = torch.int32)
                 self.node_cache_flag[cache_nodes.long()] = torch.arange(1, cache_nodes.shape[0] + 1, dtype = torch.int32)
-            # self.node_cache_num = 1000000
-            # self.node_cache_path = f'/raid/guorui/DG/dataset/{self.dataset}/pre_{self.node_cache_num}.bin'
-            # self.node_cache_flag = torch.zeros((num_nodes), dtype = torch.int32)
-            # self.node_cache_flag[loadBin(self.node_cache_path)] = torch.arange(0, self.node_cache_num, dtype = torch.int32)
-            
-            # self.mem_cache = torch.zeros((self.node_cache_num, self.mem_total_shape), dtype = torch.float32)
+            if (self.node_simple_cache):
+
+                self.node_cache_flag = torch.zeros(num_nodes + 1, dtype = torch.int64)
+
+                self.start_cache_ind = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/start_cache_ind.bin', device='cpu').long()
+                self.start_flush_ind = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/start_flush_ind.bin', device='cpu').long()
+                self.end_flush_idx = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/end_flush_idx.bin', device='cpu').long()
+                self.start_cache_ptr = loadBin( f'/raid/guorui/DG/dataset/{self.dataset}/start_cache_ptr.bin', device='cpu')
+                self.start_flush_ptr = loadBin( f'/raid/guorui/DG/dataset/{self.dataset}/start_flush_ptr.bin', device='cpu')
+                self.end_flush_ptr = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/end_flush_ptr.bin', device='cpu')
+
+                self.simple_max_num = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/simple_max_num.bin')[0]
+                self.cache_memory = torch.zeros((self.simple_max_num+ 1, self.mem_total_shape), dtype = torch.float32)
+                
+                self.node_cache_used = torch.zeros(self.simple_max_num + 2, dtype = torch.bool)
+                self.node_cache_used[0] = 1
 
             if (not os.path.exists(self.mem_path)):
                 print(f"首次做mem_disk训练，初始化mem_disk文件")
@@ -300,9 +341,18 @@ class Pre_fetch:
             self.mailbox = torch.zeros((num_nodes, memory_param['mailbox_size'], 2 * memory_param['dim_out'] + dim_edge_feat), dtype=torch.float32)
             self.mailbox_ts = torch.zeros((num_nodes, memory_param['mailbox_size']), dtype=torch.float32)
         
+        over_memory = 1
+
+    
     def reset_memory(self):
+        reset_IO()
+
         if (self.node_cache):
             self.cache_memory.fill_(0)
+            if (self.node_simple_cache):
+                self.node_cache_flag.fill_(0)
+                self.node_cache_used.fill_(0)
+                self.node_cache_used[0] = 1
         if (self.memory_disk):
             self.mem_flag.fill_(0)
         else:
@@ -310,6 +360,8 @@ class Pre_fetch:
             self.memory_ts.fill_(0)
             self.mailbox.fill_(0)
             self.mailbox_ts.fill_(0)
+        
+        asd = 1
         
     def set_mode(self, mode):
         self.mode = mode
@@ -367,8 +419,13 @@ class Pre_fetch:
 
         self.update_valid_edge(0)
 
-    def update_valid_edge(self, block_num):
-        cur_ef = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt')
+    def reset_valid_edge(self):
+        self.valid_ef.fill_(0)
+        self.update_valid_edge(0)
+
+    def update_valid_edge(self, block_num, cur_ef = None):
+        if (cur_ef is None):
+            cur_ef = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt')
         cur_map = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_map.pt')
         replace_idx = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_replace.pt')
         self.valid_map = cur_map
@@ -388,7 +445,10 @@ class Pre_fetch:
     def load_file(self, paths, tags, i):
 
         if (os.path.exists(paths[i].replace('.pt', '.bin'))):
-            self.async_load_dic[tags[i]] = loadBin(paths[i])
+            if (not self.use_bucket and 'part' in tags[i]):
+                self.async_load_dic[tags[i]] = None
+            else:
+                self.async_load_dic[tags[i]] = loadBin(paths[i])
         else:
             self.async_load_dic[tags[i]] = None
 
@@ -517,7 +577,7 @@ class Pre_fetch:
         t0 = time.time()
 
         nodes = pos_node_map.long()
-        if (hasattr(self, 'memory')):
+        if (self.use_memory):
             part_memory = self.memory[nodes]
             part_memory_ts = self.memory_ts[nodes]
             part_mailbox = self.mailbox[nodes]
@@ -556,7 +616,7 @@ class Pre_fetch:
             data = self.async_load_dic[tag]
             if (self.use_valid_edge and tag == 'valid_edge_feat' and has_ef):
                 # print(tag)
-                self.update_valid_edge(block_num)
+                self.update_valid_edge(block_num, data)
 
                 dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
             elif (tag == 'part_node_feat' and has_nf):
@@ -588,6 +648,7 @@ class Pre_fetch:
     # data_incre增量加载的总体逻辑：识别上一个bucket已经存在的数据，对本次bucket需要的数据做一个整体的初始化向量，只需要加载那些上一个bucket不存在的数据将其直接填入这个初始化向量，然后在主线程的prefetch_after函数中将上一个bucket已经存在的数据以CUDA数据迁移的形式做
 
     def pre_fetch(self, block_num, memory_info, neg_info, part_node_map, part_edge_map, conf):
+        self.pre_fetch_block = block_num
         #1.out-of-core
         total_s = time.time()
         has_ef = (self.use_valid_edge) or self.edge_feats.shape[0] > 0
@@ -596,16 +657,27 @@ class Pre_fetch:
         neg_nodes, neg_eids = neg_info
         neg_nodes,neg_eids = neg_nodes.cpu(),neg_eids.cpu()
         path, batch_size, fan_nums = conf
+        incre_bucket = self.use_bucket
 
         #incre_ef, part_ef, part_nf
-        if (self.use_valid_edge):
-            load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
-            tags = ['valid_edge_feat', 'part_edge_feat', 'part_node_feat']
-        else:
-            load_paths = [path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
-            tags = ['part_edge_feat', 'part_node_feat']
+        if (self.use_bucket and incre_bucket):
+            if (self.use_valid_edge):
+                load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat_incre.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat_incre.pt']
+                tags = ['valid_edge_feat', 'part_edge_feat', 'part_node_feat']
+            else:
+                load_paths = [path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat_incre.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat_incre.pt']
+                tags = ['part_edge_feat', 'part_node_feat']
+        else: # 否则就不使用bucket
+            if (self.use_valid_edge):
+                load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
+                tags = ['valid_edge_feat', 'part_edge_feat', 'part_node_feat']
+            else:
+                load_paths = [path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
+                tags = ['part_edge_feat', 'part_node_feat']
         pos_edge_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map.pt')
         pos_node_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map.pt')
+        pos_edge_shape = pos_edge_map.shape[0]
+        pos_node_shape = pos_node_map.shape[0]
         self.async_load(load_paths, tags)
 
         # neg_nodes, _ = torch.sort(neg_nodes)
@@ -615,6 +687,20 @@ class Pre_fetch:
         # print(f"创建{test_f.reshape(-1).shape[0] * 4 / 1024 ** 3:.3f}GB的共享向量用时{time.time() - allo_s:.5f}s")
         part_node_map = part_node_map.cpu()
         part_edge_map = part_edge_map.cpu()
+
+        
+        if (self.use_bucket and incre_bucket):
+            node_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map_incre_mask.pt')
+            edge_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map_incre_mask.pt')
+
+        if (not self.use_bucket):
+            start_t = time.time()
+
+            pos_node_feats = self.self_select('node_feats', pos_node_map.long())
+            if (not self.use_valid_edge):
+                pos_edge_feats = self.self_select('edge_feats', pos_edge_map.long())
+            print(f"no bucket load time:{time.time() - start_t}")
+
 
         t1 = 0
         if (memory_info and memory_info[1] is not None):
@@ -638,15 +724,7 @@ class Pre_fetch:
             t0 = time.time()
 
             self.mem_update(part_map, [part_memory, part_memory_ts, part_mailbox, part_mailbox_ts])
-            # self.mem_update('memory', part_map, part_memory)
-            # self.mem_update('memory_ts', part_map, part_memory_ts)
-            # self.mem_update('mailbox', part_map, part_mailbox)
-            # self.mem_update('mailbox_ts', part_map, part_mailbox_ts)
 
-            # self.memory[part_map] = part_memory
-            # self.memory_ts[part_map] = part_memory_ts
-            # self.mailbox[part_map] = part_mailbox
-            # self.mailbox_ts[part_map] = part_mailbox_ts
         
             del part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, neg_info
             # emptyCache()
@@ -673,6 +751,9 @@ class Pre_fetch:
         # 此处为负节点邻域涉及的节点，新加一个判断：这个节点集合是否在上一个block训练的所有节点集合中，若在则后续在下一个block接收时再填充他们的特征。
         # 验证：当使用负节点采样重用时，这个操作是否能减少大部分的IO开销？
         node_dd_ind = torch.isin(dis_neg_nodes, part_node_map, assume_unique=True,invert=True)
+        if (not self.data_incre):
+            # 实验：若不使用增量加载，此处作完整加载
+            node_dd_ind.fill_(True)
         dd_neg_nodes = dis_neg_nodes[node_dd_ind].long()
         # print(f"preFetch的block中含有需要做IO加载的负节点邻域个数: {dis_neg_nodes.shape[0]} 若除去上一个block中出现的节点，那么剩余{dd_neg_nodes.shape[0]}")
         t3 = time.time() - t0
@@ -686,7 +767,11 @@ class Pre_fetch:
             
             # neg_node_feats = self.self_select('node_feats', dis_neg_nodes.to(torch.int64))
 
-        node_d_map = torch.cat((torch.ones(pos_node_map.shape[0], dtype = torch.bool), node_dd_ind))
+        if (self.use_bucket and incre_bucket):
+            node_d_map = torch.cat((node_incre_mask, node_dd_ind))
+        else:
+            node_d_map = torch.cat((torch.ones(pos_node_map.shape[0], dtype = torch.bool), node_dd_ind))
+
         pos_node_map = torch.cat((pos_node_map, dis_neg_nodes))
         pos_node_map,node_indices = torch.sort(pos_node_map)
         
@@ -699,6 +784,9 @@ class Pre_fetch:
         dis_neg_eids = neg_eids[dis_ind]
 
         edge_dd_ind = torch.isin(dis_neg_eids, part_edge_map, assume_unique=True,invert=True)
+        if (not self.data_incre):
+            # 实验：若不使用增量加载，此处作完整加载
+            edge_dd_ind.fill_(True)
         dd_neg_eids = dis_neg_eids[edge_dd_ind]
         # print(f"preFetch的block中含有需要做IO加载的负边个数: {dis_neg_eids.shape[0]} 若除去上一个block中出现的边特征，那么剩余{dd_neg_eids.shape[0]}")
 
@@ -728,8 +816,13 @@ class Pre_fetch:
 
         t5 = time.time() - t0
         t0 = time.time()
+        if (self.use_bucket and incre_bucket):
+            edge_d_map = torch.cat((edge_incre_mask, edge_dd_ind))
+        else:
+            edge_d_map = torch.cat((torch.ones(pos_edge_map.shape[0], dtype = torch.bool), edge_dd_ind))
 
-        edge_d_map = torch.cat((torch.ones(pos_edge_map.shape[0], dtype = torch.bool), edge_dd_ind))
+        if (self.use_valid_edge and not self.use_bucket):
+            pos_edge_map_clone = pos_edge_map.clone()
         pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
         pos_edge_map,edge_indices = torch.sort(pos_edge_map)
 
@@ -744,7 +837,7 @@ class Pre_fetch:
         
         
         nodes = pos_node_map.long()
-        if (hasattr(self, 'memory') or self.memory_disk):
+        if (self.use_memory):
             pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map, assume_unique = True) #mask形式的
             cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu(), assume_unique = True)
             # print(f"寻找pre和cur: {time.time() - t0:.6f}s")
@@ -788,7 +881,7 @@ class Pre_fetch:
         t7 = time.time() - t0
         t0 = time.time()
 
-        
+
 
         # print(f"pre fetch over...")
         if (pos_node_map.shape[0] > self.part_node_map.shape[0]):
@@ -811,19 +904,31 @@ class Pre_fetch:
             data = self.async_load_dic[tag]
             if (self.use_valid_edge and tag == 'valid_edge_feat' and has_ef):
                 # print(tag)
-                self.update_valid_edge(block_num)
+                self.update_valid_edge(block_num, data)
 
                 dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
             elif (tag == 'part_node_feat' and has_nf):
                 # print(tag)
-                pos_node_feats = data
+                if (self.use_bucket):
+                    if (incre_bucket):
+                        pos_node_feats = torch.zeros((pos_node_shape, data.shape[1]), dtype = data.dtype)
+                        pos_node_feats[node_incre_mask] = data
+                    else:
+                        pos_node_feats = data
                 node_feats = torch.cat((pos_node_feats, neg_node_feats))
                 reorder_s = time.time()
                 node_feats = node_feats[node_indices]
                 reorder_time += time.time() - reorder_s
             elif (tag == 'part_edge_feat' and has_ef):
                 # print(tag)
-                pos_edge_feats = data
+                if (self.use_bucket):
+                    if (incre_bucket):
+                        pos_edge_feats = torch.zeros((pos_edge_shape, data.shape[1]), dtype = data.dtype)
+                        pos_edge_feats[edge_incre_mask] = data
+                    else:
+                        pos_edge_feats = data
+                if (not self.use_bucket and self.use_valid_edge):
+                    pos_edge_feats = self.self_select('edge_feats', pos_edge_map_clone.long())
                 edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
                 reorder_s = time.time()
                 edge_feats = edge_feats[edge_indices]
@@ -844,8 +949,8 @@ class Pre_fetch:
         tt = time.time() - total_s
         #nodes做sort + unique找出最终的indices
 
-        print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
-        print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
+        # print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
+        # print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
         # print(f"pre fetch over...")
 
     def run(self):

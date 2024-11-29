@@ -8,6 +8,11 @@ import numpy as np
 import gc
 import json
 
+read_IO = 0
+write_IO = 0
+read_IO_time = 0
+write_IO_time = 0
+
 def cuda_GB():
     return f"{torch.cuda.memory_allocated() / 1024**3:.4f}GB"
 
@@ -106,7 +111,7 @@ def loadConf(path):
 
     return res
 
-def loadBin(path):
+def loadBin(path, device = None):
     path = path.replace('.pt', '.bin')
     directory = os.path.dirname(path)
     if directory not in confs:
@@ -115,8 +120,9 @@ def loadBin(path):
     cur_conf = confs[directory][path]
 
     
-        
-    res = torch.from_numpy(np.fromfile(path, dtype = getattr(np, cur_conf['dtype']))).to(cur_conf['device']).reshape(cur_conf['shape'])
+    if (device is None):
+        device = cur_conf['device']
+    res = torch.from_numpy(np.fromfile(path, dtype = getattr(np, cur_conf['dtype'].replace('bool', 'bool_')))).to(device).reshape(cur_conf['shape'])
     if (cur_conf['dtype'] == 'float16'):
         res = res.to(torch.float32)
     return res
@@ -224,7 +230,16 @@ def read_binary_file_indices(file_path, indices, feat_len = 172, dtype=np.float3
     
     return torch.from_numpy(np.array(data))
 
+def reset_IO():
+    global read_IO, write_IO, read_IO_time, write_IO_time
+    read_IO, read_IO_time, write_IO, write_IO_time = 0,0,0,0
+
+def print_IO():
+    print(f"read IO量: {read_IO:.2f}GB 时间: {read_IO_time:.2f}s write IO量:{write_IO:.2f}GB write IO时间: {write_IO_time:.2f}s")
+
+
 def loadBinDisk(path, ind, use_slice = False):
+    global read_IO, write_IO, read_IO_time, write_IO_time
     path = path.replace('.pt', '.bin')
     # if ('memory' in path):
     #     print(f"注意！！！！！！ 将读取memory的一半改为纯顺序")
@@ -244,18 +259,21 @@ def loadBinDisk(path, ind, use_slice = False):
         res = res.to(torch.float32)
 
     time_use = time.time() - read_disk_s
-    
+    read_IO += res.numel() * 4 / 1024 ** 3
+    read_IO_time += time_use
     print(f"读取disk用时 {time_use:.4f}s shape:{res.shape} {res.numel() * 4 / 1024 ** 2 / time_use:.2f}MB/s path: {path}")
     return res
 
 def updateBinDisk(path, values, ind, use_slice = False):
+    global read_IO, write_IO, read_IO_time, write_IO_time
     path = path.replace('.pt', '.bin')
     directory = os.path.dirname(path)
     if directory not in confs:
         loadConf(path)
 
-    # print(f"注意！！！！ 将写入的一半改为纯顺序")
-    # ind[:ind.shape[0] // 2] = torch.arange(ind[0], ind[0] +ind.shape[0] // 2, dtype = ind.dtype)
+    # print(f"注意！！！！ 将写入改为纯顺序")
+    # # ind[:ind.shape[0] // 2] = torch.arange(ind[0], ind[0] +ind.shape[0] // 2, dtype = ind.dtype)
+    # ind = torch.arange(ind[0], ind[0] +ind.shape[0], dtype = ind.dtype)
 
     # ind = torch.stack((ind[:ind.shape[0]]))
 
@@ -266,6 +284,8 @@ def updateBinDisk(path, values, ind, use_slice = False):
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
     
     update_data_to_file(file_path=path, values=values, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
+    write_IO += values.numel() * 4 / 1024 ** 3
+    write_IO_time += (time.time() - update_disk_s)
     print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
 
 def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):

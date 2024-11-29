@@ -18,7 +18,7 @@ import pandas as pd
 import time
 from utils import *
 
-data = 'BITCOIN'
+data = 'STACK'
 
 g, df = load_graph(data)
 if (data in ['BITCOIN']):
@@ -79,11 +79,11 @@ def gen_part():
 
         left = right
         batch_num += 1
-        print(f"batch_num: {batch_num} over, node_num: {nid_uni.shape[0]}")
+        # print(f"batch_num: {batch_num} over, node_num: {nid_uni.shape[0]}")
         
         if (pre_root_nodes is not None):
             pre_root_nodes = pre_root_nodes[torch.isin(pre_root_nodes, nid_uni, invert = True)]
-            print(f"pre_node_num: {pre_root_nodes.shape[0]}")
+            # print(f"pre_node_num: {pre_root_nodes.shape[0]}")
             res.append(pre_root_nodes.cpu())
 
         pre_root_nodes = nid_uni.clone()
@@ -105,8 +105,6 @@ from numba.typed import List
 # block2node(block_info, node_info)
 
 node_count_sort,node_count_sort_ind = torch.sort(node_count, descending=True)
-saveBin(node_count_sort_ind[:1000000], f'/raid/guorui/DG/dataset/{data}/pre_1000000.bin')
-print(node_count_sort[:100])
 
 
 # 通过e_src和e_dst 计算度数
@@ -118,25 +116,25 @@ outDegree = torch.zeros(node_num, dtype = torch.int32, device = 'cuda:0')
 dgl.sumDegree(inDegree, outDegree,t_src, t_dst)
 d = inDegree + outDegree
 
-print(f"d < 2: {torch.sum(d < 2)} d < 1:{torch.sum(d<1)} count<2:{torch.sum(node_count<2)} count<1:{torch.sum(node_count<1)}")
-inf1 = torch.sum(node_count < 1)
-inf2 = torch.sum((torch.logical_and(node_count < 2, node_count > 0)))
-inf3 = torch.sum((torch.logical_and(node_count < 4, node_count > 0)))
-inf4 = torch.sum((torch.logical_and(node_count < 6, node_count > 0)))
-inf5 = torch.sum((torch.logical_and(node_count < 8, node_count > 0)))
-print(f"count < 1的放一起有{inf1}  count大于0小于2/4/6/8的放一起有{inf2} {inf3} {inf4} {inf5}")
-print(f"节点访问总数{torch.sum(node_count)} 前10w,50w,100w个节点做缓存可以消除 {torch.sum(node_count_sort[:100000])} {torch.sum(node_count_sort[:500000])} {torch.sum(node_count_sort[:1000000])}")
+# print(f"d < 2: {torch.sum(d < 2)} d < 1:{torch.sum(d<1)} count<2:{torch.sum(node_count<2)} count<1:{torch.sum(node_count<1)}")
+# inf1 = torch.sum(node_count < 1)
+# inf2 = torch.sum((torch.logical_and(node_count < 2, node_count > 0)))
+# inf3 = torch.sum((torch.logical_and(node_count < 4, node_count > 0)))
+# inf4 = torch.sum((torch.logical_and(node_count < 6, node_count > 0)))
+# inf5 = torch.sum((torch.logical_and(node_count < 8, node_count > 0)))
+# print(f"count < 1的放一起有{inf1}  count大于0小于2/4/6/8的放一起有{inf2} {inf3} {inf4} {inf5}")
+# print(f"节点访问总数{torch.sum(node_count)} 前10w,50w,100w个节点做缓存可以消除 {torch.sum(node_count_sort[:100000])} {torch.sum(node_count_sort[:500000])} {torch.sum(node_count_sort[:1000000])}")
 
 # count高的和入度高的重合率
-l = [100000,500000,1000000]
-inDegree_sort, inDegree_sort_ind = torch.sort(inDegree, descending=True)
-d_sort, d_sort_ind = torch.sort(d, descending=True)
-for li in l:
-    count_ind = node_count_sort_ind[:li]
-    inde_ind = d_sort_ind[:li]
+# l = [100000,500000,1000000]
+# inDegree_sort, inDegree_sort_ind = torch.sort(inDegree, descending=True)
+# d_sort, d_sort_ind = torch.sort(d, descending=True)
+# for li in l:
+#     count_ind = node_count_sort_ind[:li]
+#     inde_ind = d_sort_ind[:li]
     
-    ii = torch.isin(count_ind, inde_ind.cpu())
-    print(f"l: {li}, count在ind: {torch.sum(ii)}")
+#     ii = torch.isin(count_ind, inde_ind.cpu())
+#     print(f"l: {li}, count在ind: {torch.sum(ii)}")
 
 
 
@@ -155,17 +153,20 @@ blocks_ptr = torch.cat((torch.zeros(1, dtype = torch.int32, device = blocks_ptr.
 blocks_ptr_diff = torch.diff(blocks_ptr)
 blocks_ind = torch.repeat_interleave(torch.arange(0, blocks_ptr_diff.shape[0]), blocks_ptr_diff)
 
-dis_node = node_count_sort_ind[:1000000]
-torch.save(dis_node, '/raid/guorui/DG/dataset/BITCOIN/node_cache_map.bin')
-saveBin(dis_node, '/raid/guorui/DG/dataset/BITCOIN/node_cache_map.bin')
-dis_ind = torch.isin(blocks, node_count_sort_ind[:1000000])
+dis_node_num = 1000000 if data == 'BITCOIN' else 100000
+dis_node = node_count_sort_ind[:dis_node_num]
+saveBin(dis_node, f'/raid/guorui/DG/dataset/{data}/node_cache_map.bin')
+dis_ind = torch.isin(blocks, node_count_sort_ind[:dis_node_num])
 blocks = blocks[~dis_ind]
 blocks_ind = blocks_ind[~dis_ind]
 
 blocks_sort, blocks_sort_ind = torch.sort(blocks)
 node_info = blocks_ind[blocks_sort_ind]
 
-node = blocks_sort.cpu()
-block = node_info.cpu()
-torch.save(node, '/home/guorui/workspace/tmp/root_node.pt')
-torch.save(block, '/home/guorui/workspace/tmp/root_block.pt')
+node = blocks_sort.cuda()
+block = node_info.cuda()
+
+from 根据node和block计算相似度 import *
+cal_sim(node, block)
+torch.save(node, '/home/guorui/workspace/tmp/root_node_complete.pt')
+torch.save(block, '/home/guorui/workspace/tmp/root_block_complete.pt')

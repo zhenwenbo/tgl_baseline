@@ -43,7 +43,7 @@ def preparation(ret_list, node_list, ts_list, node_feats, edge_feats, history, t
             mfgs_r, uni_node_r, inv_node_r, uni_edge_r, inv_edge_r = to_dgl_blocks(ret_list[i], history, cuda=False,  reverse=True)
             edge_r = mfgs_r[0][0].edges()[0]
             node_data, edge_data = None, None
-        
+
         q.put((mfgs, uni_node, inv_node, uni_edge, inv_edge, uni_node_r, inv_node_r, edge_r, node_data, edge_data))
 
 

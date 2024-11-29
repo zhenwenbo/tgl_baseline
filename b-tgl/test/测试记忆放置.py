@@ -131,7 +131,7 @@ def pre():
         emptyCache()
 
 # pre()
-path = '/raid/guorui/DG/dataset/BITCOIN'
+path = '/raid/guorui/DG/dataset/LASTFM'
 def init_memory(dim_edge_feat, num_nodes):
     memory_param = {'dim_out': 100, 'mailbox_size': 1}
     
@@ -258,6 +258,6 @@ def test():
         emptyCache()
 
 
-init_memory(172, 24575383)
+init_memory(128, 1980)
 asdasdas = 1
 # test()

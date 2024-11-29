@@ -5,24 +5,6 @@ import torch
 import numpy as np
 import dgl
 
-
-
-# for i in range(1):
-#     edges = torch.load(f'/home/guorui/workspace/dgnn/b-tgl/test/动态放置结果/edges_{i}.bin')
-#     src = edges[::2]
-#     dst = edges[1::2]
-
-#     src = torch.cat((src, edges[1::2]))
-#     dst = torch.cat((dst, edges[::2]))
-
-#     src_sort, sort_ind = torch.sort(src)
-#     dst_sort = dst[sort_ind]
-
-#     edges_reorder = torch.unique(torch.stack((src_sort,dst_sort),dim=-1).reshape(-1))
-
-
-
-
 import math
 import torch
 import dgl
@@ -70,13 +52,13 @@ def uni_simple(node, block, freq, reorder_res):
 
     return node, block, reorder_res
 
-
+# data = 'STACK'
 
 import math
 import torch
 import dgl
-node = torch.load('/home/guorui/workspace/tmp/root_node.pt').cuda().to(torch.int32)
-block = torch.load('/home/guorui/workspace/tmp/root_block.pt').cuda().to(torch.int32)
+node = torch.load('/home/guorui/workspace/tmp/root_node_complete.pt').cuda().to(torch.int32)
+block = torch.load('/home/guorui/workspace/tmp/root_block_complete.pt').cuda().to(torch.int32)
 
 node, block, reorder_res = uni_simple(node, block, 1, reorder_res)
 node, block, reorder_res = uni_simple(node, block, 2, reorder_res)
@@ -113,7 +95,18 @@ for i in range(bucket_len):
     print(f"处理{i}后, res:{reorder_res.shape[0]}")
 
 # 最终结果中，对node_num中未出现的统一置于最后面
-node_num = 24575383
+
+data = 'LASTFM'
+if (data == 'BITCOIN'):
+    node_num = 24575383
+elif (data == 'TALK'):
+    node_num = 1140149
+elif (data == 'STACK'):
+    node_num = 2601977
+elif (data == 'GDELT'):
+    node_num = 16682
+elif (data == 'LASTFM'):
+    node_num = 1980
 total_node = torch.arange(0, node_num + 1, dtype = torch.int32).cuda()
 reorder_res = reorder_res.cuda()
 dis_node = total_node[torch.isin(total_node, reorder_res, invert=True)]
@@ -127,4 +120,4 @@ root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 from utils import *
-saveBin(res.cpu(), '/raid/guorui/DG/dataset/BITCOIN/node_reorder_map.bin')
+saveBin(res.cpu(), f'/raid/guorui/DG/dataset/{data}/node_simple_reorder_map.bin')

@@ -1,6 +1,6 @@
 {
     "use_valid_edge": false,  
-    "use_async_prefetch": true,
+    "use_async_prefetch": false,
     "pre_sample_size": 60000,
     "part_neg_sample": false,
     "use_pin_memory": false,
@@ -13,7 +13,8 @@
     "use_async_IO": false,
     "node_cache": true,
     "node_reorder": true,
-    "node_simple_cache": true
+    "node_simple_cache": true,
+    "epoch": 1
     
 
 }

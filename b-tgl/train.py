@@ -15,7 +15,7 @@ import os
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -23,8 +23,8 @@ parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
-parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='basic_conf_disk', help='name of stored model')
+parser.add_argument('--reuse_ratio', type=float, default=0, help='reuse_ratio')
+parser.add_argument('--train_conf', type=str, default='mem_w_valid', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -58,6 +58,9 @@ if (args.data == 'GDELT' and sample_param['layer'] == 2):
 if (args.data == 'BITCOIN'):
     train_param['epoch'] = 2
 
+if (config.epoch != -1):
+    train_param['epoch'] = config.epoch
+    print(f"预设epoch为 {config.epoch}")
 
 print(sample_param)
 print(train_param)
@@ -257,18 +260,18 @@ if __name__ == '__main__':
 
     parent_conn = None
     prefetch_conn = None
-    if (use_async_prefetch):
-        parent_conn, child_conn = multiprocessing.Pipe()
-        prefetch_conn, prefetch_child_conn = multiprocessing.Pipe()
+    # if (use_async_prefetch):
+    parent_conn, child_conn = multiprocessing.Pipe()
+    prefetch_conn, prefetch_child_conn = multiprocessing.Pipe()
 
-        p = multiprocessing.Process(target=prefetch_worker, args=(child_conn, prefetch_child_conn))
-        p.start()
+    p = multiprocessing.Process(target=prefetch_worker, args=(child_conn, prefetch_child_conn))
+    p.start()
 
-        parent_conn.send(('init_feats', (args.data, )))
-        print(f"Sent: {'init_feats'}")
-        result = parent_conn.recv()
-        print(f"Received: {result}")
-        node_feats,edge_feats = 1,1
+    parent_conn.send(('init_feats', (args.data, )))
+    print(f"Sent: {'init_feats'}")
+    result = parent_conn.recv()
+    print(f"Received: {result}")
+    node_feats,edge_feats = 1,1
 
     if (args.use_async_IO):
         parent_conn.send(('init_IO_load', (parent_conn_IO,)))
@@ -281,8 +284,8 @@ if __name__ == '__main__':
 
 
         
-    if (not args.use_async_prefetch):
-        node_feats, edge_feats = load_feat(args.data)
+    # if (not args.use_async_prefetch):
+    #     node_feats, edge_feats = load_feat(args.data)
     
     g, datas, df_conf = load_graph_bin(args.data)
 
@@ -293,33 +296,34 @@ if __name__ == '__main__':
         inductive_inds = get_inductive_links(df, train_edge_end, val_edge_end)
         df = df.iloc[inductive_inds]
         
-    gnn_dim_node = 0 if (node_feats is None or args.use_async_prefetch) else node_feats.shape[1]
-    gnn_dim_edge = 0 if (node_feats is None or args.use_async_prefetch) else edge_feats.shape[1]
+    # gnn_dim_node = 0 if (node_feats is None or args.use_async_prefetch) else node_feats.shape[1]
+    # gnn_dim_edge = 0 if (node_feats is None or args.use_async_prefetch) else edge_feats.shape[1]
+    # gnn_dim_node = 0
+    # gnn_dim_edge = 0
 
-    if (args.use_async_prefetch):
-        if (args.data == 'LASTFM'):
-            gnn_dim_edge = 128
-            gnn_dim_node = 128
-        elif (args.data == 'TALK'):
-            gnn_dim_edge = 172
-            gnn_dim_node = 172
-        elif (args.data == 'STACK'):
-            gnn_dim_edge = 172
-            gnn_dim_node = 172
-        elif (args.data == 'GDELT'):
-            gnn_dim_edge = 182 #TODO 为什么下载下来的数据集的edge feat是182呢？
-            gnn_dim_node = 413
-        elif (args.data == 'BITCOIN'):
-            gnn_dim_edge = 172
-            gnn_dim_node = 172
-        elif (args.data == 'MAG'):
-            gnn_dim_edge = 0
-            gnn_dim_node = 768
-        elif (args.data == 'WIKI'):
-            gnn_dim_edge = 0
-            gnn_dim_node = 0
-        else:
-            raise RuntimeError("have not this dataset config!")
+    if (args.data == 'LASTFM'):
+        gnn_dim_edge = 128
+        gnn_dim_node = 128
+    elif (args.data == 'TALK'):
+        gnn_dim_edge = 172
+        gnn_dim_node = 172
+    elif (args.data == 'STACK'):
+        gnn_dim_edge = 172
+        gnn_dim_node = 172
+    elif (args.data == 'GDELT'):
+        gnn_dim_edge = 182 #TODO 为什么下载下来的数据集的edge feat是182呢？
+        gnn_dim_node = 413
+    elif (args.data == 'BITCOIN'):
+        gnn_dim_edge = 172
+        gnn_dim_node = 172
+    elif (args.data == 'MAG'):
+        gnn_dim_edge = 0
+        gnn_dim_node = 768
+    elif (args.data == 'WIKI'):
+        gnn_dim_edge = 0
+        gnn_dim_node = 0
+    else:
+        raise RuntimeError("have not this dataset config!")
     
 
     combine_first = False
@@ -347,6 +351,7 @@ if __name__ == '__main__':
     # if (not args.no_emb_buffer):
     #     emb_buffer = Embedding_buffer(g, df, train_param, train_edge_end, 100, args.dis_threshold, sample_param['neighbor'], gnn_param, neg_link_sampler)
     # no_neg = True
+    print(f"初始化GPU sampler")
     sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], emb_buffer)
     node_num = g['indptr'].shape[0] - 1
     g = None
@@ -422,8 +427,8 @@ if __name__ == '__main__':
         
     feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
                               sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge), node_num=node_num)
-    if (not use_async_prefetch):
-        feat_buffer.init_feat(node_feats, edge_feats)
+    # if (not use_async_prefetch):
+    #     feat_buffer.init_feat(node_feats, edge_feats)
     # feat_buffer.gen_part()
 
     test_ap, val_ap = [], []
@@ -459,6 +464,7 @@ if __name__ == '__main__':
             model.memory_updater.last_updated_nid = None
         if (feat_buffer is not None):
             feat_buffer.reset()
+        
 
         sampleTime = 0
         startTime = time.time()
@@ -587,9 +593,9 @@ if __name__ == '__main__':
             loss = creterion(pred_pos, torch.ones_like(pred_pos))
             loss += creterion(pred_neg, torch.zeros_like(pred_neg))
             total_loss += float(loss.item()) * train_param['batch_size']
-            if (batch_num % 100 == 0):
-                # print(root_nodes)
-                print(f"loss: {loss.item()}")
+            # if (batch_num % 100 == 0):
+            #     # print(root_nodes)
+            #     print(f"loss: {loss.item()}")
             # print(f"one loop time2.1: {time.time() - loopTime:.4f}")
             loss.backward()
             optimizer.step()
@@ -699,9 +705,9 @@ if __name__ == '__main__':
             print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
 
     print(f"训练完成，退出子进程")
-    if (use_async_prefetch):
-        parent_conn.send(('EXIT', ()))
-        p.terminate()
+    # if (use_async_prefetch):
+    parent_conn.send(('EXIT', ()))
+    p.terminate()
 
 
 

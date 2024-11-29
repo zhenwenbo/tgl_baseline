@@ -8,12 +8,13 @@
     "cut_zombie": false,
     "use_disk": true,
     "reuse_neg_sample": 0.9,
-    "data_incre": true,
+    "data_incre": false,
     "memory_disk": true,
     "use_async_IO": false,
     "node_cache": true,
     "node_reorder": true,
-    "node_simple_cache": true
+    "node_simple_cache": true,
+    "epoch": 1
     
 
 }
