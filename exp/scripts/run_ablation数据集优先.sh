@@ -74,22 +74,23 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+ds=("STACK" "BITCOIN" "GDELT")
 # ds=("GDELT")
 # ds=("GDELT")
-models=("TGAT" "TimeSGN")
+# models=("TimeSGN")
 models=("TGN" "TGAT" "TimeSGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
-configs=("mem" "mem_w_valid" "disk")
+configs=("mem" "mem_w_valid")
 
 layers=("1" "2")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
-for layer in "${layers[@]}"; do
-    for model in "${models[@]}"; do
-        for d in "${ds[@]}"; do
+for d in "${ds[@]}"; do
+    for layer in "${layers[@]}"; do
+        for model in "${models[@]}"; do
+            
             for config in "${configs[@]}"; do
 
                 echo "处理 $d-$model-$layer-$config"

@@ -425,10 +425,16 @@ class Pre_fetch:
 
     def update_valid_edge(self, block_num, cur_ef = None):
         if (cur_ef is None):
-            cur_ef = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt')
-        cur_map = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_map.pt')
+            self.cur_ef_bound = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_bound.pt')
+            self.valid_ind = torch.arange(self.cur_ef_bound[0], self.cur_ef_bound[1], dtype = torch.int32)
+            cur_ef = loadBinDisk(self.path + '/edge_features.bin', self.valid_ind)
+            # cur_ef = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt')
+        # cur_map = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_map.pt')
         replace_idx = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_replace.pt')
-        self.valid_map = cur_map
+        if (block_num > 0):
+            self.valid_map[replace_idx.long()] = self.valid_ind
+        else:
+            self.valid_map = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_map.pt')
         self.valid_ef[replace_idx.long()] = cur_ef
 
     def get_ef_valid(self, eids):
@@ -445,10 +451,15 @@ class Pre_fetch:
     def load_file(self, paths, tags, i):
 
         if (os.path.exists(paths[i].replace('.pt', '.bin'))):
-            if (not self.use_bucket and 'part' in tags[i]):
+            if ((not self.use_bucket and 'part' in tags[i])):
                 self.async_load_dic[tags[i]] = None
             else:
-                self.async_load_dic[tags[i]] = loadBin(paths[i])
+                if ('valid_edge_feat' == tags[i]):
+                    self.cur_ef_bound = loadBin(self.path + f'/part-{self.batch_size}/part{self.block_num}_edge_incre_bound.pt')
+                    self.valid_ind = torch.arange(self.cur_ef_bound[0], self.cur_ef_bound[1], dtype = torch.int32)
+                    self.async_load_dic[tags[i]] = loadBinDisk(self.path + '/edge_features.bin', self.valid_ind)
+                else:
+                    self.async_load_dic[tags[i]] = loadBin(paths[i])
         else:
             self.async_load_dic[tags[i]] = None
 
@@ -466,186 +477,6 @@ class Pre_fetch:
         self.async_load_flag[tags[0]] = thread
         thread.start()
 
-    def pre_fetch_old(self, block_num, memory_info, neg_info, part_node_map, part_edge_map, conf):
-        #1.预采样下一个块的负节点的neg_nodes和neg_eids
-        #2.预取下一个块的正边采样出现的nodes和eids
-        #3.将1和2获得的组成下一个块会出现的所有的nodes和eids
-        #4.根据下一个块出现的nodes和eids，得到需要增量加载的incre_nodes_mask和incre_eids_mask（incre即当前处理块中未出现的但下一个块出现的）
-        #5.将增量的节点特征、边特征、节点记忆 使用cpu预取出来（后面可以替换为IO）
-        #6.对于特征的处理已经结束，之后将增量特征返回即可。对于记忆的处理需要额外做处理(记忆刷入)，块1运行时需要异步刷入块1中不出现而块0中出现的节点记忆
-        # print(f"子进程...")
-        #TODO 这里暂时不考虑任何增量策略
-        # print(f"子线程prefetch")
-
-        if (self.use_disk):
-            self.pre_fetch_disk(block_num, memory_info, neg_info, part_node_map,part_edge_map, conf)
-            return
-        
-
-        has_ef = (self.use_valid_edge) or self.edge_feats.shape[0] > 0
-        has_nf = self.node_feats.shape[0] > 0
-        t0 = time.time()
-        neg_nodes, neg_eids = neg_info
-        neg_nodes,neg_eids = neg_nodes.cpu(),neg_eids.cpu()
-        path, batch_size, fan_nums = conf
-
-        #incre_ef, part_ef, part_nf
-        if (self.use_valid_edge):
-            load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
-            tags = ['valid_edge_feat', 'part_edge_feat', 'part_node_feat']
-        else:
-            load_paths = [path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
-            tags = ['part_edge_feat', 'part_node_feat']
-        
-        self.async_load(load_paths, tags)
-
-        # neg_nodes, _ = torch.sort(neg_nodes)
-        # neg_eids, _ = torch.sort(neg_eids)
-
-        part_node_map = part_node_map.cpu()
-
-        if (memory_info and memory_info[1] is not None):
-            #当前正在异步运行块i，需要将块(i-1)的memory信息传入并做刷入，
-            part_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = memory_info
-            part_map = part_map.long()
-            self.memory[part_map] = part_memory.cpu()
-            self.memory_ts[part_map] = part_memory_ts.cpu()
-            self.mailbox[part_map] = part_mailbox.cpu()
-            self.mailbox_ts[part_map] = part_mailbox_ts.cpu()
-        
-            del part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, neg_info
-            # emptyCache()
-        
-        
-        t1 = time.time() - t0
-        t0 = time.time()
-
-        # pos_edge_feats = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt')
-        pos_edge_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map.pt')
-        # pos_node_feats = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt')
-        pos_node_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map.pt')
-        t2 = time.time() - t0
-        t0 = time.time()
-
-        t3 = time.time() - t0
-        t0 = time.time()
-        # table1 = torch.zeros_like(neg_nodes) - 1
-        # table2 = torch.zeros_like(pos_node_map) - 1
-        # dgl.findSameNode(neg_nodes, pos_node_map, table1, table2)
-        # neg_nodes, pos_node_map, table1, table2 = neg_nodes.cpu(), pos_node_map.cpu(), table1.cpu(), table2.cpu()
-        # dis_ind = table1 == -1
-        dis_ind = torch.isin(neg_nodes, pos_node_map, assume_unique=True,invert=True)
-        dis_neg_nodes = neg_nodes[dis_ind]
-        if (has_nf):
-            neg_node_feats = self.node_feats[dis_neg_nodes.to(torch.int64)]
-
-        pos_node_map = torch.cat((pos_node_map, dis_neg_nodes))
-        pos_node_map,node_indices = torch.sort(pos_node_map)
-        
-
-
-        # table1 = torch.zeros_like(neg_eids) - 1
-        # table2 = torch.zeros_like(pos_edge_map) - 1
-        # dgl.findSameNode(neg_eids, pos_edge_map, table1, table2)
-        # neg_eids, pos_edge_map, table1, table2 = neg_eids.cpu(), pos_edge_map.cpu(), table1.cpu(), table2.cpu()
-        # dis_ind = table1 == -1
-        dis_ind = torch.isin(neg_eids, pos_edge_map, assume_unique=True,invert=True)
-        dis_neg_eids = neg_eids[dis_ind]
-        # print(f"neg_nodes: {neg_nodes.shape[0]}, neg_eids: {neg_eids.shape[0]}, dis_neg_nodes: {dis_neg_nodes.shape[0]},dis_neg_eids: {dis_neg_eids.shape[0]}")
-        t4 = time.time() - t0
-        t0 = time.time()
-
-
-        if (has_ef and not self.use_valid_edge):
-            dis_neg_eids_feat = self.edge_feats[dis_neg_eids.to(torch.int64)]
-
-
-        t5 = time.time() - t0
-        t0 = time.time()
-
-        pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
-        pos_edge_map,edge_indices = torch.sort(pos_edge_map)
-        
-        t6 = time.time() - t0
-        t0 = time.time()
-
-        #此时获得了下一个块的所有nodes eids node_feats edge_feats
-        #分别为 pos_node_map pos_edge_map node_feats edge_feats
-        #还需要获得下一个块的所有node_memory信息
-        
-        t7 = time.time() - t0
-        t0 = time.time()
-
-        nodes = pos_node_map.long()
-        if (self.use_memory):
-            part_memory = self.memory[nodes]
-            part_memory_ts = self.memory_ts[nodes]
-            part_mailbox = self.mailbox[nodes]
-            part_mailbox_ts = self.mailbox_ts[nodes]
-
-            #此处要返回的memory信息不包括当前执行块的，因此需要在后面处理加上当前处理块后的最新memory信息
-            #即当前异步处理的块的memory结果会实时更新到self.memory中，这里返回的下一个块需要用到的memory需要在下一个块开始之前和self.memory结合
-            #因此这里预先判断：当前异步处理的块中出现的节点哪些在下一个块也出现了，即self.part_node_map(当前块)和pos_node_map(下一个块)的关系
-            
-            pre_same_nodes = torch.isin(part_node_map.cpu(), pos_node_map) #mask形式的
-            cur_same_nodes = torch.isin(pos_node_map, part_node_map.cpu())
-        else:
-            part_memory = torch.empty(0)
-            part_memory_ts = torch.empty(0)
-            part_mailbox = torch.empty(0)
-            part_mailbox_ts = torch.empty(0)
-            pre_same_nodes = torch.empty(0)
-            cur_same_nodes = torch.empty(0)
-        
-        t8 = time.time() - t0
-        t0 = time.time()
-
-        # print(f"pre fetch over...")
-        if (pos_node_map.shape[0] > self.part_node_map.shape[0]):
-            self.prefetch_conn.send('node extension')
-            self.prefetch_conn.recv()
-        if (pos_edge_map.shape[0] > self.part_edge_map.shape[0]):
-            self.prefetch_conn.send('edge extension')
-            self.prefetch_conn.recv()
-        t9 = time.time() - t0
-        t0 = time.time()
-
-        node_feats, edge_feats = torch.empty(0, dtype = torch.float32), torch.empty(0, dtype = torch.float32)
-        for tag in tags:
-            self.async_load_flag[tag].join()
-            data = self.async_load_dic[tag]
-            if (self.use_valid_edge and tag == 'valid_edge_feat' and has_ef):
-                # print(tag)
-                self.update_valid_edge(block_num, data)
-
-                dis_neg_eids_feat = self.get_ef_valid(dis_neg_eids)
-            elif (tag == 'part_node_feat' and has_nf):
-                # print(tag)
-                pos_node_feats = data
-                node_feats = torch.cat((pos_node_feats, neg_node_feats))
-                node_feats = node_feats[node_indices]
-            elif (tag == 'part_edge_feat' and has_ef):
-                # print(tag)
-                pos_edge_feats = data
-                edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
-                edge_feats = edge_feats[edge_indices]
-
-
-
-        self.prefetch_after([pos_node_map, node_feats, pos_edge_map, edge_feats, part_memory,\
-                              part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes])
-        # self.preFetchDataCache.put({'node_info': [pos_node_map, node_feats], 'edge_info': [pos_edge_map, edge_feats],\
-        #                              'memory_info': [part_memory, part_memory_ts, part_mailbox, part_mailbox_ts],\
-        #                                 'memory_update_info': [pre_same_nodes, cur_same_nodes]})
-        t10 = time.time() - t0
-        t0 = time.time()
-        #nodes做sort + unique找出最终的indices
-
-        # print(f" {t1:.2f}s\n {t2:.2f}s\n {t3:.2f}s\n {t4:.2f}s\n {t5:.2f}s\n {t6:.2f}s\n {t7:.2f}s\n {t8:.2f}s\n {t9:.2f}s\n {t10:.2f}s\n")
-        # print(f"pre fetch over...")
-
-
-    # data_incre增量加载的总体逻辑：识别上一个bucket已经存在的数据，对本次bucket需要的数据做一个整体的初始化向量，只需要加载那些上一个bucket不存在的数据将其直接填入这个初始化向量，然后在主线程的prefetch_after函数中将上一个bucket已经存在的数据以CUDA数据迁移的形式做
 
     def pre_fetch(self, block_num, memory_info, neg_info, part_node_map, part_edge_map, conf):
         self.pre_fetch_block = block_num
@@ -660,6 +491,7 @@ class Pre_fetch:
         incre_bucket = self.use_bucket
 
         #incre_ef, part_ef, part_nf
+        self.block_num = block_num
         if (self.use_bucket and incre_bucket):
             if (self.use_valid_edge):
                 load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat_incre.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat_incre.pt']
@@ -699,7 +531,7 @@ class Pre_fetch:
             pos_node_feats = self.self_select('node_feats', pos_node_map.long())
             if (not self.use_valid_edge):
                 pos_edge_feats = self.self_select('edge_feats', pos_edge_map.long())
-            print(f"no bucket load time:{time.time() - start_t}")
+            # print(f"no bucket load time:{time.time() - start_t}")
 
 
         t1 = 0
@@ -928,7 +760,7 @@ class Pre_fetch:
                     else:
                         pos_edge_feats = data
                 if (not self.use_bucket and self.use_valid_edge):
-                    pos_edge_feats = self.self_select('edge_feats', pos_edge_map_clone.long())
+                    pos_edge_feats = self.get_ef_valid(pos_edge_map_clone.long())
                 edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
                 reorder_s = time.time()
                 edge_feats = edge_feats[edge_indices]

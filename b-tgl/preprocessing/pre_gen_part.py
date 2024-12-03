@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -15,7 +15,7 @@ parser.add_argument('--use_stream', action='store_true', default=False)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
+parser.add_argument('--pre_sample_size', type=int, default=600000, help='pre sample size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -178,8 +178,8 @@ if __name__ == '__main__':
                                 sampler_gpu,neg_link_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
         feat_buffer.init_feat(node_feats, edge_feats)
         print(f"非流式预处理")
-        print(f"只做train的预处理")
-        feat_buffer.gen_part(incre = True, mode = 'train')
+        # print(f"只做train的预处理")
+        feat_buffer.gen_part(incre = True, mode = '')
         feat_buffer.val_edge_end = val_edge_end
         feat_buffer.test_edge_end = len(df)
         # if (use_val_test):

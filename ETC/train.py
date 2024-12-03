@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', default='GDELT', type=str, help='dataset name')
-parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGN-2.yml', type=str, help='path to config file')
+parser.add_argument('--data', default='STACK', type=str, help='dataset name')
+parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGAT-1.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -145,7 +145,7 @@ if __name__ == '__main__':
                                   sample_param['num_thread'], 1, sample_param['layer'], sample_param['neighbor'],
                                   sample_param['strategy']=='recent', sample_param['prop_time'],
                                   sample_param['history'], float(sample_param['duration']))
-    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1)
+    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1, g['indices'].shape[0])
     print('initialize sampler finish.')
     def eval(group_indices,mode='val'):
         neg_samples = 1

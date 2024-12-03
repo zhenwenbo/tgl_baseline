@@ -106,7 +106,7 @@ class Feat_buffer:
         else:
             self.share_edge_num = 3200000 #TODO 动态扩容share tensor
             self.share_node_num = 1000000
-            self.tmp_tensor_num = 300000000
+            self.tmp_tensor_num = 500000000
 
 
         if (d == 'MAG'):
@@ -991,6 +991,10 @@ class Feat_buffer:
             start = time.time()
             ret_list = self.sampler.sample_layer(root_nodes, root_ts)
             eid_uni = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
+
+            # print(f"eid去除root部分测试!!!")
+            # eid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
+
             nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
             # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
 

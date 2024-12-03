@@ -98,6 +98,16 @@ def saveBin(tensor,savePath,addSave=False, use_pt = False):
         elif isinstance(tensor, np.ndarray):
             tensor.tofile(savePath)
 
+from concurrent.futures import ThreadPoolExecutor
+executor = ThreadPoolExecutor(max_workers=1)
+
+def saveBin_concurrent(tensor, savePath, addSave=False, use_pt=False):
+
+    def thread_task():
+        saveBin(tensor, savePath, addSave, use_pt)
+    
+    # 创建并启动线程
+    future = executor.submit(saveBin, tensor, savePath, addSave, use_pt)
 
 
 confs = {}

@@ -37,28 +37,19 @@ def gen_expire(args):
     # batch_size = 600000
     # df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
     # g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
-    g, df = load_graph(args.data)
+    g, datas, df_conf = load_graph_bin(args.data)
 
-    if (args.data in ['BITCOIN']):
-        train_edge_end = 86063713
-        val_edge_end = 110653345
-    else:
-        train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-        val_edge_end = df[df['ext_roll'].gt(1)].index[0]
-    group_indexes = np.array(df[:train_edge_end].index // batch_size)
 
     fan_nums = [10]
     layers = len(fan_nums)
     sampler_gpu = Sampler_GPU(g, fan_nums, layers)
 
-    num_nodes = max(int(df['src'].max()), int(df['dst'].max()))
 
     expired = torch.zeros_like(sampler_gpu.indices).cuda()
-    zombie_eid = torch.zeros_like(sampler_gpu.indices).cuda()
 
     cal_max_edge_num = 0
     cal_edge_num = 0
-    max_edge_num = get_max_edge_num(sampler_gpu.indptr) + batch_size * 2
+    max_edge_num = get_max_edge_num(sampler_gpu.indptr) + batch_size * 3
 
     totaleid = sampler_gpu.totaleid.cuda()
 
@@ -77,7 +68,7 @@ def gen_expire(args):
 
     exp_eids = None
 
-    node_feats, edge_feats = load_feat(d)
+    # node_feats, edge_feats = load_feat(d)
     path = f'/raid/guorui/DG/dataset/{d}'
 
     part_path = path + f'/part-{batch_size}'
@@ -86,17 +77,43 @@ def gen_expire(args):
         os.mkdir(part_path)
 
     unexpire_ind = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
-    for cur_batch, rows in df[:train_edge_end].groupby(group_indexes):  
-        root_nodes = torch.from_numpy(np.concatenate([rows.src.values, rows.dst.values]).astype(np.int32)).cuda()
-        root_ts = torch.from_numpy(np.concatenate([rows.time.values, rows.time.values]).astype(np.float32)).cuda()
+
+
+    left, right = 0, 0
+    batch_num = 0
+    total_src = datas['src'].cuda()
+    total_dsts = datas['dst'].cuda()
+    total_time = datas['time'].to(torch.float32).cuda()
+    edge_end = datas['src'].shape[0]
+    while True:
+        total_s = time.time()
+        right += batch_size
+        right = min(edge_end, right)
+        if (left >= right):
+            break
+
+        src = total_src[left: right]
+        dst = total_dsts[left: right]
+        times = total_time[left: right]
+
+        # root_nodes = torch.from_numpy(np.concatenate([src, dst]).astype(np.int32)).cuda()
+        # root_ts = torch.from_numpy(np.concatenate([times, times]).astype(np.float32)).cuda()
+        root_nodes = torch.cat([src, dst])
+        root_ts = torch.cat([times, times]).to(torch.float32)
+
         start_eid = end_eid
         end_eid += root_nodes.shape[0] // 2
 
         cur_eids = torch.arange(start_eid, end_eid, dtype = torch.int32, device='cuda:0')
-        cur_edge_feat = edge_feats[cur_eids.cpu().long()]
-        saveBin(cur_edge_feat.cpu(), part_path + f'/part{cur_batch}_edge_incre.pt')
+        # cur_edge_feat = edge_feats[cur_eids.cpu().long()]
+        # cur_edge_feat = loadBinDisk(f'/raid/guorui/DG/dataset/{d}/edge_features.bin', cur_eids.cpu().long())
+        # saveBin(cur_edge_feat.cpu(), part_path + f'/part{cur_batch}_edge_incre.pt')
+        ind_se = torch.tensor([start_eid, end_eid], dtype = torch.int32)
+        saveBin_concurrent(ind_se, part_path + f'/part{batch_num}_edge_incre_bound.pt' )
         #TODO incre feat可以和gen_part里的正边采样出的边特征合作一下
+        print(f"抽取时间{time.time() - total_s:.6f}s")
 
+        judge_s = time.time()
         replace_idx = None
         if (exp_eids == None):
             #第一次，直接放入
@@ -148,24 +165,30 @@ def gen_expire(args):
                 if (unalloc_ptr is None):
                     unalloc_ptr = cur_eids.shape[0]
                 end_ptr = end_ptr + (replace_idx.shape[0] - unalloc_ptr)
+                if (torch.max(replace_idx) >= map.shape[0]):
+                    map = torch.cat((map, torch.zeros(torch.max(replace_idx) - map.shape[0] + 1, dtype = torch.int32, device = 'cuda:0') + (2**31 - 1) ))
                 map[replace_idx] = cur_eids
                 # break
+        print(f"判断时间 {time.time() - judge_s:.6f}s")
 
-        saveBin(map.cpu(), part_path + f'/part{cur_batch}_edge_incre_map.pt')
+        save_s = time.time()
+        if (batch_num == 0):
+            saveBin_concurrent(map.cpu(), part_path + f'/part{batch_num}_edge_incre_map.pt')
+        print(f"save 时间 {time.time() - save_s:.6f}s")
         if (replace_idx is not None):
-            saveBin(replace_idx.cpu(), part_path + f'/part{cur_batch}_edge_incre_replace.pt')
-
+            saveBin_concurrent(replace_idx.cpu(), part_path + f'/part{batch_num}_edge_incre_replace.pt')
+        print(f"save 时间 {time.time() - save_s:.6f}s")
         start = time.time()
         expired_clone = expired.clone()
-        ret_list = sampler_gpu.sample_layer(root_nodes, root_ts, expired=expired, sample_mode = 'expire', sample_param={'cur_block': cur_batch, 'zombie_block': zombie_block})
-        zombie_edge = torch.nonzero(expired == 2).reshape(-1)
+        ret_list = sampler_gpu.sample_layer(root_nodes, root_ts, expired=expired, sample_mode = 'expire', sample_param={'cur_block': batch_num, 'zombie_block': zombie_block})
+        # zombie_edge = torch.nonzero(expired == 2).reshape(-1)
         # erro_edge = torch.nonzero(torch.bitwise_and(expired == 2, expired_clone == 1)).reshape(-1)
         # print(f"异常个数: {erro_edge.shape[0]}")
-        print(f"僵尸边个数: {zombie_edge.shape[0]}")
-        expired[zombie_edge] = 0
+        # print(f"僵尸边个数: {zombie_edge.shape[0]}")
+        # expired[zombie_edge] = 0
         expired_cur = expired ^ expired_clone
 
-        emptyCache()
+        # emptyCache()
 
         
         ind = torch.nonzero(expired_cur).reshape(-1)
@@ -178,17 +201,19 @@ def gen_expire(args):
         #满足两个条件 1.eid_flag改变。2.eid_flag变为0
         exp_eids = torch.nonzero( (eid_flag ^ eid_flag_clone).to(torch.bool) & (eid_flag == 0) ).to(torch.int32).reshape(-1)
         
+        print(f"计算时间 {time.time() - start:.6f}s")
 
         cal_edge_num += root_nodes.shape[0] // 2
-        
-
         cal_max_edge_num = max(cal_edge_num, cal_max_edge_num)
         # print(torch.sum(map < (2**30)))
-        print(f"{start_eid}:{end_eid},end_ptr:{end_ptr},全体最多边数{max_edge_num} 新加了{root_nodes.shape[0] // 2}条边, 待丢弃{exp_eids.shape[0]}条边, 目前总边数{cal_edge_num}, 历史上最大边数{cal_max_edge_num}")
+        print(f"{start_eid}:{end_eid},end_ptr:{end_ptr},全体最多边数{max_edge_num} 新加了{root_nodes.shape[0] // 2}条边, 待丢弃{exp_eids.shape[0]}条边, 目前总边数{cal_edge_num}, 历史上最大边数{cal_max_edge_num} loop 用时{time.time() - total_s:.6f}s")
         
         cal_edge_num -= exp_eids.shape[0]
         # if (_ == 100):
         #     break
+
+        left = right
+        batch_num += 1
     return end_ptr
 
     # srcr,dstr,outts,outeid,root_nodes,root_ts = ret_list[-1]
@@ -221,8 +246,8 @@ import os
 import json
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--bs', type=int, help='batch size', default='60000')
+parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
+parser.add_argument('--bs', type=int, help='batch size', default='600000')
 parser.add_argument('--zombie_block', type=int, help='zombie block', default='2')
 args=parser.parse_args()
 

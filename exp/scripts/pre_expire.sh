@@ -74,8 +74,8 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "GDELT")
-ds=("STACK")
+ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+# ds=("GDELT")
 
 block_size=60000
 timestamp=$(date +%Y%m%d-%H%M%S)
@@ -87,24 +87,24 @@ for d in "${ds[@]}"; do
 
   mkdir -p "../res-pre-${timestamp}/${d}"
 
-#   nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire.log &
+  nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire.log &
+  pid=$!
+  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire-mem.log"
+  monitor_memory_usage $pid
+  wait
+
+
+#   nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
 #   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire-mem.log"
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-mem.log"
 #   monitor_memory_usage $pid
 #   wait
 
-
-  nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-mem.log"
-  monitor_memory_usage $pid
-  wait
-
-  nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part-mem.log"
-  monitor_memory_usage $pid
-  wait
+#   nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part.log &
+#   pid=$!
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part-mem.log"
+#   monitor_memory_usage $pid
+#   wait
 
 
 

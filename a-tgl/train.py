@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='WIKI')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -100,7 +100,7 @@ if args.use_inductive:
     print("inductive nodes", len(inductive_nodes))
     neg_link_sampler = NegLinkInductiveSampler(inductive_nodes)
 else:
-    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1)
+    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1, g['indices'].shape[0])
 
 def eval(mode='val'):
     neg_samples = 1
