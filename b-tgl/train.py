@@ -13,9 +13,9 @@ from utils import emptyCache
 import os
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
-
+5
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')

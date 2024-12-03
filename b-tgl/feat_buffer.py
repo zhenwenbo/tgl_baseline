@@ -1122,7 +1122,10 @@ class Feat_buffer:
                 ind_time += time.time() - ind_s
 
                 cur_data = torch.from_numpy(row_data[cur_ind - start])
-                saveBin(cur_data, save_path.replace('parti', f'part{his_ind[i]}'), addSave=(start > 0))
+                cur_save_path = save_path.replace('parti', f'part{his_ind[i]}')
+                if (i > 0):
+                    cur_save_path = cur_save_path.replace('.bin', '_incre.bin')
+                saveBin(cur_data, cur_save_path, addSave=(start > 0))
 
             print(f"{start}:{end}抽取 mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
             start = end
@@ -1143,7 +1146,6 @@ class Feat_buffer:
         df = self.df
         batch_size = self.batch_size
         # node_feats, edge_feats = load_feat(d)
-        train_edge_end = self.train_edge_end
 
         budget_byte = budget * 1024 * 1024
         his_ind = []
@@ -1157,15 +1159,14 @@ class Feat_buffer:
         his_mem_threshold = budget_byte * 0.1
         his_mem_byte = 0 #单位为字节
 
-        train_edge_end = self.train_edge_end
         left, right = 0, 0
         batch_num = 0
         datas = self.datas
+        pre_eid, pre_nid = None, None
+        edge_end = datas['src'].shape[0]
         while True:
-        # for batch_num, rows in df[:train_edge_end].groupby(group_indexes):
-            # emptyCache()
             right += batch_size
-            right = min(train_edge_end, right)
+            right = min(edge_end, right)
             if (left >= right):
                 break
 
@@ -1213,22 +1214,32 @@ class Feat_buffer:
             cur_datas = {}
             his_ind.append(batch_num)
             eid_uni,_ = torch.sort(eid_uni)
-            if (self.edge_feat_dim > 0):
-                edge_his.append(eid_uni.cpu())
-                edge_his_max.append(torch.max(eid_uni).cpu())
-                his_mem_byte += eid_uni.numel() * eid_uni.element_size()
 
-            #     cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
-            #     saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat.pt')
+            cur_eid = eid_uni
+            if (pre_eid is not None):
+                eid_incre_mask = torch.isin(eid_uni, pre_eid, assume_unique=True, invert = True)
+                cur_eid = eid_uni[eid_incre_mask]
+                saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map_incre_mask.pt')
+
+            if (self.edge_feat_dim > 0):
+                edge_his.append(cur_eid.cpu())
+                edge_his_max.append(torch.max(cur_eid).cpu())
+                his_mem_byte += cur_eid.numel() * cur_eid.element_size()
+
             saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
 
             nid_uni,_ = torch.sort(nid_uni)
+            cur_nid = nid_uni
+            if (pre_nid is not None):
+                nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
+                cur_nid = nid_uni[nid_incre_mask]
+                saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map_incre_mask.pt')
+
             if (self.node_feat_dim > 0):
-                node_his.append(nid_uni.cpu())
-                node_his_max.append(torch.max(nid_uni).cpu())
-                his_mem_byte += nid_uni.numel() * nid_uni.element_size()
-            #     cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
-            #     saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat.pt')
+                node_his.append(cur_nid.cpu())
+                node_his_max.append(torch.max(cur_nid).cpu())
+                his_mem_byte += cur_nid.numel() * cur_nid.element_size()
+
             saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
 
             
@@ -1236,8 +1247,8 @@ class Feat_buffer:
                 print(f"达到计数上限, his_mem: {his_mem_byte / 1024 ** 2}MB")
                 node_feat_path = f'{path}/node_features.bin'
                 edge_feat_path =  f'{path}/edge_features.bin'
-                node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat_test.bin'
-                edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat_test.bin'
+                node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
+                edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
                 self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
                 node_his.clear()
                 node_his_max.clear()
@@ -1249,17 +1260,18 @@ class Feat_buffer:
                 his_ind.clear()
                 his_mem_byte = 0
             sampleTime = time.time() - start
-            # mfgs = sampler.gen_mfgs(ret_list)
             
             print(f"总边数:{eid_uni.shape[0]}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
+            pre_eid = eid_uni
+            pre_nid = nid_uni
             left = right
             batch_num += 1
 
             
         node_feat_path = f'{path}/node_features.bin'
         edge_feat_path =  f'{path}/edge_features.bin'
-        node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat_test.bin'
-        edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat_test.bin'
+        node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
+        edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
         self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
         node_his.clear()
 
