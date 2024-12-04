@@ -87,20 +87,15 @@ for d in "${ds[@]}"; do
 
   mkdir -p "../res-pre-${timestamp}/${d}"
 
-#   nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/gen_expire.py --data=${d} --bs=${block_size} >/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire.log &
-#   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-expire-mem.log"
-#   monitor_memory_usage $pid
-#   wait
 
 
-  nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml" --pre_sample_size=600000 &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
+  nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml" --pre_sample_size=600000 &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
   pid=$!
   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-mem.log"
   monitor_memory_usage $pid
   wait
 
-#   nohup python -u /raid/guorui/workspace/dgnn/b-tgl/preprocessing/pre_gen_part.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part.log &
+#   nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part.log &
 #   pid=$!
 #   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part-mem.log"
 #   monitor_memory_usage $pid
@@ -129,5 +124,3 @@ for d in "${ds[@]}"; do
 
 
 done
-
-# python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data='GDELT' --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=0.8

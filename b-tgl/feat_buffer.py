@@ -105,7 +105,7 @@ class Feat_buffer:
             self.tmp_tensor_num = 50000000
         else:
             self.share_edge_num = 3200000 #TODO 动态扩容share tensor
-            self.share_node_num = 1000000
+            self.share_node_num = 2000000
             self.tmp_tensor_num = 500000000
 
 
@@ -1114,7 +1114,7 @@ class Feat_buffer:
 
             for i, tensor in enumerate(his):
                 mask_s = time.time()  
-                mask = torch.bitwise_and(tensor >= start, tensor < end)
+                mask = torch.bitwise_and(tensor >= start, tensor <= end)
                 mask_time += time.time() - mask_s
 
                 ind_s = time.time()
@@ -1128,7 +1128,8 @@ class Feat_buffer:
                 saveBin(cur_data, cur_save_path, addSave=(start > 0))
 
             print(f"{start}:{end}抽取 mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
-            start = end
+            start = end + 1
+        flush_saveBin_conf()
 
         print(f"总抽取, mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
         print(f"总用时: {time.time() - time_start:.4f}s")
@@ -1164,24 +1165,29 @@ class Feat_buffer:
         datas = self.datas
         pre_eid, pre_nid = None, None
         edge_end = datas['src'].shape[0]
+        total_src = datas['src'].cuda().to(torch.int32)
+        total_dst = datas['dst'].cuda().to(torch.int32)
+        total_time = datas['time'].cuda().to(torch.float32)
+        total_eid = datas['eid'].cuda().to(torch.int32)
         while True:
             right += batch_size
             right = min(edge_end, right)
             if (left >= right):
                 break
 
-            src = datas['src'][left: right]
-            dst = datas['dst'][left: right]
-            times = datas['time'][left: right]
-            eid = datas['eid'][left: right]
-            root_nodes = (np.concatenate([src, dst]).astype(np.int32))
-            root_ts = np.concatenate([times, times]).astype(np.float32)
-            root_nodes = torch.from_numpy(root_nodes).cuda()
-            root_ts = torch.from_numpy(root_ts).cuda()
+            src = total_src[left: right]
+            dst = total_dst[left: right]
+            times = total_time[left: right]
+            eid = total_eid[left: right]
+            root_nodes = torch.cat((src, dst))
+            root_ts = torch.cat((times, times))
+            # root_nodes = torch.from_numpy(root_nodes).cuda()
+            # root_ts = torch.from_numpy(root_ts).cuda()
 
             # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
             start = time.time()
             ret_list = self.sampler.sample_layer(root_nodes, root_ts)
+            # print(f"采样用时: {time.time() - start:.8f}s")
             eid_uni = eid.to(torch.int32).cuda()
             nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
             # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
@@ -1194,7 +1200,7 @@ class Feat_buffer:
                 cur_eid = torch.unique(eid)
                 eid_uni = torch.cat((cur_eid, eid_uni))
                 eid_uni = torch.unique(eid_uni)
-            
+            # print(f"t1: {time.time() - start:.8f}s")
             #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
             ret = ret_list[-1]
             src,dst,outts,outeid,root_nodes,root_ts,dts = ret
@@ -1206,12 +1212,12 @@ class Feat_buffer:
             src = src[mask]
             nid_uni = torch.cat((src, root_nodes))
             nid_uni = torch.unique(nid_uni)
+            # print(f"t2: {time.time() - start:.8f}s")
 
             #处理这个eid_uni，抽特征然后存就行。这里eid是个全局的
             #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
             #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
-            eid_uni, nid_uni = eid_uni.cpu(), nid_uni.cpu()
-            cur_datas = {}
+            # eid_uni, nid_uni = eid_uni.cpu(), nid_uni.cpu()
             his_ind.append(batch_num)
             eid_uni,_ = torch.sort(eid_uni)
 

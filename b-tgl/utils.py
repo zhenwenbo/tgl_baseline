@@ -51,10 +51,17 @@ def emptyCache():
     torch.cuda.empty_cache()
     gc.collect()
 
+def flush_saveBin_conf():
+    print(f"flush saveBin conf")
+    for json_path in conf_dic:
+        with open(json_path, 'w') as f:
+            json.dump(conf_dic[json_path], f, indent=4)
+
+conf_dic = {}
 #在当前目录下保存这个tensor的数据类型以及所处容器(cpu or cuda)以便恢复
 def saveBin(tensor,savePath,addSave=False, use_pt = False):
 
-    total_start = time.time()
+    total_s = time.time()
     if (not use_pt):
         savePath = savePath.replace('.pt','.bin')
 
@@ -73,21 +80,24 @@ def saveBin(tensor,savePath,addSave=False, use_pt = False):
         'shape': list(tensor.shape)
     }
 
-    try:
-        with open(json_path, 'r') as f:
-            config = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        config = {}
+    if (json_path in conf_dic):
+        config = conf_dic[json_path]
+    else:
+        try:
+            with open(json_path, 'r') as f:
+                config = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            config = {}
     
     if addSave:
         if savePath in config and config[savePath]['shape'] is not None:
             tensor_info['shape'][0] += config[savePath]['shape'][0]
     config[savePath] = tensor_info
 
-    with open(json_path, 'w') as f:
-        json.dump(config, f, indent=4)
-    
-    # print(f"save前置: {time.time() - total_start:.6f}s")
+    # with open(json_path, 'w') as f:
+    #     json.dump(config, f, indent=4)
+    conf_dic[json_path] = config
+
 
     if addSave :
         with open(savePath, 'ab') as f:
@@ -97,17 +107,19 @@ def saveBin(tensor,savePath,addSave=False, use_pt = False):
                 tensor.tofile(f)
     else:
         if isinstance(tensor, torch.Tensor):
-            trans_s = time.time()
             tensor = tensor.cpu().numpy()
-            trans_t = time.time() - trans_s
-            save_start = time.time()
+            save_s = time.time()
             tensor.tofile(savePath)
-            save_time = time.time() - save_start
+            save_time = time.time() - save_s
         elif isinstance(tensor, np.ndarray):
             tensor.tofile(savePath)
 
-    total_time = time.time() - total_start
-    print(f"saveBin shape:{tensor.shape} total:{total_time}  save:{save_time} {(tensor.nbytes/ 1024 ** 2) / save_time:.2f}MB/s")
+    if (not 'part' in savePath):
+        
+        flush_saveBin_conf()
+    
+    total_time = time.time() - total_s
+    # print(f"saveBin {savePath} {tensor.nbytes * 4 / 1024 ** 2:.2f}MB total_t:{total_time:.4f}s save_t:{save_time:.4f}s")
 
 from concurrent.futures import ThreadPoolExecutor
 executor = ThreadPoolExecutor(max_workers=1)
@@ -321,6 +333,8 @@ def stream_rand_save(path, num, len, budget, dtype):
     if (total_num < num):
         saveBin(torch.rand((num - total_num, len), dtype = dtype), path, addSave = True)
 
+    flush_saveBin_conf()
+
 def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     path = f'/raid/guorui/DG/dataset/{d}'
     node_feats = None
@@ -363,18 +377,19 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
             saveBin(edge_feats, path + '/edge_features.pt', use_pt = use_pt)
         if (node_feats != None):
             saveBin(node_feats, path + '/node_features.pt', use_pt = use_pt)
+    flush_saveBin_conf()
 
 
 
 def load_feat(d, load_node = True, load_edge = True):
     node_feats = torch.empty(0)
-    if load_node and os.path.exists('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d)):
-        node_feats = torch.load('/raid/guorui/DG/dataset/{}/node_features.pt'.format(d))
+    if load_node and os.path.exists('/raid/guorui/DG/dataset/{}/node_features.bin'.format(d)):
+        node_feats = loadBin('/raid/guorui/DG/dataset/{}/node_features.bin'.format(d))
         if node_feats.dtype == torch.bool:
             node_feats = node_feats.type(torch.float32)
     edge_feats = torch.empty(0)
-    if load_edge and os.path.exists('/raid/guorui/DG/dataset/{}/edge_features.pt'.format(d)):
-        edge_feats = torch.load('/raid/guorui/DG/dataset/{}/edge_features.pt'.format(d))
+    if load_edge and os.path.exists('/raid/guorui/DG/dataset/{}/edge_features.bin'.format(d)):
+        edge_feats = loadBin('/raid/guorui/DG/dataset/{}/edge_features.bin'.format(d))
         if edge_feats.dtype == torch.bool:
             edge_feats = edge_feats.type(torch.float32)
 

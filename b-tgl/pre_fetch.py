@@ -765,6 +765,8 @@ class Pre_fetch:
                 reorder_s = time.time()
                 edge_feats = edge_feats[edge_indices]
                 reorder_time += time.time() - reorder_s
+
+            # print(f"cur tag: {tag} use time:{time.time() - asy_time_s:.4f}s")
         t9 = time.time() - t0
         t0 = time.time()
 
