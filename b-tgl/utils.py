@@ -54,6 +54,7 @@ def emptyCache():
 #在当前目录下保存这个tensor的数据类型以及所处容器(cpu or cuda)以便恢复
 def saveBin(tensor,savePath,addSave=False, use_pt = False):
 
+    total_start = time.time()
     if (not use_pt):
         savePath = savePath.replace('.pt','.bin')
 
@@ -85,6 +86,8 @@ def saveBin(tensor,savePath,addSave=False, use_pt = False):
 
     with open(json_path, 'w') as f:
         json.dump(config, f, indent=4)
+    
+    # print(f"save前置: {time.time() - total_start:.6f}s")
 
     if addSave :
         with open(savePath, 'ab') as f:
@@ -94,9 +97,17 @@ def saveBin(tensor,savePath,addSave=False, use_pt = False):
                 tensor.tofile(f)
     else:
         if isinstance(tensor, torch.Tensor):
-            tensor.cpu().numpy().tofile(savePath)
+            trans_s = time.time()
+            tensor = tensor.cpu().numpy()
+            trans_t = time.time() - trans_s
+            save_start = time.time()
+            tensor.tofile(savePath)
+            save_time = time.time() - save_start
         elif isinstance(tensor, np.ndarray):
             tensor.tofile(savePath)
+
+    total_time = time.time() - total_start
+    print(f"saveBin shape:{tensor.shape} total:{total_time}  save:{save_time} {(tensor.nbytes/ 1024 ** 2) / save_time:.2f}MB/s")
 
 from concurrent.futures import ThreadPoolExecutor
 executor = ThreadPoolExecutor(max_workers=1)
@@ -298,10 +309,27 @@ def updateBinDisk(path, values, ind, use_slice = False):
     write_IO_time += (time.time() - update_disk_s)
     print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
 
-def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):
+def stream_rand_save(path, num, len, budget, dtype):
+    if (num <= 0):
+        return
+    once_num = int(budget / len / 4 )
+    total_num = 0
+    for i in range(num // once_num):
+        saveBin(torch.rand((once_num, len), dtype = dtype), path, addSave = True)
+        total_num += once_num
+    
+    if (total_num < num):
+        saveBin(torch.rand((num - total_num, len), dtype = dtype), path, addSave = True)
+
+def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     path = f'/raid/guorui/DG/dataset/{d}'
     node_feats = None
     edge_feats = None
+
+    ef_num = 0
+    ef_len = 0
+    nf_num = 0
+    nf_len = 0
 
     if d == 'LASTFM':
         edge_feats = torch.randn(1293103, 128)
@@ -312,7 +340,8 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):
     elif d == 'TALK':
         edge_feats = torch.randn(7833139, 172)
     elif d == 'BITCOIN':
-        edge_feats = torch.randn(122948162, 172)
+        ef_num = 0
+        ef_len = 172
 
     if d == 'LASTFM':
         node_feats = torch.randn(1980, 128)
@@ -322,13 +351,18 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False):
         node_feats = torch.randn(2601977, 172)
     elif d == 'TALK':
         node_feats = torch.randn(1140149, 172)
-    # elif d == 'BITCOIN':
-    #     node_feats = torch.randn(24575383, 172)
+    elif d == 'BITCOIN':
+        nf_num = 24575383
+        nf_len = 172
     
-    if (edge_feats != None):
-        saveBin(edge_feats, path + '/edge_features.pt', use_pt = use_pt)
-    if (node_feats != None):
-        saveBin(node_feats, path + '/node_features.pt', use_pt = use_pt)
+    if (budget is not None):
+        stream_rand_save(path + '/edge_features.pt', ef_num, ef_len, budget, torch.float32)
+        stream_rand_save(path + '/node_features.pt', nf_num, nf_len, budget, torch.float32)
+    else:
+        if (edge_feats != None):
+            saveBin(edge_feats, path + '/edge_features.pt', use_pt = use_pt)
+        if (node_feats != None):
+            saveBin(node_feats, path + '/node_features.pt', use_pt = use_pt)
 
 
 
