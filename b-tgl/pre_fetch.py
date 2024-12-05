@@ -411,41 +411,37 @@ class Pre_fetch:
             self.node_feats = node_feats
             self.edge_feats = torch.empty(0)
 
-    def init_valid_edge(self, max_valid_num, edge_feat_len, conf):
+    def init_valid_edge(self, max_valid_num, edge_feat_len, edge_num, conf):
         # 淘汰过期边策略 这里先对TALK数据集
         self.path, self.batch_size, self.fan_nums = conf
-
+        self.valid_map = torch.zeros(edge_num, dtype = torch.int32)
         self.valid_ef = torch.zeros((max_valid_num, edge_feat_len), dtype = torch.float32)
 
         self.update_valid_edge(0)
 
     def reset_valid_edge(self):
         self.valid_ef.fill_(0)
+        self.valid_map.fill_(0)
         self.update_valid_edge(0)
 
     def update_valid_edge(self, block_num, cur_ef = None):
+        
         if (cur_ef is None):
             self.cur_ef_bound = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_bound.pt')
             self.valid_ind = torch.arange(self.cur_ef_bound[0], self.cur_ef_bound[1], dtype = torch.int32)
             cur_ef = loadBinDisk(self.path + '/edge_features.bin', self.valid_ind)
-            # cur_ef = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt')
-        # cur_map = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_map.pt')
+
+
         replace_idx = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_replace.pt')
-        if (block_num > 0):
-            self.valid_map[replace_idx.long()] = self.valid_ind
-        else:
-            self.valid_map = loadBin(self.path + f'/part-{self.batch_size}/part{block_num}_edge_incre_map.pt')
+
+        self.valid_map[self.valid_ind.long()] = replace_idx.to(torch.int32)
+
         self.valid_ef[replace_idx.long()] = cur_ef
 
     def get_ef_valid(self, eids):
 
         eids = eids.cpu()
-        map = self.valid_map
-        sorted_map, indices = torch.sort(map)
-        positions = torch.searchsorted(sorted_map, eids)
-
-        original_positions = indices[positions]
-        return self.valid_ef[original_positions.long()]
+        return self.valid_ef[self.valid_map[eids.long()].long()]
 
 
     def load_file(self, paths, tags, i):
@@ -783,9 +779,9 @@ class Pre_fetch:
         tt = time.time() - total_s
         #nodes做sort + unique找出最终的indices
 
-        # print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
-        # print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
-        # print(f"pre fetch over...")
+        print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
+        print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
+        print(f"pre fetch over...")
 
     def run(self):
         while True:

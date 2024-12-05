@@ -14,7 +14,7 @@ import multiprocessing
 import json
 
 class Feat_buffer:
-    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, prefetch_conn = None, feat_dim = None):
+    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, edge_num = None, prefetch_conn = None, feat_dim = None):
         self.d = d
         self.df = df
         self.datas = datas
@@ -25,6 +25,8 @@ class Feat_buffer:
         batch_size = train_param['batch_size'] * presample_batch
         train_batch_size = train_param['batch_size']
         self.path = f'/raid/guorui/DG/dataset/{d}'
+        self.total_node_num = node_num
+        self.total_edge_num = edge_num
 
         self.node_feat_dim, self.edge_feat_dim = feat_dim
         self.memory_param = memory_param
@@ -149,7 +151,7 @@ class Feat_buffer:
             with open(file_path, 'r', encoding='utf-8') as file:
                 expire_info = json.load(file)
             if (self.prefetch_conn is not None and (self.config.use_valid_edge and not self.config.use_disk)):
-                self.prefetch_conn.send(('init_valid_edge', (expire_info[d], self.edge_feat_dim, (self.path, self.batch_size, self.sampler.fan_nums))))
+                self.prefetch_conn.send(('init_valid_edge', (expire_info[d], self.edge_feat_dim, self.total_edge_num, (self.path, self.batch_size, self.sampler.fan_nums))))
                 self.prefetch_conn.recv()
             
 
@@ -1093,7 +1095,7 @@ class Feat_buffer:
         
         mask_time = 0
         ind_time = 0
-        max_feat_len = max(his_max).item()
+        max_feat_len = max(his_max).item() + 1
         # print(his_max)
         start = 0
         end = 0
@@ -1114,7 +1116,7 @@ class Feat_buffer:
 
             for i, tensor in enumerate(his):
                 mask_s = time.time()  
-                mask = torch.bitwise_and(tensor >= start, tensor <= end)
+                mask = torch.bitwise_and(tensor >= start, tensor < end)
                 mask_time += time.time() - mask_s
 
                 ind_s = time.time()
@@ -1128,7 +1130,7 @@ class Feat_buffer:
                 saveBin(cur_data, cur_save_path, addSave=(start > 0))
 
             print(f"{start}:{end}抽取 mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
-            start = end + 1
+            start = end
         flush_saveBin_conf()
 
         print(f"总抽取, mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")

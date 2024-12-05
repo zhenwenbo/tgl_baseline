@@ -9,7 +9,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default = 'TALK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--dim_edge_feat', type=int, default=128, help='dim of edge feat')
@@ -293,7 +293,9 @@ group_indexes = list()
 group_indexes.append(np.array(df[:train_edge_end].index // train_param['batch_size']))
 
 #dims = np.array([2*args.mem_dim+args.dim_edge_feat, args.mem_dim, args.dim_edge_feat])
-if memory_param['mailbox_size'] == 1:
+if memory_param['mailbox_size'] == 0:
+    dims = np.array([args.dim_node_feat, args.dim_edge_feat])
+elif memory_param['mailbox_size'] == 1:
     dims = np.array([3*args.mem_dim+args.dim_edge_feat+args.dim_node_feat, args.dim_edge_feat])
 else:
     dims = np.array([args.mem_dim+(2*args.mem_dim+args.dim_edge_feat)*memory_param['mailbox_size'],args.dim_edge_feat])

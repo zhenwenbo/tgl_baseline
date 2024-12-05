@@ -15,7 +15,7 @@ import os
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 5
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -355,6 +355,7 @@ if __name__ == '__main__':
     print(f"初始化GPU sampler")
     sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], emb_buffer)
     node_num = g['indptr'].shape[0] - 1
+    edge_num = g['indices'].shape[0]
     g = None
     del g
     emptyCache()
@@ -417,7 +418,6 @@ if __name__ == '__main__':
 
     from feat_buffer import *
     # gpu_sampler = Sampler_GPU(g, 10)
-
     train_neg_sampler = None
     if (config.part_neg_sample):
         train_neg_sampler = TrainNegLinkSampler(g['indptr'].shape[0] - 1, g['indptr'][-1])
@@ -427,7 +427,7 @@ if __name__ == '__main__':
         train_neg_sampler = neg_link_sampler
         
     feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
-                              sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge), node_num=node_num)
+                              sampler_gpu,train_neg_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge), node_num=node_num, edge_num = edge_num)
     # if (not use_async_prefetch):
     #     feat_buffer.init_feat(node_feats, edge_feats)
     # feat_buffer.gen_part()

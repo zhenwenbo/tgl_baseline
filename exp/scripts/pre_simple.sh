@@ -74,11 +74,11 @@ monitor_memory_usage() {
 
 
 
-ds=("BITCOIN")
+ds=("STACK")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-pre-simple-${timestamp}"
-model='TGN'
+model='TGAT'
 for d in "${ds[@]}"; do
 
   echo "处理 $d"
