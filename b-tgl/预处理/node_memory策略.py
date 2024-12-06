@@ -20,7 +20,7 @@ from utils import *
 
 total_start = time.time()
 
-data = 'BITCOIN'
+data = 'STACK'
 
 g, datas, df_conf = load_graph_bin(data)
 
@@ -29,11 +29,12 @@ val_edge_end = df_conf['val_edge_end']
 e_src = datas['src']
 e_dst = datas['dst']
 
+batch_size = 60000
 def gen_part():
     #当分区feat不存在的时候做输出
     res = []
     node_count = torch.zeros(g['indptr'].shape[0], dtype = torch.int32)
-    batch_size = 60000
+    # batch_size = 60000
 
     df_start = 0
     df_end = train_edge_end
@@ -205,9 +206,9 @@ end = torch.from_numpy(end).cuda()
 IDs = torch.from_numpy(IDs).cuda()
 batch_plan = pre_load_all(start,end,IDs,len(block_info), True)
 
-saveBin(start, f'/raid/guorui/DG/dataset/{data}/simple_start.bin')
-saveBin(end, f'/raid/guorui/DG/dataset/{data}/simple_end.bin')
-saveBin(IDs, f'/raid/guorui/DG/dataset/{data}/simple_IDs.bin')
+saveBin(start, f'/raid/guorui/DG/dataset/{data}/simple_start-{batch_size}.bin')
+saveBin(end, f'/raid/guorui/DG/dataset/{data}/simple_end-{batch_size}.bin')
+saveBin(IDs, f'/raid/guorui/DG/dataset/{data}/simple_IDs-{batch_size}.bin')
 
 
 def gen_simple(start, end, IDs):
@@ -253,12 +254,12 @@ def gen_simple(start, end, IDs):
     start_flush_ptr = torch.cumsum(start_flush_ptr, dim = 0)
     end_flush_ptr = torch.cumsum(end_flush_ptr, dim = 0)
  
-    saveBin(start_cache_ind, f'/raid/guorui/DG/dataset/{data}/start_cache_ind.bin')
-    saveBin(start_flush_ind, f'/raid/guorui/DG/dataset/{data}/start_flush_ind.bin')
-    saveBin(end_flush_idx, f'/raid/guorui/DG/dataset/{data}/end_flush_idx.bin')
-    saveBin(start_cache_ptr, f'/raid/guorui/DG/dataset/{data}/start_cache_ptr.bin')
-    saveBin(start_flush_ptr, f'/raid/guorui/DG/dataset/{data}/start_flush_ptr.bin')
-    saveBin(end_flush_ptr, f'/raid/guorui/DG/dataset/{data}/end_flush_ptr.bin')
+    saveBin(start_cache_ind, f'/raid/guorui/DG/dataset/{data}/start_cache_ind-{batch_size}.bin')
+    saveBin(start_flush_ind, f'/raid/guorui/DG/dataset/{data}/start_flush_ind-{batch_size}.bin')
+    saveBin(end_flush_idx, f'/raid/guorui/DG/dataset/{data}/end_flush_idx-{batch_size}.bin')
+    saveBin(start_cache_ptr, f'/raid/guorui/DG/dataset/{data}/start_cache_ptr-{batch_size}.bin')
+    saveBin(start_flush_ptr, f'/raid/guorui/DG/dataset/{data}/start_flush_ptr-{batch_size}.bin')
+    saveBin(end_flush_ptr, f'/raid/guorui/DG/dataset/{data}/end_flush_ptr-{batch_size}.bin')
 
     return simple_node, simple_block
 simple_node, simple_block = gen_simple(start, end, IDs)
@@ -269,7 +270,7 @@ block = simple_block[node_sort_ind]
 max_num = 0
 for i in range(len(batch_plan)):
     max_num = max(max_num, batch_plan[i].shape[0])
-saveBin(torch.tensor([max_num], dtype = torch.int32), f'/raid/guorui/DG/dataset/{data}/simple_max_num.bin')
+saveBin(torch.tensor([max_num], dtype = torch.int32), f'/raid/guorui/DG/dataset/{data}/simple_max_num-{batch_size}.bin')
 
 
 
@@ -351,7 +352,7 @@ root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 from utils import *
-saveBin(res.cpu(), f'/raid/guorui/DG/dataset/{data}/node_simple_reorder_map.bin')
+saveBin(res.cpu(), f'/raid/guorui/DG/dataset/{data}/node_simple_reorder_map-{batch_size}.bin')
 
 path = f'/raid/guorui/DG/dataset/{data}'
 def init_memory(dim_edge_feat, num_nodes):
@@ -376,6 +377,6 @@ def init_memory(dim_edge_feat, num_nodes):
 feat_len = 128
 if (data in ['TALK', 'STACK', 'BITCOIN']):
     feat_len = 172
-init_memory(feat_len, node_num)
+# init_memory(feat_len, node_num)
 
 print(f"共用时: {time.time() - total_start:.2f}s")

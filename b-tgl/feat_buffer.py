@@ -32,6 +32,7 @@ class Feat_buffer:
         self.memory_param = memory_param
         self.use_memory = memory_param['type'] != 'none'
         
+        self.transfer_cpu = sampler.layer != 1 #为1时False，大于1True
 
         self.batch_size = batch_size #预采样做分析的batch_size
         self.train_batch_size = train_batch_size
@@ -326,8 +327,11 @@ class Feat_buffer:
         table2 = torch.zeros_like(nid) - 1
         dgl.findSameIndex(self.part_memory_map, nid, table1, table2)
         table2 = table2.to(torch.int64)
+        if (not self.transfer_cpu):
+            return[self.part_memory[table2], self.part_memory_ts[table2],self.part_mailbox[table2],self.part_mailbox_ts[table2]]
+        else:
+            return[self.part_memory[table2].cpu(), self.part_memory_ts[table2].cpu(),self.part_mailbox[table2].cpu(),self.part_mailbox_ts[table2].cpu()]
 
-        return[self.part_memory[table2].cpu(), self.part_memory_ts[table2].cpu(),self.part_mailbox[table2].cpu(),self.part_mailbox_ts[table2].cpu()]
 
     def input_mails(self, b):
 
@@ -646,7 +650,10 @@ class Feat_buffer:
                     next_root_nodes = (torch.cat((self.datas['src'][next_start:next_end], self.datas['dst'][next_start:next_end]))).cuda()
                     next_root_nodes = torch.unique(next_root_nodes)
                     root_nodes = root_nodes[torch.isin(root_nodes, next_root_nodes, invert=True, assume_unique=True)]
-                    memory_info = (root_nodes.cpu(), *self.get_mails(root_nodes))
+                    if (self.transfer_cpu):
+                        memory_info = (root_nodes.cpu(), *self.get_mails(root_nodes))
+                    else:
+                        memory_info = (root_nodes, *self.get_mails(root_nodes))
 
             # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
 
@@ -695,11 +702,14 @@ class Feat_buffer:
             # self.pool.apply_async(self.pre_fetch, args=(self.cur_block + 1, memory_info, self.pipe[1]))
 
             neg_info = self.pre_neg_sample(self.cur_block + 1)
-            if (neg_info is not None):
+            if (neg_info is not None and self.transfer_cpu):
                 neg_info = [neg_info[0].cpu(), neg_info[1].cpu()]
             if (self.use_async):
                 if (neg_info is not None):
-                    self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map.cpu(), self.part_edge_map.cpu(),\
+                    if (self.transfer_cpu):
+                        self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map.cpu(), self.part_edge_map.cpu(), (self.path, self.batch_size, self.sampler.fan_nums))))
+                    else:
+                        self.prefetch_conn.send(('pre_fetch', (self.cur_block + 1,memory_info,neg_info, self.part_node_map, self.part_edge_map,\
                                         (self.path, self.batch_size, self.sampler.fan_nums))))
             else:
                 if (neg_info is not None):

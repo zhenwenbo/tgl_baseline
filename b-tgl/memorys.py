@@ -35,8 +35,11 @@ class MailBox():
         if (self.prefetch_conn is None):
             self.feat_buffer.init_memory(self.node_memory, self.node_memory_ts, self.mailbox, self.mailbox_ts)
 
-    def reset(self):
+    def print_time(self):
         print(f"更新memory时寻找最后出现的用时{self.find_uni_time:.4f}s")
+
+    def reset(self):
+        self.print_time()
         self.find_uni_time = 0
         if (self.prefetch_conn):
             self.prefetch_conn.send(('reset_memory', ()))

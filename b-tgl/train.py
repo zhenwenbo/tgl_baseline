@@ -15,8 +15,8 @@ import os
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 5
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -40,8 +40,9 @@ args.use_async_IO = config.use_async_IO
 
 args.pre_sample_size = 60000
 if (sample_param['layer'] == 1):
-    if (args.data == 'STACK'):
-        args.pre_sample_size = 60000
+    if (args.train_conf == 'disk'):
+        print(f"一跳disk全改为60w")
+        args.pre_sample_size = 600000
 else:
     if (args.data == 'STACK'):
         args.pre_sample_size = 60000
@@ -63,6 +64,9 @@ if (config.epoch != -1):
     train_param['epoch'] = config.epoch
     print(f"预设epoch为 {config.epoch}")
 
+if (args.data == 'BITCOIN' and 'TGN' not in args.config):
+    train_param['epoch'] = 1
+    print(f"BITCOIN后面两个的disk只跑一个epoch")
 print(sample_param)
 print(train_param)
 
@@ -495,6 +499,7 @@ if __name__ == '__main__':
 
             if (batch_num % 1000 == 0):
                 print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+                # mailbox.print_time()
                 print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
                     loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s  mask_time: {sampler_gpu.mask_time:.4f}s")
                 if (feat_buffer):

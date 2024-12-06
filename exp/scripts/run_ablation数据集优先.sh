@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("STACK" "BITCOIN" "GDELT")
+ds=("BITCOIN")
 # ds=("GDELT")
 # ds=("GDELT")
 # models=("TimeSGN")
