@@ -73,7 +73,7 @@ class Feat_buffer:
 
 
         self.err_num = 0
-        use_detection = False
+        use_detection = True
 
         self.err_detection = use_detection
         if (self.err_detection):
@@ -1003,6 +1003,8 @@ class Feat_buffer:
             start = time.time()
             ret_list = self.sampler.sample_layer(root_nodes, root_ts)
             eid_uni = torch.from_numpy(rows['Unnamed: 0'].values).to(torch.int32).cuda()
+            saveBin(torch.tensor([left, right], dtype = torch.int32).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_bound.bin')
+            root_eids_num = eid_uni.shape[0]
 
             # print(f"eid去除root部分测试!!!")
             # eid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
@@ -1065,7 +1067,7 @@ class Feat_buffer:
                 cur_eid = eid_uni[eid_incre_mask]
 
                 if (self.edge_feats.shape[0] > 0):
-                    cur_edge_feat = self.select_index('edge_feats',cur_eid.to(torch.int64))
+                    cur_edge_feat = self.select_index('edge_feats',cur_eid[:cur_eid.shape[0] - root_eids_num].to(torch.int64))
                     save_start = time.time()
                     saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat{mode}_incre.pt')
                     save_time += time.time() - save_start

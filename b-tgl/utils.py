@@ -275,9 +275,9 @@ def loadBinDisk(path, ind, use_slice = False):
     global read_IO, write_IO, read_IO_time, write_IO_time
     path = path.replace('.pt', '.bin')
     # if ('memory' in path):
-    #     print(f"注意！！！！！！ 将读取memory的一半改为纯顺序")
-    #     ind[:ind.shape[0] // 2] = torch.arange(ind[10], ind[10] + ind.shape[0] // 2, dtype = ind.dtype)
-    #     # ind = torch.arange(ind[10], ind[10] + ind.shape[0], dtype = ind.dtype)
+    #     print(f"注意！！！！！！ 将读取memory的改为纯顺序")
+    #     # ind[:ind.shape[0] // 2] = torch.arange(ind[10], ind[10] + ind.shape[0] // 2, dtype = ind.dtype)
+    #     ind = torch.arange(ind[10], ind[10] + ind.shape[0], dtype = ind.dtype)
     directory = os.path.dirname(path)
     if directory not in confs:
         loadConf(path)

@@ -455,7 +455,13 @@ class Pre_fetch:
                     self.valid_ind = torch.arange(self.cur_ef_bound[0], self.cur_ef_bound[1], dtype = torch.int32)
                     self.async_load_dic[tags[i]] = loadBinDisk(self.path + '/edge_features.bin', self.valid_ind)
                 else:
-                    self.async_load_dic[tags[i]] = loadBin(paths[i])
+                    if ('edge_feat' in tags[i]):
+                        cur_rootef_bound = loadBin(paths[i].replace('edge_feat_incre','edge_bound'))
+                        other_ef = loadBin(paths[i])
+                        root_ef = loadBinDisk(self.part_path + f'/edge_features.bin', torch.arange(cur_rootef_bound[0], cur_rootef_bound[1], dtype = torch.int32))
+                        self.async_load_dic[tags[i]] = torch.cat((other_ef, root_ef))
+                    else:
+                        self.async_load_dic[tags[i]] = loadBin(paths[i])
         else:
             self.async_load_dic[tags[i]] = None
 
@@ -484,6 +490,9 @@ class Pre_fetch:
         neg_nodes, neg_eids = neg_info
         neg_nodes,neg_eids = neg_nodes.cpu(),neg_eids.cpu()
         path, batch_size, fan_nums = conf
+        self.fan_nums = fan_nums
+        self.batch_size = batch_size
+        self.part_path = path
         incre_bucket = self.use_bucket
 
         #incre_ef, part_ef, part_nf

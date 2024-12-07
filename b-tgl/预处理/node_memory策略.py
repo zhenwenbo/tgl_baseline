@@ -20,7 +20,7 @@ from utils import *
 
 total_start = time.time()
 
-data = 'STACK'
+data = 'BITCOIN'
 
 g, datas, df_conf = load_graph_bin(data)
 
