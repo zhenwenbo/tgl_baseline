@@ -6,7 +6,7 @@ if MODULE_PATH not in sys.path:
 	sys.path.append(MODULE_PATH)
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGAT-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
@@ -14,7 +14,7 @@ parser.add_argument('--model_name', type=str, default='', help='name of stored m
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=100, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
-parser.add_argument('--threshold',type=float, default=0.01, help='placement budget')
+parser.add_argument('--threshold',type=float, default=0.1, help='placement budget')
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -30,6 +30,9 @@ from SIMPLE.sampler import *
 from sklearn.metrics import average_precision_score, roc_auc_score
 from SIMPLE.memory_module import *
 
+if 'TGAT' in args.config:
+    set_model('TGAT')
+
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -41,16 +44,24 @@ g, df = load_graph(args.data)
 num_node = g['indptr'].shape[0] - 1
 num_edge = len(df)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-
+train_param['epoch'] = 1
 if (args.data == 'BITCOIN'):
     train_param['epoch'] = 1
 if (args.data == 'GDELT' and sample_param['layer'] == 2):
     sample_param['neighbor'] = [8, 8]
     train_param['epoch'] = 1
     print(f"GDELT二跳修改邻域为8,8")
+
+
+if (args.data in ['LASTFM','TALK','STACK']):
+    train_param['interval_to_gpu'] = False
+    train_param['pre_load'] = False
+else:
+    train_param['interval_to_gpu'] = False
+    train_param['pre_load'] = False
+
 print(sample_param)
 print(train_param)
-
 
 interval_to_gpu = train_param['interval_to_gpu']
 pre_load = train_param['pre_load']

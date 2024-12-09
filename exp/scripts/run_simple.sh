@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "GDELT")
+ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 ds=("STACK")
 
 models=("TGAT")
@@ -82,8 +82,8 @@ models=("TGAT")
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
-for model in "${models[@]}"; do
-    for d in "${ds[@]}"; do
+for d in "${ds[@]}"; do
+    for model in "${models[@]}"; do
 
     echo "处理 $d"
     mkdir -p "../res-${timestamp}/${d}"

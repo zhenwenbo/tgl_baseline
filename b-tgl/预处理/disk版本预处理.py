@@ -11,7 +11,7 @@ parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--only_gen_part', action='store_true', default=False)
 parser.add_argument('--use_async_prefetch', action='store_true', default=False)
-parser.add_argument('--use_stream', action='store_true', default=False)
+parser.add_argument('--use_stream', action='store_true', default=True)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')

@@ -73,7 +73,7 @@ class Feat_buffer:
 
 
         self.err_num = 0
-        use_detection = True
+        use_detection = False
 
         self.err_detection = use_detection
         if (self.err_detection):
@@ -1205,6 +1205,7 @@ class Feat_buffer:
             eid_uni = eid.to(torch.int32).cuda()
             nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
             # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
+            root_eids_num = eid_uni.shape[0]
 
             for ret in ret_list:
                 #找出每层的所有eid即可
@@ -1234,16 +1235,18 @@ class Feat_buffer:
             # eid_uni, nid_uni = eid_uni.cpu(), nid_uni.cpu()
             his_ind.append(batch_num)
             eid_uni,_ = torch.sort(eid_uni)
+            saveBin(torch.tensor([left, right], dtype = torch.int32).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_bound.bin')
 
             cur_eid = eid_uni
             if (pre_eid is not None):
                 eid_incre_mask = torch.isin(eid_uni, pre_eid, assume_unique=True, invert = True)
                 cur_eid = eid_uni[eid_incre_mask]
+                cur_eid = cur_eid[:cur_eid.shape[0] - root_eids_num]
                 saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map_incre_mask.pt')
 
             if (self.edge_feat_dim > 0):
                 edge_his.append(cur_eid.cpu())
-                edge_his_max.append(torch.max(cur_eid).cpu())
+                edge_his_max.append(torch.max(cur_eid).cpu() if cur_eid.shape[0] > 0 else 0)
                 his_mem_byte += cur_eid.numel() * cur_eid.element_size()
 
             saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')

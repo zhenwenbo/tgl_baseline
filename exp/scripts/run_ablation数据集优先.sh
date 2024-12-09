@@ -80,7 +80,7 @@ ds=("GDELT")
 # models=("TimeSGN")
 models=("TGN" "TGAT" "TimeSGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
-configs=("mem" "mem_w_valid")
+configs=("disk")
 
 layers=("1" "2")
 

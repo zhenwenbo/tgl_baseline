@@ -8,6 +8,17 @@ import numpy as np
 import time
 import numba as nb
 
+model = 'TGN'
+model_path = 'intervals-TGN'
+def set_model(model_name):
+    global model,model_path
+    model = model_name
+    if (model_name in ['TGN', 'TimeSGN']):
+        model_path = "intervals-TGN"
+    else:
+        model_path = "intervals-TGAT"
+
+
 def model_structure(model):
     blank = ' '
     print('-' * 90)
@@ -126,17 +137,17 @@ def to_dgl_blocks(ret, hist, reverse=False, cuda=True):
 
 def load_intervals(data_name, type_name, mailbox_size, threshold, multi_layer=False, mailbox=False, emb_reuse=False):
     if not mailbox:
-        start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
-        end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
-        IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
+        start = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_start_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
+        end = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_end_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
+        IDs = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_ids_'+type_name + f'_tgat_{2 if multi_layer else 1}.npy')
     if multi_layer and mailbox: #TODO 此处作改动契合预处理的保存逻辑，但是无法对threshold做消融
-        start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + '_2.npy')
-        end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + '_2.npy')
-        IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + '_2.npy')
+        start = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_start_'+type_name + '_2.npy')
+        end = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_end_'+type_name + '_2.npy')
+        IDs = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_ids_'+type_name + '_2.npy')
     if (not multi_layer and mailbox_size == 1) or emb_reuse:
-        start = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_start_'+type_name + '_1.npy')
-        end = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_end_'+type_name + '_1.npy')
-        IDs = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_ids_'+type_name + '_1.npy')
+        start = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_start_'+type_name + '_1.npy')
+        end = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_end_'+type_name + '_1.npy')
+        IDs = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_ids_'+type_name + '_1.npy')
     return start, end, IDs
                   
 def intervals_to_gpu(start, end, IDs, device):
@@ -156,16 +167,16 @@ def load_total_intervals(d, budget, num_node, num_edge, mailbox_size, threshold,
 
 def load_budget(d, mailbox_size, threshold, multi_layer=False, mailbox=False, emb_reuse=False):
     if not mailbox:
-        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+f'_{2 if multi_layer else 1}_budget_tgat_{2 if multi_layer else 1}.npy')
+        budget = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+d+f'_{2 if multi_layer else 1}_budget_tgat_{2 if multi_layer else 1}.npy')
     if multi_layer and mailbox and threshold == 0.1:
-        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+'_2_budget.npy')
+        budget = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+d+'_2_budget.npy')
     if multi_layer and mailbox and threshold != 0.1:
-        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+'_2_'+str(threshold)+'_budget.npy')
+        budget = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+d+'_2_'+str(threshold)+'_budget.npy')
     if (not multi_layer and mailbox_size == 1) or emb_reuse:
         print('yes here.')
-        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+'_budget.npy')
+        budget = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+d+'_budget.npy')
     if not multi_layer and mailbox_size > 1:
-        budget = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+d+'_budget_apan.npy')
+        budget = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+d+'_budget_apan.npy')
     return budget
 
 def gen_batch_plan_tensor(start, end, IDs, batch_id):
@@ -353,7 +364,7 @@ def pre_load_all(start, end, IDs, num_batch, to_gpu):
         
     
 def load_batch_plan(data_name, type_name):
-    batch_plan = np.load('/raid/guorui/workspace/dgnn/simple/intervals/'+data_name+'_'+type_name+'_'+ 'cache_plan.npy',allow_pickle=True)
+    batch_plan = np.load(f'/raid/guorui/workspace/dgnn/simple/{model_path}/'+data_name+'_'+type_name+'_'+ 'cache_plan.npy',allow_pickle=True)
     return batch_plan
 
 def load_batched_data_2layer(mfgs, node_idx, edge_idx, node_feats, edge_feats, node_gpu_mask, node_gpu_local_ids, node_cpu_ids, edge_gpu_mask, edge_gpu_local_ids, edge_cpu_ids, nfeat_buffs=None, efeat_buffs=None):

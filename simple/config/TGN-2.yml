@@ -29,5 +29,5 @@ train:
     lr: 0.0001
     dropout: 0.2
     att_dropout: 0.2
-    interval_to_gpu: False
-    pre_load: False
+    interval_to_gpu: True
+    pre_load: True

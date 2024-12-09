@@ -20,7 +20,7 @@ from utils import *
 
 total_start = time.time()
 
-data = 'BITCOIN'
+data = 'GDELT'
 
 g, datas, df_conf = load_graph_bin(data)
 
