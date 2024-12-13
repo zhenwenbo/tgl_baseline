@@ -75,7 +75,7 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
-ds=("STACK" "BITCOIN" "GDELT")
+ds=("BITCOIN")
 
 block_size=60000
 timestamp=$(date +%Y%m%d-%H%M%S)

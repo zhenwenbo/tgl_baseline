@@ -75,7 +75,7 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
-ds=("STACK")
+ds=("GDELT")
 
 models=("TGAT")
 

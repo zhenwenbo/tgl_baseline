@@ -18,6 +18,7 @@ class GlobalConfig:
         self.node_reorder = False
         self.node_simple_cache = False
         self.epoch = -1
+        self.pre_sample_size = -1
 
 
         filename = f'{self.conf_path}/{self.conf}'

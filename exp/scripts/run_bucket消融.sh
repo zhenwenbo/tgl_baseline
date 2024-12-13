@@ -67,7 +67,7 @@ monitor_memory_usage() {
 
     
     echo "平均内存占用: $average_memory_usage_mb MB" >> $memory_usage_file
-    echo "峰值内存占用: $((peak_memory_usage_kb / 1024)) MB, $((peak_memory_usage_kb / 1024 / 1024)) GB" >> $memory_usage_file
+    echo "峰值内存占用: $((peak_memory_usage_kb / 1024)) MB, $(echo "scale=2; $peak_memory_usage_kb / 1024 / 1024" | bc) GB" >> $memory_usage_file
     echo "峰值显存占用 $peak_gpu_usage MB" >> $memory_usage_file
 }
 
@@ -75,42 +75,38 @@ monitor_memory_usage() {
 
 
 ds=("GDELT")
+# ds=("GDELT")
+# ds=("GDELT")
+# models=("TimeSGN")
+models=("TGN")
+# configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
+configs=("bucket")
+
+layers=("1" "2")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p "../res-pre-simple-${timestamp}"
-model='TGAT'
+mkdir -p "../res-${timestamp}"
+
 for d in "${ds[@]}"; do
+    for layer in "${layers[@]}"; do
+        for model in "${models[@]}"; do
+            
+            for config in "${configs[@]}"; do
 
-  echo "处理 $d"
-
-  mkdir -p "../res-pre-simple-${timestamp}/${d}"
-
-
-
-  threshold=0.1
-  if [ "$d" == "GDELT" ]; then
-    threshold=0.01
-  fi
-  if [ "$d" == "BITCOIN" ]; then
-    threshold=0.05
-  fi
-  
-#   nohup python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}.log &
-#   pid=$!
-#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${threshold}-mem.log"
-#   monitor_memory_usage $pid
-#   wait
-
-  nohup python -u /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-2.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-2-${threshold}.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-2-${threshold}-mem.log"
-  monitor_memory_usage $pid
-  wait
+                echo "处理 $d-$model-$layer-$config"
+                mkdir -p "../res-${timestamp}/${d}"
 
 
+                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res.log &
+                pid=$!
+                memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res_mem.log"
+                monitor_memory_usage $pid
+                wait
 
 
+            done
 
+
+        done
+    done
 done
-
-# python /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --data='GDELT' --config="/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml" --threshold=0.8

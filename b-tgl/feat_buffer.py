@@ -1135,8 +1135,10 @@ class Feat_buffer:
                 cur_ind = tensor[mask]
                 ind_time += time.time() - ind_s
 
-                cur_data = torch.from_numpy(row_data[cur_ind - start])
+                cur_data = torch.from_numpy(row_data[cur_ind - start].reshape(-1, feat_len))
                 cur_save_path = save_path.replace('parti', f'part{his_ind[i]}')
+
+                    
                 if (i > 0):
                     cur_save_path = cur_save_path.replace('.bin', '_incre.bin')
                 saveBin(cur_data, cur_save_path, addSave=(start > 0))
@@ -1150,7 +1152,7 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (16 * 1024)):
+    def gen_part_stream(self, budget = (5 * 1024)):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path
@@ -1171,7 +1173,7 @@ class Feat_buffer:
         node_window_size = int(budget_byte * 0.9 / 4 / self.node_feat_dim)
         edge_window_size = int(budget_byte * 0.9 / 4 / self.edge_feat_dim)
         history_datas = []
-        his_mem_threshold = budget_byte * 0.1
+        his_mem_threshold = 4 * 1024 ** 3  # 4GB
         his_mem_byte = 0 #单位为字节
 
         left, right = 0, 0
@@ -1184,6 +1186,7 @@ class Feat_buffer:
         total_time = datas['time'].cuda().to(torch.float32)
         total_eid = datas['eid'].cuda().to(torch.int32)
         while True:
+            start = time.time()
             right += batch_size
             right = min(edge_end, right)
             if (left >= right):
@@ -1199,7 +1202,6 @@ class Feat_buffer:
             # root_ts = torch.from_numpy(root_ts).cuda()
 
             # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
-            start = time.time()
             ret_list = self.sampler.sample_layer(root_nodes, root_ts)
             # print(f"采样用时: {time.time() - start:.8f}s")
             eid_uni = eid.to(torch.int32).cuda()

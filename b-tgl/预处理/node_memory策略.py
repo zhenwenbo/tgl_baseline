@@ -19,8 +19,16 @@ import time
 from utils import *
 
 total_start = time.time()
+import argparse
+import os
 
-data = 'GDELT'
+parser=argparse.ArgumentParser()
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--pre_sample_size', type=int, default=6000, help='pre sample size')
+args=parser.parse_args()
+
+
+data = args.data
 
 g, datas, df_conf = load_graph_bin(data)
 
@@ -29,12 +37,11 @@ val_edge_end = df_conf['val_edge_end']
 e_src = datas['src']
 e_dst = datas['dst']
 
-batch_size = 60000
+batch_size = args.pre_sample_size
 def gen_part():
     #当分区feat不存在的时候做输出
     res = []
     node_count = torch.zeros(g['indptr'].shape[0], dtype = torch.int32)
-    # batch_size = 60000
 
     df_start = 0
     df_end = train_edge_end
