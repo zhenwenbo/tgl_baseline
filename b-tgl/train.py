@@ -15,7 +15,7 @@ import os
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -93,8 +93,10 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     dgl.seed(seed)
+    print(f"======================================================================")
     print(f"设置随机种子为{seed}")
-# set_seed(42)
+    print(f"======================================================================")
+set_seed(42)
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]

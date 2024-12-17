@@ -308,7 +308,7 @@ def updateBinDisk(path, values, ind, use_slice = False):
     # # ind[:ind.shape[0] // 2] = torch.arange(ind[0], ind[0] +ind.shape[0] // 2, dtype = ind.dtype)
     # ind = torch.arange(ind[0], ind[0] +ind.shape[0], dtype = ind.dtype)
 
-    # ind = torch.stack((ind[:ind.shape[0]]))
+    # # ind = torch.stack((ind[:ind.shape[0]]))
 
 
     cur_conf = confs[directory][path]
