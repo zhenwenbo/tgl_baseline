@@ -333,12 +333,13 @@ if __name__ == '__main__':
         for batch_num, rows in df[:train_edge_end].groupby(train_group_index):
 
             batch_edge_count += len(rows)
-            if (batch_num % 1000 == 0):
-                print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / batch_edge_count * (train_edge_end)):.3f}s")
-                print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
+            if (batch_num > 0 and batch_num % 1000 == 0):
+                print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+                print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s")
 
                 time_per_batch = 0
-                batch_edge_count = 0
+
+                print(f"当前已执行 {batch_num * 2000}条边,共需要运行{train_edge_end}条边，预计总时间: {((time.time() - time_total_epoch_s) / (batch_num * 2000)) * train_edge_end}")
             t0 = time.time()
             root_nodes = node_list[count]
             ts = ts_list[count]

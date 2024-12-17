@@ -280,9 +280,13 @@ for e in range(train_param['epoch']):
         t_tot_s = time.time()
         #load target data.
 
-        if (batch_num % 1000 == 0):
+        if (batch_num > 0 and batch_num % 1000 == 0):
             print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
+            print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s")
+
             time_per_batch = 0
+
+            print(f"当前已执行 {batch_num * 2000}条边,共需要运行{train_edge_end}条边，预计总时间: {((time.time() - time_total_epoch_s) / (batch_num * 2000)) * train_edge_end}")
 
         time_total_prep_s = time.time()
         root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)

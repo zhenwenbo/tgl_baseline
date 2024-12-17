@@ -74,13 +74,13 @@ monitor_memory_usage() {
 
 
 
-ds=("GDELT")
-# ds=("GDELT")
+ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+ds=("BITCOIN")
 # ds=("GDELT")
 # models=("TimeSGN")
 models=("TGN" "TGAT" "TimeSGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
-configs=("disk")
+configs=("disk" "wo_bucket")
 
 layers=("1" "2")
 

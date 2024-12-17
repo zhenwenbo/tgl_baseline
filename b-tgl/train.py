@@ -13,7 +13,7 @@ from utils import emptyCache
 import os
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
-5
+
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='STACK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
@@ -49,9 +49,9 @@ else:
     else:
         args.pre_sample_size = 60000
 
-if (args.data == 'MAG'):
-    args.pre_sample_size = 600000
-        
+if (config.pre_sample_size != -1):
+    args.pre_sample_size = config.pre_sample_size
+
 if (args.data == 'GDELT' and sample_param['layer'] == 2):
     sample_param['neighbor'] = [8, 8]
     train_param['epoch'] = 1
@@ -64,7 +64,7 @@ if (config.epoch != -1):
     train_param['epoch'] = config.epoch
     print(f"预设epoch为 {config.epoch}")
 
-if (args.data == 'BITCOIN' and 'TGN' not in args.config):
+if (args.data in ['BITCOIN', 'STACK', 'GDELT'] and 'TGN' not in args.config):
     train_param['epoch'] = 1
     print(f"BITCOIN后面两个的disk只跑一个epoch")
 print(sample_param)
@@ -93,8 +93,10 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     dgl.seed(seed)
+    print(f"======================================================================")
     print(f"设置随机种子为{seed}")
-# set_seed(42)
+    print(f"======================================================================")
+set_seed(42)
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]

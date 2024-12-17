@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -36,6 +36,10 @@ def set_seed(seed):
 node_feats, edge_feats = load_feat(args.data, args.rand_edge_features, args.rand_node_features)
 g, df = load_graph(args.data)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+
+if (args.data == 'GDELT' and sample_param['layer'] == 2):
+    print(f"GDELT二跳估计epoch时间")
+    use_estime = True
 
 
 if (args.data == 'BITCOIN'):
@@ -208,6 +212,7 @@ for e in range(train_param['epoch']):
     if mailbox is not None:
         mailbox.reset()
         model.memory_updater.last_updated_nid = None
+
     for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
         t_tot_s = time.time()
         time_total_prep_s = time.time()
@@ -222,11 +227,16 @@ for e in range(train_param['epoch']):
             ret = sampler.get_ret()
             time_sample += ret[0].sample_time()
 
-        if (batch_num % 1000 == 0):
+        if (batch_num > 0 and batch_num % 1000 == 0):
             print(f"平均每个batch用时{time_per_batch / 1000:.5f}s, 预计epoch时间: {(time_per_batch / 1000 * (train_edge_end/train_param['batch_size'])):.3f}s")
             print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s")
 
             time_per_batch = 0
+
+            print(f"当前已执行 {batch_num * 2000}条边,共需要运行{train_edge_end}条边，预计总时间: {((time.time() - time_total_epoch_s) / (batch_num * 2000)) * train_edge_end}")
+
+            if (use_estime and batch_num == 3):
+                exit(-1)
 
         t_prep_s = time.time()
         if gnn_param['arch'] != 'identity':
