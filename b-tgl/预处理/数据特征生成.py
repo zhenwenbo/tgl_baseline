@@ -31,7 +31,7 @@ def saveBin(tensor,savePath,addSave=False):
         tensor.cpu().numpy().tofile(savePath)
     elif isinstance(tensor, np.ndarray):
         tensor.tofile(savePath)
-data = 'BITCOIN'
+data = 'STACK'
 
 
 import sys
@@ -75,10 +75,10 @@ def df2bin():
     saveBin(src, f'{base_path}/df-src.bin')
 
     dst = torch.from_numpy(df.dst.values.astype(np.int32))
-    saveBin(src, f'{base_path}/df-src.bin')
+    saveBin(dst, f'{base_path}/df-dst.bin')
 
     eid = torch.from_numpy(df['Unnamed: 0'].values.astype(np.int32))
-    saveBin(src, f'{base_path}/df-src.bin')
+    saveBin(eid, f'{base_path}/df-eid.bin')
 
     time = torch.from_numpy(df.time.values)
     saveBin(time, f'{base_path}/df-time.bin')
@@ -89,7 +89,7 @@ def df2bin():
         json.dump(dataset_conf, f, indent=4)
 
 
-
+# df2bin()
 
 # eid = torch.from_numpy(g['eid']).cuda()
 # print(f'eid shape: {eid.shape} unique shape: {torch.unique(eid).shape}')

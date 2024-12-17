@@ -295,7 +295,7 @@ class Pre_fetch:
                     
             if (self.node_reorder):
                 # if (self.node_simple_cache):
-                self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_simple_reorder_map.bin')
+                self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_simple_reorder_map-{self.batch_size}.bin')
                 # else:
                 # self.node_reorder_map = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/node_reorder_map.bin')
             
@@ -308,14 +308,14 @@ class Pre_fetch:
 
                 self.node_cache_flag = torch.zeros(num_nodes + 1, dtype = torch.int64)
 
-                self.start_cache_ind = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/start_cache_ind.bin', device='cpu').long()
-                self.start_flush_ind = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/start_flush_ind.bin', device='cpu').long()
-                self.end_flush_idx = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/end_flush_idx.bin', device='cpu').long()
-                self.start_cache_ptr = loadBin( f'/raid/guorui/DG/dataset/{self.dataset}/start_cache_ptr.bin', device='cpu')
-                self.start_flush_ptr = loadBin( f'/raid/guorui/DG/dataset/{self.dataset}/start_flush_ptr.bin', device='cpu')
-                self.end_flush_ptr = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/end_flush_ptr.bin', device='cpu')
+                self.start_cache_ind = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/start_cache_ind-{self.batch_size}.bin', device='cpu').long()
+                self.start_flush_ind = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/start_flush_ind-{self.batch_size}.bin', device='cpu').long()
+                self.end_flush_idx = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/end_flush_idx-{self.batch_size}.bin', device='cpu').long()
+                self.start_cache_ptr = loadBin( f'/raid/guorui/DG/dataset/{self.dataset}/start_cache_ptr-{self.batch_size}.bin', device='cpu')
+                self.start_flush_ptr = loadBin( f'/raid/guorui/DG/dataset/{self.dataset}/start_flush_ptr-{self.batch_size}.bin', device='cpu')
+                self.end_flush_ptr = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/end_flush_ptr-{self.batch_size}.bin', device='cpu')
 
-                self.simple_max_num = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/simple_max_num.bin')[0]
+                self.simple_max_num = loadBin(f'/raid/guorui/DG/dataset/{self.dataset}/simple_max_num-{self.batch_size}.bin')[0]
                 self.cache_memory = torch.zeros((self.simple_max_num+ 1, self.mem_total_shape), dtype = torch.float32)
                 
                 self.node_cache_used = torch.zeros(self.simple_max_num + 2, dtype = torch.bool)
@@ -366,10 +366,11 @@ class Pre_fetch:
     def set_mode(self, mode):
         self.mode = mode
 
-    def init_feats(self, dataset):
+    def init_feats(self, dataset, block_size):
         # node_feats, edge_feats = load_feat(dataset)
         # self.node_feats = node_feats
         self.dataset = dataset
+        self.batch_size = block_size
         
         feat_conf = loadConf(f'/raid/guorui/DG/dataset/{self.dataset}/1')
         self.feat_conf = {}

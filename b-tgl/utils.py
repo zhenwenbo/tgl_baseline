@@ -8,6 +8,42 @@ import numpy as np
 import gc
 import json
 
+only_compute_io = True #TODO 后续需要把这个逻辑全部删除
+real_read_io = 0
+real_write_io = 0
+
+def create_interval_map(ind1, tensor_len, mode, interval=4096):
+    if (ind1.shape[0] == 0):
+        return
+    ind = ind1.clone().to(torch.int64)
+    tensor_start = ind * tensor_len * 4
+    tensor_end = (ind + 1) * tensor_len * 4 - 1
+    tensor_ind = torch.cat((tensor_start, tensor_end))
+    tensor, _ = torch.sort(tensor_ind)
+
+    global real_read_io, real_write_io
+    # 将tensor中的每个值转换为对应的区间索引
+    indices = tensor.div(interval, rounding_mode='floor').long()
+    # 找到所有不同的区间索引
+    unique_indices = torch.unique(indices)
+    # 计算最大索引
+    max_idx = int((tensor.max().item() // interval) + 1)
+    # 创建一个全为False的布尔张量
+    map_tensor = torch.zeros(max_idx, dtype=torch.bool)
+    # 使用scatter_将存在的区间的索引位置设置为True
+    map_tensor[unique_indices] = True
+    
+    page_num = torch.sum(map_tensor)
+    io = page_num * 4 * 1024
+    
+
+    if (mode == 'write'):
+        real_write_io += io / 1024 ** 2
+        print(f"实际写入了{page_num}个page, IO量: {io / 1024 ** 2}MB, 目前总写入IO: {real_write_io}MB")
+    else:
+        real_read_io += io / 1024 ** 2
+        print(f"实际读取了{page_num}个page, IO量: {io / 1024 ** 2}MB, 目前总读取IO: {real_read_io}MB")
+
 read_IO = 0
 write_IO = 0
 read_IO_time = 0
@@ -145,6 +181,7 @@ def loadConf(path):
     return res
 
 def loadBin(path, device = None):
+
     path = path.replace('.pt', '.bin')
     directory = os.path.dirname(path)
     if directory not in confs:
@@ -271,8 +308,9 @@ def print_IO():
     print(f"read IO量: {read_IO:.2f}GB 时间: {read_IO_time:.2f}s write IO量:{write_IO:.2f}GB write IO时间: {write_IO_time:.2f}s")
 
 
+
 def loadBinDisk(path, ind, use_slice = False):
-    global read_IO, write_IO, read_IO_time, write_IO_time
+    global read_IO, write_IO, read_IO_time, write_IO_time, only_compute_io
     path = path.replace('.pt', '.bin')
     # if ('memory' in path):
     #     print(f"注意！！！！！！ 将读取memory的改为纯顺序")
@@ -283,6 +321,13 @@ def loadBinDisk(path, ind, use_slice = False):
         loadConf(path)
 
     cur_conf = confs[directory][path]
+    
+    if (only_compute_io):
+        create_interval_map(ind, cur_conf['shape'][1], 'read')
+        res = torch.zeros((ind.shape[0], cur_conf['shape'][1]), dtype=getattr(torch, cur_conf['dtype']))
+        # print(res)
+        # print(res.shape)
+        return res
     ind = ind.cpu()
     read_disk_s = time.time()
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
@@ -309,9 +354,11 @@ def updateBinDisk(path, values, ind, use_slice = False):
     # ind = torch.arange(ind[0], ind[0] +ind.shape[0], dtype = ind.dtype)
 
     # ind = torch.stack((ind[:ind.shape[0]]))
-
-
     cur_conf = confs[directory][path]
+
+    if (only_compute_io):
+        create_interval_map(ind, cur_conf['shape'][1], 'write')
+        return
     ind = ind.cpu()
     update_disk_s = time.time()
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
@@ -329,10 +376,13 @@ def stream_rand_save(path, num, len, budget, dtype):
     for i in range(num // once_num):
         saveBin(torch.rand((once_num, len), dtype = dtype), path, addSave = True)
         total_num += once_num
+
+        gc.collect()
     
     if (total_num < num):
         saveBin(torch.rand((num - total_num, len), dtype = dtype), path, addSave = True)
 
+    gc.collect()
     flush_saveBin_conf()
 
 def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
@@ -350,9 +400,13 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     elif d == 'MOOC':
         edge_feats = torch.randn(411749, rand_de)
     elif d == 'STACK':
-        edge_feats = torch.randn(63497049, 172)
+        ef_num = 63497049
+        ef_len = 172
+        # edge_feats = torch.randn(63497049, 172)
     elif d == 'TALK':
-        edge_feats = torch.randn(7833139, 172)
+        ef_num = 7833139
+        ef_len = 172
+        # edge_feats = torch.randn(7833139, 172)
     elif d == 'BITCOIN':
         ef_num = 0
         ef_len = 172
@@ -362,9 +416,13 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     elif d == 'MOOC':
         node_feats = torch.randn(7144, rand_dn)
     elif d == 'STACK':
-        node_feats = torch.randn(2601977, 172)
+        nf_num = 2601977
+        nf_len = 172
+        # node_feats = torch.randn(2601977, 172)
     elif d == 'TALK':
-        node_feats = torch.randn(1140149, 172)
+        nf_num = 1140149
+        nf_len = 172
+        # node_feats = torch.randn(1140149, 172)
     elif d == 'BITCOIN':
         nf_num = 24575383
         nf_len = 172

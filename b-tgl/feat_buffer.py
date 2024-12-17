@@ -12,6 +12,7 @@ import concurrent.futures
 from queue import Queue
 import multiprocessing
 import json
+import gc
 
 class Feat_buffer:
     def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, edge_num = None, prefetch_conn = None, feat_dim = None):
@@ -1141,6 +1142,8 @@ class Feat_buffer:
                     cur_save_path = cur_save_path.replace('.bin', '_incre.bin')
                 saveBin(cur_data, cur_save_path, addSave=(start > 0))
 
+            del row_data
+            gc.collect()
             print(f"{start}:{end}抽取 mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
             start = end
         flush_saveBin_conf()
@@ -1150,7 +1153,7 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (16 * 1024)):
+    def gen_part_stream(self, budget = (10 * 1024)):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path

@@ -15,7 +15,7 @@ import os
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 5
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -272,7 +272,7 @@ if __name__ == '__main__':
         p = multiprocessing.Process(target=prefetch_worker, args=(child_conn, prefetch_child_conn))
         p.start()
 
-        parent_conn.send(('init_feats', (args.data, )))
+        parent_conn.send(('init_feats', (args.data, args.pre_sample_size )))
         print(f"Sent: {'init_feats'}")
         result = parent_conn.recv()
         print(f"Received: {result}")

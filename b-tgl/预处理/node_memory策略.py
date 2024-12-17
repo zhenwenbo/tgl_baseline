@@ -20,7 +20,7 @@ from utils import *
 
 total_start = time.time()
 
-data = 'GDELT'
+data = 'STACK'
 
 g, datas, df_conf = load_graph_bin(data)
 
@@ -377,6 +377,6 @@ def init_memory(dim_edge_feat, num_nodes):
 feat_len = 128
 if (data in ['TALK', 'STACK', 'BITCOIN']):
     feat_len = 172
-# init_memory(feat_len, node_num)
+init_memory(feat_len, node_num)
 
 print(f"共用时: {time.time() - total_start:.2f}s")
