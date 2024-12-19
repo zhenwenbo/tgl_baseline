@@ -74,38 +74,37 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
-# ds=("BITCOIN")
+ds=("LASTFM" "TALK" "STACK" "BITCOIN")
 # ds=("GDELT")
+# ds=("STACK" "BITCOIN")
+models=("TGAT" "TimeSGN")
 models=("TGN")
-# models=("TGN" "TGAT" "TimeSGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
-configs=("disk" "wo_reuse")
+configs=("disk" "wo_reorder" "wo_cache")
 
-layers=("1")
+layers=("2")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
-for d in "${ds[@]}"; do
-    for layer in "${layers[@]}"; do
-        for model in "${models[@]}"; do
-            
+for layer in "${layers[@]}"; do
+    for model in "${models[@]}"; do
+        for d in "${ds[@]}"; do
             for config in "${configs[@]}"; do
 
-                echo "处理 $d-$model-$layer-$config"
-                mkdir -p "../res-${timestamp}/${d}"
+                    echo "处理 $d-$model-$layer-$config"
+                    mkdir -p "../res-${timestamp}/${d}"
 
 
-                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res.log &
-                pid=$!
-                memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res_mem.log"
-                monitor_memory_usage $pid
-                wait
+                    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train纯IO测试.py  --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res.log &
+                    pid=$!
+                    memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res_mem.log"
+                    monitor_memory_usage $pid
+                    wait
+
 
 
             done
-
 
         done
     done

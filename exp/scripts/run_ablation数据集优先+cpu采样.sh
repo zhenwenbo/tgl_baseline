@@ -74,15 +74,15 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+ds=("GDELT")
 # ds=("BITCOIN")
 # ds=("GDELT")
 models=("TGN")
 # models=("TGN" "TGAT" "TimeSGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
-configs=("disk" "wo_reuse")
+configs=("disk")
 
-layers=("1")
+layers=("1" "2")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
@@ -97,7 +97,7 @@ for d in "${ds[@]}"; do
                 mkdir -p "../res-${timestamp}/${d}"
 
 
-                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res.log &
+                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --use_cpu_sample --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res.log &
                 pid=$!
                 memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res_mem.log"
                 monitor_memory_usage $pid

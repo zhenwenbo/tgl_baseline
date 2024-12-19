@@ -76,14 +76,14 @@ monitor_memory_usage() {
 
 ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 # ds=("GDELT")
-ds=("BITCOIN")
+ds=("STACK")
 models=("TGAT" "TimeSGN")
 models=("TGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
 configs=("disk_reuse")
 
 layers=("1")
-reuse_ratio=("0.9" "0" "0.1" "0.2" "0.3" "0.4" "0.5" "0.6" "0.7" "0.8" "0.9")
+reuse_ratio=("0.95")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"

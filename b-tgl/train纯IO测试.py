@@ -15,7 +15,7 @@ import os
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -24,7 +24,7 @@ parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='wo_reorder', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='disk', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -60,13 +60,15 @@ if (args.data == 'GDELT' and sample_param['layer'] == 2):
 if (args.data == 'BITCOIN'):
     train_param['epoch'] = 2
 
-if (config.epoch != -1):
-    train_param['epoch'] = config.epoch
-    print(f"预设epoch为 {config.epoch}")
+# if (config.epoch != -1):
+#     train_param['epoch'] = config.epoch
+#     print(f"预设epoch为 {config.epoch}")
 
 if (args.data == 'BITCOIN' and 'TGN' not in args.config):
     train_param['epoch'] = 1
     print(f"BITCOIN后面两个的disk只跑一个epoch")
+
+train_param['epoch'] = 1
 print(sample_param)
 print(train_param)
 
@@ -94,7 +96,7 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
     dgl.seed(seed)
     print(f"设置随机种子为{seed}")
-# set_seed(42)
+set_seed(42)
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]
@@ -114,131 +116,6 @@ def get_inductive_links(df, train_edge_end, val_edge_end):
     print('Inductive links', len(inductive_inds), len(test_df))
     return [i for i in range(val_edge_end)] + inductive_inds
 
-
-def eval(mode='val'):
-    
-    if (emb_buffer):
-        emb_buffer.cur_mode = 'val'
-    if (feat_buffer):
-        feat_buffer.mode = 'val'
-
-    neg_samples = 1
-    model.eval()
-    aps = list()
-    aucs_mrrs = list()
-
-    if mode == 'val':
-        left = df_conf['train_edge_end']
-        eval_df_end = val_edge_end
-    elif mode == 'test':
-        left = df_conf['val_edge_end']
-        eval_df_end = datas['src'].shape[0]
-        neg_samples = args.eval_neg_samples
-    elif mode == 'train':
-        left = 0
-        eval_df_end = df_conf['train_edge_end']
-    
-    right = left
-    with torch.no_grad():
-        total_loss = 0
-        while True:
-            right += batch_size
-            right = min(right, eval_df_end)
-            if (left >= right):
-                break
-
-            src = datas['src'][left: right]
-            dst = datas['dst'][left: right]
-            times = datas['time'][left: right]
-            eid = datas['eid'][left: right]
-            root_nodes = np.concatenate([src, dst, neg_link_sampler.sample(src.shape[0] * neg_samples)]).astype(np.int32)
-            ts = np.tile(times, neg_samples + 2).astype(np.float32)
-            
-            if (use_gpu_sample):
-                root_nodes = torch.from_numpy(root_nodes).cuda()
-                root_ts = torch.from_numpy(ts).cuda()
-                ret = sampler_gpu.sample_layer(root_nodes, root_ts, cut_zombie=args.cut_zombie)
-            else:
-                if sampler is not None:
-                    if 'no_neg' in sample_param and sample_param['no_neg']:
-                        pos_root_end = len(rows) * 2
-                        sampler.sample(root_nodes[:pos_root_end], ts[:pos_root_end])
-                    else:
-                        sampler.sample(root_nodes, ts)
-                    ret = sampler.get_ret()
-
-            if (use_gpu_sample):
-                mfgs = sampler_gpu.gen_mfgs(ret)
-                root_nodes = root_nodes.cpu().numpy()
-            else:
-                if gnn_param['arch'] != 'identity':
-                    mfgs = to_dgl_blocks(ret, sample_param['history'])
-                else:
-                    mfgs = node_to_dgl_blocks(root_nodes, ts)  
-                    
-            mfgs = prepare_input(mfgs, node_feats, edge_feats, feat_buffer = feat_buffer, combine_first=combine_first)
-            
-            if mailbox is not None:
-                mailbox.prep_input_mails(mfgs[0])
-            pred_pos, pred_neg = model(mfgs, neg_samples=neg_samples)
-            total_loss += creterion(pred_pos, torch.ones_like(pred_pos))
-            total_loss += creterion(pred_neg, torch.zeros_like(pred_neg))
-            y_pred = torch.cat([pred_pos, pred_neg], dim=0).sigmoid().cpu()
-            y_true = torch.cat([torch.ones(pred_pos.size(0)), torch.zeros(pred_neg.size(0))], dim=0)
-            aps.append(average_precision_score(y_true, y_pred))
-            if neg_samples > 1:
-                aucs_mrrs.append(torch.reciprocal(torch.sum(pred_pos.squeeze() < pred_neg.squeeze().reshape(neg_samples, -1), dim=0) + 1).type(torch.float))
-            else:
-                aucs_mrrs.append(roc_auc_score(y_true, y_pred))
-            if mailbox is not None:
-                eid = eid.cuda().to(torch.int32)
-                mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
-                block = None
-                if memory_param['deliver_to'] == 'neighbors':
-                    block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
-                mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block, neg_samples=neg_samples)
-                mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts, neg_samples=neg_samples)
-            
-            left = right
-
-        if mode == 'val':
-            val_losses.append(float(total_loss))
-    ap = float(torch.tensor(aps).mean())
-    if neg_samples > 1:
-        auc_mrr = float(torch.cat(aucs_mrrs).mean())
-    else:
-        auc_mrr = float(torch.tensor(aucs_mrrs).mean())
-    return ap, auc_mrr
-
-def count_judge(src_node, dst_node):
-    cur_node = torch.empty(0).to(torch.int32)
-    maxLen = 0
-    countLen = 0
-    for i,node in enumerate(src_node):
-        if (torch.nonzero(cur_node == node).shape[0] > 0):
-            continue
-        cur_node = torch.cat((cur_node, torch.tensor([node], dtype = torch.int32)), dim = 0)
-
-        #判断node在后面出现的次数    
-        # print(i)
-        #判断src_node中值等于node的个数，要求索引大于i
-        indices = torch.nonzero(src_node[i + 1:] == node).reshape(-1)
-        len1 = src_node[i+1:][indices].shape[0]
-
-        indices = torch.nonzero(dst_node[i + 1:] == node).reshape(-1)
-        len2 = dst_node[i+1:][indices].shape[0]
-
-        len = len1 + len2
-        countLen += len
-        maxLen = max(maxLen, len)
-
-        # if (len1 == 0 and len2 == 0):
-        #     asdasd = 0
-        #     print(f"node: {node}在后面从未出现过...")
-        # else:
-        #     print(f"node: {node}在src_node后面总共出现了{len1}次,在dst_node后面共出现了{len2}次")
-
-    print(f"出现的最长的依赖长度为{maxLen},依赖链总长度为{countLen}")
 
 # set_seed(0)
 if __name__ == '__main__':
@@ -536,3 +413,7 @@ if __name__ == '__main__':
     
 
 
+    print(f"训练完成，退出子进程")
+    # if (use_async_prefetch):
+    parent_conn.send(('EXIT', ()))
+    p.terminate()

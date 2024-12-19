@@ -5,6 +5,12 @@ import time
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import sys
+# from sampler_core import ParallelSampler, TemporalGraphBlock
+
+root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
 # from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 from utils import *
 
@@ -140,8 +146,8 @@ class NegLinkInductiveSampler:
     
 if __name__ == '__main__':
     parser=argparse.ArgumentParser()
-    parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-    parser.add_argument('--config', type=str, help='path to config file', default='./config/TGN.yml')
+    parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+    parser.add_argument('--config', type=str, help='path to config file', default='../config/TGN.yml')
     parser.add_argument('--batch_size', type=int, default=600000, help='path to config file')
     parser.add_argument('--num_thread', type=int, default=64, help='number of thread')
     args=parser.parse_args()

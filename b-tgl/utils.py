@@ -8,7 +8,7 @@ import numpy as np
 import gc
 import json
 
-only_compute_io = True #TODO 后续需要把这个逻辑全部删除
+only_compute_io = False #TODO 后续需要把这个逻辑全部删除
 real_read_io = 0
 real_write_io = 0
 

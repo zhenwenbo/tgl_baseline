@@ -20,6 +20,7 @@ import time
 from utils import *
 from sampler.sampler import *
 import random
+from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 
 def set_seed(seed):
     random.seed(seed)

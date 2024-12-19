@@ -24,11 +24,11 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--pre_sample_size', type=int, default=6000, help='pre sample size')
+parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
 args=parser.parse_args()
 
 
-data = 'STACK'
+data = 'TALK'
 
 g, datas, df_conf = load_graph_bin(data)
 

@@ -80,7 +80,7 @@ ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 models=("TGN")
 # models=("TGN" "TGAT" "TimeSGN")
 # configs=("mem" "disk" "wo_cache" "wo_incre" "wo_reorder" "wo_reuse")
-configs=("disk" "wo_reuse")
+configs=("disk" "wo_incre")
 
 layers=("1")
 

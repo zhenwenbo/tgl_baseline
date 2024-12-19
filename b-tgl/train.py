@@ -11,21 +11,25 @@ from utils import *
 from sklearn.metrics import average_precision_score, roc_auc_score
 from utils import emptyCache
 import os
+from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
+
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:1024"
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
+parser.add_argument('--use_cpu_sample', action='store_true', default=False)
 
 parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
 parser.add_argument('--train_conf', type=str, default='disk', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
+parser.add_argument('--set_epoch', type=int, default=-1, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -67,6 +71,9 @@ if (config.epoch != -1):
 if (args.data in ['BITCOIN', 'STACK', 'GDELT'] and 'TGN' not in args.config):
     train_param['epoch'] = 1
     print(f"BITCOIN后面两个的disk只跑一个epoch")
+
+if (args.set_epoch != -1):
+    train_param['epoch'] = args.set_epoch
 print(sample_param)
 print(train_param)
 
@@ -339,8 +346,10 @@ if __name__ == '__main__':
 
 
         from sampler.sampler_gpu import *
-        use_gpu_sample = False
-        use_gpu_sample = True
+        use_gpu_sample = not args.use_cpu_sample
+
+        print(f"====================================\n使用CPU采样? {not use_gpu_sample}")
+        # use_gpu_sample = True
         no_neg = 'no_neg' in sample_param and sample_param['no_neg']
         from emb_buffer import *
 
@@ -362,6 +371,14 @@ if __name__ == '__main__':
         sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], emb_buffer)
         node_num = g['indptr'].shape[0] - 1
         edge_num = g['indices'].shape[0]
+
+        if not (('no_sample' in sample_param and sample_param['no_sample']) or (use_gpu_sample)):
+            sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),
+                                    sample_param['num_thread'], 1, sample_param['layer'], sample_param['neighbor'],
+                                    sample_param['strategy']=='recent', sample_param['prop_time'],
+                                    sample_param['history'], float(sample_param['duration']))
+        else:
+            sampler = None
         g = None
         del g
         emptyCache()
@@ -400,13 +417,9 @@ if __name__ == '__main__':
             if mailbox is not None:
                 mailbox.move_to_gpu()
 
-        sampler = None
+        
         # if (True):
-        if not (('no_sample' in sample_param and sample_param['no_sample']) or (use_gpu_sample)):
-            sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),
-                                    sample_param['num_thread'], 1, sample_param['layer'], sample_param['neighbor'],
-                                    sample_param['strategy']=='recent', sample_param['prop_time'],
-                                    sample_param['history'], float(sample_param['duration']))
+
 
 
         if not os.path.isdir('models'):
