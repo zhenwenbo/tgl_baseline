@@ -75,7 +75,7 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
-ds=("GDELT")
+# ds=("BITCOIN" "GDELT")
 
 block_size=60000
 timestamp=$(date +%Y%m%d-%H%M%S)
@@ -89,17 +89,23 @@ for d in "${ds[@]}"; do
 
 
 
-  nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml" --pre_sample_size=60000 &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
+  nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1-25.yml" --pre_sample_size=60000 &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
   pid=$!
   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-mem.log"
   monitor_memory_usage $pid
   wait
 
-  nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part.log &
-  pid=$!
-  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part-mem.log"
-  monitor_memory_usage $pid
-  wait
+#   nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1-100.yml" --pre_sample_size=60000 &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
+#   pid=$!
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-mem.log"
+#   monitor_memory_usage $pid
+#   wait
+
+#   nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-2.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part.log &
+#   pid=$!
+#   memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-2-part-mem.log"
+#   monitor_memory_usage $pid
+#   wait
 
 
 

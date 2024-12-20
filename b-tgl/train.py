@@ -18,7 +18,7 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1-50.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -71,7 +71,7 @@ if (config.epoch != -1):
 if (args.data in ['BITCOIN', 'STACK', 'GDELT'] and 'TGN' not in args.config):
     train_param['epoch'] = 1
     print(f"BITCOIN后面两个的disk只跑一个epoch")
-
+train_param['epoch'] = 2
 if (args.set_epoch != -1):
     train_param['epoch'] = args.set_epoch
 print(sample_param)

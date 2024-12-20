@@ -235,8 +235,8 @@ for e in range(train_param['epoch']):
 
             print(f"当前已执行 {batch_num * 2000}条边,共需要运行{train_edge_end}条边，预计总时间: {((time.time() - time_total_epoch_s) / (batch_num * 2000)) * train_edge_end}")
 
-            if (use_estime and batch_num == 3):
-                exit(-1)
+            # if (use_estime and batch_num == 3):
+            #     exit(-1)
 
         t_prep_s = time.time()
         if gnn_param['arch'] != 'identity':
