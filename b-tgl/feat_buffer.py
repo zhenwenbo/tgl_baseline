@@ -113,10 +113,11 @@ class Feat_buffer:
             self.tmp_tensor_num = 500000000
 
 
-        if (d == 'MAG'):
-            self.share_edge_num = 10000000
-            self.share_node_num = 5000000
-
+        # if (d == 'MAG'):
+        self.share_edge_num = 10000000
+        self.share_node_num = 5000000
+        self.tmp_tensor_num = 500000000
+        
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
         else:
@@ -1261,6 +1262,8 @@ class Feat_buffer:
             if (pre_nid is not None):
                 nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
                 cur_nid = nid_uni[nid_incre_mask]
+                if (batch_num == 1605):
+                    asdjlasdk = 1
                 saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map_incre_mask.pt')
 
             if (self.node_feat_dim > 0):

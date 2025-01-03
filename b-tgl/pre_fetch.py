@@ -480,6 +480,9 @@ class Pre_fetch:
         self.async_load_flag[tags[0]] = thread
         thread.start()
 
+    def sync_load(self, paths, tags):
+        self.load_file(paths, tags, 0)
+
 
     def pre_fetch(self, block_num, memory_info, neg_info, part_node_map, part_edge_map, conf):
         self.pre_fetch_block = block_num
@@ -516,7 +519,11 @@ class Pre_fetch:
         pos_node_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map.pt')
         pos_edge_shape = pos_edge_map.shape[0]
         pos_node_shape = pos_node_map.shape[0]
-        self.async_load(load_paths, tags)
+        use_async = False
+        if (use_async):
+            self.async_load(load_paths, tags)
+        else:
+            self.sync_load(load_paths, tags)
 
         # neg_nodes, _ = torch.sort(neg_nodes)
         # neg_eids, _ = torch.sort(neg_eids)
@@ -736,7 +743,8 @@ class Pre_fetch:
         node_feats, edge_feats = torch.empty(0, dtype = torch.float32), torch.empty(0, dtype = torch.float32)
         for tag in tags:
             asy_time_s = time.time()
-            self.async_load_flag[tag].join()
+            if (use_async):
+                self.async_load_flag[tag].join()
             asy_time += time.time() - asy_time_s
 
             data = self.async_load_dic[tag]

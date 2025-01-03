@@ -247,8 +247,8 @@ import os
 import json
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
-parser.add_argument('--bs', type=int, help='batch size', default='60000')
+parser.add_argument('--data', type=str, help='dataset name', default='STACK')
+parser.add_argument('--bs', type=int, help='batch size', default='2000')
 parser.add_argument('--zombie_block', type=int, help='zombie block', default='2')
 args=parser.parse_args()
 

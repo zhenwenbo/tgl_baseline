@@ -2,6 +2,5 @@
 # bash /raid/guorui/workspace/dgnn/exp/scripts/run_b_tgl_test.sh
 
 
-bash /home/guorui/workspace/dgnn/exp/scripts/pre.sh
-bash /home/guorui/workspace/dgnn/exp/scripts/run_ablation消融reuse1.sh
-bash /home/guorui/workspace/dgnn/exp/scripts/run_ablation数据集优先+cpu采样.sh
+python /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py
+bash /home/guorui/workspace/dgnn/exp/scripts/run_test.sh

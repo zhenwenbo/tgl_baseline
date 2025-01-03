@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+ds=("GDELT")
 # ds=("BITCOIN")
 models=("TGN")
 fanouts=("25" "50")
@@ -92,11 +92,11 @@ for d in "${ds[@]}"; do
     mkdir -p "../res-pre-simple-${timestamp}/${d}"
 
 
-        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1-${fanout}.yml" &>../res-${timestamp}/${d}/TGL-${model}-1-${fanout}_res.log &
-        pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-1-${fanout}_res_mem.log"
-        monitor_memory_usage $pid
-        wait
+        # nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1-${fanout}.yml" &>../res-${timestamp}/${d}/TGL-${model}-1-${fanout}_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-1-${fanout}_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
 
         nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1-${fanout}.yml" &>../res-${timestamp}/${d}/ETC-${model}-1-${fanout}_res.log &
         pid=$!
@@ -104,11 +104,11 @@ for d in "${ds[@]}"; do
         monitor_memory_usage $pid
         wait
 
-        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1-${fanout}.yml" &>../res-${timestamp}/${d}/b-${model}-1-${fanout}_res.log &
-        pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/b-${model}-1-${fanout}_res_mem.log"
-        monitor_memory_usage $pid
-        wait
+        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1-${fanout}.yml" &>../res-${timestamp}/${d}/b-${model}-1-${fanout}_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-1-${fanout}_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
 
 
 

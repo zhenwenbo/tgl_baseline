@@ -74,39 +74,41 @@ monitor_memory_usage() {
 
 
 
-ds=("TALK" "STACK")
+# ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 ds=("STACK")
-models=("TGAT")
-models=("TimeSGN")
-layers=("1")
-layers=("2")
+model="TGN"
+layer="1"
 
-ratios=("0.9" "0")
-# ratios=("0.9")
-
+block_sizes=("600000" "2000" "4000" "6000" "8000" "10000" "20000" "40000" "80000" "100000" "200000" "400000" "600000")
 timestamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p "../res-test-${timestamp}"
+mkdir -p "../res-pre-${timestamp}"
+mkdir -p "../res-${timestamp}"
+for d in "${ds[@]}"; do
+for block_size in "${block_sizes[@]}"; do
 
-for layer in "${layers[@]}"; do
-    for d in "${ds[@]}"; do
-        for model in "${models[@]}"; do
-            for r in "${ratios[@]}"; do
+  echo "处理 $d $block_size"
 
-                echo "处理 $d"
-                mkdir -p "../res-test-${timestamp}/${d}"
-
-                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-${layer}.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-${layer}_res.log &
-                pid=$!
-                memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-${layer}_res_mem.log"
-                monitor_memory_usage $pid
-                wait
+  mkdir -p "../res-pre-${timestamp}/${d}"
+  mkdir -p "../res-${timestamp}/${d}"
 
 
 
-            done
+  nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/TGN-1.yml" --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part.log &
+  pid=$!
+  memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-mem.log"
+  monitor_memory_usage $pid
+  wait
 
+  nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/node_memory策略.py --data=${d} --pre_sample_size=${block_size} &>/raid/guorui/workspace/dgnn/exp/res-pre-${timestamp}/${d}/b-${block_size}-1-part-nodememory.log &
+  pid=$!
+  wait
 
+    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --pre_sample_size=${block_size} --data=${d} --train_conf="disk" --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res-${block_size}.log &
+    pid=$!
+    memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res_mem-${block_size}.log"
+    monitor_memory_usage $pid
+    wait
 
-        done
-    done
+done
+
 done

@@ -75,11 +75,11 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "GDELT")
-ds=("STACK")
+ds=("TALK")
 models=("TGAT" "TimeSGN")
 models=("TGN")
-
-ratios=("0" "0.9" "0.7" "0.5" "0.3")
+seeds=("412" "868")
+ratios=("0.1" "0.2" "0.4" "0.6" "0.8")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-test-${timestamp}"
@@ -92,37 +92,38 @@ for model in "${models[@]}"; do
 
 
 
-
+    for seed in "${seeds[@]}"; do
     for r in "${ratios[@]}"; do
-        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-1.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-1_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --seed=${seed} --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-1.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-${seed}-1_res.log &
         pid=$!
         memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-1_res_mem.log"
         monitor_memory_usage $pid
         wait
     done
-
-
-    done
-done
-
-
-for model in "${models[@]}"; do
-    for d in "${ds[@]}"; do
-
-    echo "处理 $d"
-    mkdir -p "../res-test-${timestamp}/${d}"
-
-
-
-
-    for r in "${ratios[@]}"; do
-        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-2.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-2_res.log &
-        pid=$!
-        memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-2_res_mem.log"
-        monitor_memory_usage $pid
-        wait
     done
 
 
     done
 done
+
+
+# for model in "${models[@]}"; do
+#     for d in "${ds[@]}"; do
+
+#     echo "处理 $d"
+#     mkdir -p "../res-test-${timestamp}/${d}"
+
+
+
+
+#     for r in "${ratios[@]}"; do
+#         nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-2.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-2_res.log &
+#         pid=$!
+#         memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-2_res_mem.log"
+#         monitor_memory_usage $pid
+#         wait
+#     done
+
+
+#     done
+# done

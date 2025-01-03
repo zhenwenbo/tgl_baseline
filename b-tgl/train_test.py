@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TimeSGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -13,9 +13,10 @@ parser.add_argument('--use_gpu_sampler', action='store_true', default=True)
 
 parser.add_argument('--train_conf', type=str, default='basic_eval', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
-parser.add_argument('--reuse_ratio', type=float, default=0, help='reuse_ratio')
+parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
+parser.add_argument('--seed', type=int, default=41286821, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -48,7 +49,6 @@ from utils import emptyCache
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 import torch.multiprocessing as multiprocessing
-# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -245,13 +245,13 @@ def set_mode(mode):
     if (feat_buffer):
         feat_buffer.mode = mode
 
-set_seed(42)
+set_seed(args.seed)
 if __name__ == '__main__':
     multiprocessing.set_start_method("spawn")
     
     total_val_res = []
     total_test_res = []
-    test_epo = 2
+    test_epo = 1
     if (args.data == 'GDELT'):
         print(f"GDELT数据集改为只测一轮...")
         test_epo = 1
@@ -268,14 +268,14 @@ if __name__ == '__main__':
             node_feats, edge_feats = load_feat(args.data)
         sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
         if (args.data == 'GDELT' or args.data == 'BITCOIN' or args.data == 'STACK'):
-            print(f"GDELT和BITCOIN和STACK只跑5个epoch")
-            train_param['epoch'] = 5
+            print(f"GDELT和BITCOIN和STACK只跑3个epoch")
+            train_param['epoch'] = 3
         g, df = load_graph(args.data)
 
         if (args.data == 'GDELT' and sample_param['layer'] == 2):
             sample_param['neighbor'] = [8, 8]
             
-            train_param['epoch'] = 5
+            train_param['epoch'] = 3
             print(f"GDELT二跳修改邻域为8,8, 只跑3个epoch")
         # train_edge_end = df[df['ext_roll'].gt(0)].index[0]
         # val_edge_end = df[df['ext_roll'].gt(1)].index[0]
@@ -358,7 +358,7 @@ if __name__ == '__main__':
             p = multiprocessing.Process(target=prefetch_worker, args=(child_conn, prefetch_child_conn))
             p.start()
 
-            parent_conn.send(('init_feats', (args.data, )))
+            parent_conn.send(('init_feats', (args.data, args.pre_sample_size )))
             print(f"Sent: {'init_feats'}")
             result = parent_conn.recv()
             print(f"Received: {result}")
