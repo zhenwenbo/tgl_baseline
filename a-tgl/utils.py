@@ -179,7 +179,11 @@ def mfgs_to_cuda(mfgs):
             mfg[i] = mfg[i].to('cuda:0')
     return mfgs
 
+io_mem = 0
+io_time = 0
+
 def prepare_input(mfgs, node_feats, edge_feats, combine_first=False, pinned=False, nfeat_buffs=None, efeat_buffs=None, nids=None, eids=None):
+    global io_mem, io_time
     if combine_first:
         for i in range(len(mfgs[0])):
             if mfgs[0][i].num_src_nodes() > mfgs[0][i].num_dst_nodes():
@@ -211,8 +215,11 @@ def prepare_input(mfgs, node_feats, edge_feats, combine_first=False, pinned=Fals
                 b.srcdata['h'] = nfeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
                 i += 1
             else:
+                start = time.time()
                 srch = node_feats[b.srcdata['ID'].long()].float()
                 b.srcdata['h'] = srch.cuda()
+                io_time += time.time() - start
+                io_mem += srch.numel() * 4
     i = 0
     if edge_feats is not None:
         for mfg in mfgs:
@@ -227,10 +234,19 @@ def prepare_input(mfgs, node_feats, edge_feats, combine_first=False, pinned=Fals
                         b.edata['f'] = efeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
                         i += 1
                     else:
+                        start = time.time()
                         srch = edge_feats[b.edata['ID'].long()].float()
                         b.edata['f'] = srch.cuda()
+                        io_time += time.time() - start
+                        io_mem += srch.numel() * 4
     return mfgs
 
+def print_io(mailbox):
+    global io_time, io_mem
+    io_time += mailbox.io_time
+    io_mem += mailbox.io_mem
+
+    print(f"io time: {io_time:.2f}s io mem: {io_mem / 1024**3}GB")
 def get_ids(mfgs, node_feats, edge_feats):
     nids = list()
     eids = list()

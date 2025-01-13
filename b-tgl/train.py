@@ -18,7 +18,7 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1-600.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -26,8 +26,8 @@ parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 parser.add_argument('--use_cpu_sample', action='store_true', default=False)
 
-parser.add_argument('--reuse_ratio', type=float, default=0, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='mem_w_valid', help='name of stored model')
+parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
+parser.add_argument('--train_conf', type=str, default='disk', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--pre_sample_size', type=int, default=60000)
 parser.add_argument('--set_epoch', type=int, default=-1, help='distance threshold')
@@ -76,7 +76,7 @@ if (args.data in ['BITCOIN', 'STACK', 'GDELT'] and 'TGN' not in args.config):
 train_param['epoch'] = 2
 if (args.set_epoch != -1):
     train_param['epoch'] = args.set_epoch
-train_param['epoch'] = 2
+train_param['epoch'] = 1
 print(f"=================================================================epoch强制设置为1")
 print(sample_param)
 print(train_param)
@@ -639,7 +639,7 @@ if __name__ == '__main__':
                     mem_edge_feats = feat_buffer.get_e_feat(eid) if edge_feats is not None else None
                     block = None
                     if memory_param['deliver_to'] == 'neighbors':
-                        # block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                        block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
                         block = sampler_gpu.gen_mfgs(ret, reverse=True)[0][0]
                         # block = mfgs[0][0]
 
@@ -661,6 +661,8 @@ if __name__ == '__main__':
                 left = right
                 batch_num += 1
 
+            print(f"io time: {feat_buffer.io_time:.2f}s io mem: {feat_buffer.io_mem / 1024**3}GB")
+            feat_buffer.io_mem = 0
             print(f"total loop use time: {time.time() - startTime:.4f}")
             print(f"run batch{batch_num}total time: {time_tot:.2f}s,presample: {time_presample:.2f}s, sample: {time_sample:.2f}s, prep time: {time_prep:.2f}s, gen block: {time_gen_dgl:.2f}s, feat input: {time_feat:.2f}s, model run: {time_model:.2f}s,\
                 loss and opt: {time_opt:.2f}s, update mem: {time_update_mem:.2f}s update mailbox: {time_update_mail:.2f}s")

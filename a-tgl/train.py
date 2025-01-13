@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1-600.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -42,8 +42,8 @@ if (args.data == 'GDELT' and sample_param['layer'] == 2):
     use_estime = True
 
 
-if (args.data == 'BITCOIN'):
-    train_param['epoch'] = 1
+# if (args.data == 'BITCOIN'):
+train_param['epoch'] = 1
 
 if (args.data in ['BITCOIN']):
     train_edge_end = 86063713
@@ -278,6 +278,7 @@ for e in range(train_param['epoch']):
         time_tot += time.time() - t_tot_s
         time_per_batch += time.time() - t_tot_s
 
+    print_io(mailbox)
     time_total_epoch += time.time() - time_total_epoch_s
     time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
     print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")

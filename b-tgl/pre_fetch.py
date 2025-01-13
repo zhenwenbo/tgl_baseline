@@ -18,6 +18,7 @@ class Pre_fetch:
         self.config = GlobalConfig()
         self.use_valid_edge = self.config.use_valid_edge
         self.use_disk = self.config.use_disk
+        self.use_edge_reorder = self.config.edge_reorder
         self.data_incre = self.config.data_incre
         self.memory_disk = self.config.memory_disk
         self.use_async_IO = self.config.use_async_IO
@@ -25,7 +26,15 @@ class Pre_fetch:
         self.node_simple_cache = self.config.node_simple_cache
         self.node_reorder = self.config.node_reorder
         self.use_bucket = self.config.use_bucket
+
+        self.load_positive_t = 0
+        self.construct_negative_t = 0
+        self.prefetch_total = 0
+        self.update_t = 0
         print(f"pre_fetch: 是否使用disk: {self.use_disk}")
+
+        self.io_time = 0
+        self.io_mem = 0
 
         if (self.use_valid_edge and self.use_disk):
             print(f"无法同时使用过期边淘汰和diskGNN！将过期边淘汰取消.")
@@ -130,7 +139,8 @@ class Pre_fetch:
     
 
     def print_time(self):
-        print_IO()
+        print(f"prefetch总用时{self.prefetch_total:.4f}s 读正bucket用时{self.load_positive_t:.4f}s 构建负bucket用时{self.construct_negative_t:.4f}s update用时{self.update_t:.4f}s")
+        # print_IO()
 
     def mem_select(self, indices, base_ind = None,  base_mems = None):
         names = ['memory', 'memory_ts', 'mailbox', 'mailbox_ts']
@@ -385,6 +395,7 @@ class Pre_fetch:
             
                 
             self.edge_feats_path = f'/raid/guorui/DG/dataset/{self.dataset}/edge_features.bin'
+            self.edge_features_path = f'/raid/guorui/DG/dataset/{self.dataset}/edge_features.bin'
             self.node_feats_path = f'/raid/guorui/DG/dataset/{self.dataset}/node_features.bin'
             if (os.path.exists(self.node_feats_path)):
                 self.node_feats = torch.empty(1)
@@ -520,10 +531,13 @@ class Pre_fetch:
         pos_edge_shape = pos_edge_map.shape[0]
         pos_node_shape = pos_node_map.shape[0]
         use_async = False
+
+        load_positive_s = time.time()
         if (use_async):
             self.async_load(load_paths, tags)
         else:
             self.sync_load(load_paths, tags)
+        self.load_positive_t += time.time() - load_positive_s
 
         # neg_nodes, _ = torch.sort(neg_nodes)
         # neg_eids, _ = torch.sort(neg_eids)
@@ -548,6 +562,7 @@ class Pre_fetch:
 
 
         t1 = 0
+        update_s = time.time()
         if (memory_info and memory_info[1] is not None):
             #当前正在异步运行块i，需要将块(i-1)的memory信息传入并做刷入，
             part_map, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts = memory_info
@@ -573,7 +588,7 @@ class Pre_fetch:
         
             del part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, neg_info
             # emptyCache()
-        
+        self.update_t += time.time() - update_s
         
         t1_1 = time.time() - t0
         t0 = time.time()
@@ -584,6 +599,7 @@ class Pre_fetch:
         t0 = time.time()
 
         
+        construct_s = time.time()
         # table1 = torch.zeros_like(neg_nodes) - 1
         # table2 = torch.zeros_like(pos_node_map) - 1
         # dgl.findSameNode(neg_nodes, pos_node_map, table1, table2)
@@ -650,9 +666,12 @@ class Pre_fetch:
                 if (not self.use_disk):
                     dis_neg_eids_feat[edge_dd_ind] = self.self_select('edge_feats',dd_neg_eids.to(torch.int64))
                 else:
-                    reorder_ind = self.edge_reorder_map[dd_neg_eids.long()]
-                    reorder_ind,indices = torch.sort(reorder_ind)
-                    dis_neg_eids_feat[torch.nonzero(edge_dd_ind).reshape(-1)[indices]]= self.self_select('edge_features_reorder',reorder_ind, use_slice=False)
+                    if (self.use_edge_reorder):
+                        reorder_ind = self.edge_reorder_map[dd_neg_eids.long()]
+                        reorder_ind,indices = torch.sort(reorder_ind)
+                        dis_neg_eids_feat[torch.nonzero(edge_dd_ind).reshape(-1)[indices]]= self.self_select('edge_features_reorder',reorder_ind, use_slice=False)
+                    else:
+                        dis_neg_eids_feat[edge_dd_ind]= self.self_select('edge_features',dd_neg_eids, use_slice=False)
                 
 
             
@@ -725,6 +744,7 @@ class Pre_fetch:
             cur_same_nodes = torch.empty(0)
         t7 = time.time() - t0
         t0 = time.time()
+        self.construct_negative_t += time.time() - construct_s
 
 
 
@@ -793,9 +813,12 @@ class Pre_fetch:
         #                                 'memory_update_info': [pre_same_nodes, cur_same_nodes]})
         t10 = time.time() - t0
         t0 = time.time()
+        self.prefetch_total += time.time() - total_s
+
 
         tt = time.time() - total_s
         #nodes做sort + unique找出最终的indices
+        self.print_time()
 
         # print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
         # print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")

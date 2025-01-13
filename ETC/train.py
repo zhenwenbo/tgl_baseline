@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', default='STACK', type=str, help='dataset name')
+parser.add_argument('--data', default='TALK', type=str, help='dataset name')
 parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGN-1.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -25,16 +25,24 @@ from utils import *
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 def preparation(ret_list, node_list, ts_list, node_feats, edge_feats, history, total, flag1, flag2, q):
+    global io_time, io_mem
     for i in range(total):
         if not flag1:
             mfgs, uni_node, inv_node, uni_edge, inv_edge = \
         to_dgl_blocks(ret_list[i], history)
+            start = time.time()
             node_data, edge_data = prepare_input_selection(mfgs, node_feats, edge_feats, uni_node, uni_edge)
             if not flag2:
                 if node_data is not None:
                     node_data = node_data.cuda()
+                    print(f"node data: {node_data.shape[0]}")
                 if edge_data is not None:
                     edge_data = edge_data.cuda()
+                    print(f"edge_data: {edge_data.shape[0]}")
+                io_time += time.time() - start
+                io_mem += node_data.numel() * 4 if node_data is not None else 0
+                io_mem += edge_data.numel() * 4 if edge_data is not None else 0
+                
                 mfgs = feat_reconstruct(mfgs, node_data, edge_data, inv_node, inv_edge)
                 node_data, edge_data = None, None
             uni_node_r, inv_node_r, edge_r = None, None, None
@@ -48,6 +56,10 @@ def preparation(ret_list, node_list, ts_list, node_feats, edge_feats, history, t
 
 
 if __name__ == '__main__':
+    
+    io_time = 0
+    io_mem = 0
+
     def set_seed(seed):
         random.seed(seed)
         np.random.seed(seed)
@@ -64,8 +76,7 @@ if __name__ == '__main__':
         train_param['epoch'] = 1
         print(f"GDELT二跳修改邻域为8,8")
     
-    if (args.data == 'BITCOIN'):
-        train_param['epoch'] = 1
+    train_param['epoch'] = 1
     print(sample_param)
     print(train_param)
 
@@ -348,17 +359,22 @@ if __name__ == '__main__':
             mfgs, uni_node, inv_node, uni_edge, inv_edge, uni_node_r, inv_node_r, edge_r, node_data, edge_data = q.get()
             #refresh uni_mem
             if mailbox is not None:
+                start = time.time()
                 uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
                 mailbox.prep_input_mails_selection(mfgs[0], uni_node)
+                uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
+                uni_mem.cuda(), uni_mem_ts.cuda(), uni_mem_input.cuda(), uni_mail_ts.cuda()
+                io_time += time.time() - start
+                io_mem += uni_mem.numel() * 4
+                io_mem += uni_mem_ts.numel() * 4
+                io_mem += uni_mem_input.numel() * 4
+                io_mem += uni_mail_ts.numel() * 4
             # to_cuda 
             if flag2:
                 if node_data is not None:
                     node_data = node_data.cuda()
                 if edge_data is not None:
                     edge_data = edge_data.cuda()
-            if mailbox is not None: 
-                uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
-                uni_mem.cuda(), uni_mem_ts.cuda(), uni_mem_input.cuda(), uni_mail_ts.cuda()
             t3 = time.time()
             #reconstruct input
             mfgs = feat_reconstruct(mfgs, node_data, edge_data, inv_node, inv_edge)
@@ -398,6 +414,7 @@ if __name__ == '__main__':
 
             time_per_batch += time.time() - t0
         prep_thread.join()
+        print(f"io time: {io_time:.2f}s io mem: {io_mem / 1024**3}GB")
         print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s'.format(time_tot, time_prep, time_sample))
 
         time_total_epoch += time.time() - time_total_epoch_s

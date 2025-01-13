@@ -19,6 +19,9 @@ class MailBox():
         self.mailbox_buffs = None
         self.node_memory_buffs = None
         self.device = torch.device('cpu')
+
+        self.io_time = 0
+        self.io_mem = 0
         
     def reset(self):
         self.node_memory.fill_(0)
@@ -109,7 +112,11 @@ class MailBox():
                 else:
                     mem = self.node_memory_buffs[:len(idx)]
                 mem[gpu_mask] = self.node_memory_buffs[gpu_local_ids]
+                start = time.time()
                 mem[~gpu_mask] = self.node_memory[cpu_ids].cuda()
+                self.io_time += time.time() - start
+                self.io_mem += mem[~gpu_mask].numel() * 4
+
             else:
                 mem = self.node_memory[idx]
             b.srcdata['mem'] = mem
@@ -126,7 +133,12 @@ class MailBox():
                 mem_input = mem_input.reshape(len(idx),-1)
                 if len(gpu_local_ids) != 0:
                     mem_input[gpu_mask] = self.mailbox_buffs[gpu_local_ids].reshape(len(gpu_local_ids), -1)
+                start = time.time()
                 mem_input[~gpu_mask] = self.mailbox[cpu_ids].cuda().reshape(len(cpu_ids),-1)
+                self.io_time += time.time() - start
+                self.io_mem += mem_input[~gpu_mask].numel() * 4
+
+
             else:
                 mem_input = self.mailbox[idx].reshape(len(idx),-1)
             b.srcdata['mem_input'] = mem_input

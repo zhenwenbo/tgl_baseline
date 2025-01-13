@@ -62,6 +62,8 @@ class Feat_buffer:
 
         self.part_memory_map = None
         self.mode = ''
+        self.io_time = 0
+        self.io_mem = 0
         
         self.time_load = 0
         self.time_analyze = 0
@@ -99,6 +101,10 @@ class Feat_buffer:
         # self.pipe = multiprocessing.Pipe(duplex=False)
         # if (d == 'STACK' or d == ''):
 
+        self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
+        with open(self.bucket_config_path, 'r') as json_file:
+            self.bucket_config = json.load(json_file)
+
         if (d == 'LASTFM'):
             self.share_edge_num = 500000
             self.share_node_num = 20000
@@ -114,8 +120,11 @@ class Feat_buffer:
 
 
         # if (d == 'MAG'):
-        self.share_edge_num = 10000000
-        self.share_node_num = 5000000
+        # self.share_edge_num = 10000000
+        # self.share_node_num = 5000000
+        # self.tmp_tensor_num = 500000000
+        self.share_edge_num = self.bucket_config['max_edge_num']
+        self.share_node_num = self.bucket_config['max_node_num']
         self.tmp_tensor_num = 500000000
         
         if (prefetch_conn[0] is None):
@@ -143,7 +152,7 @@ class Feat_buffer:
 
         #下面是过期时间特征淘汰策略
         self.use_valid_edge = self.config.use_valid_edge
-
+        
         if (self.use_valid_edge):
             self.unexpired_edge_map = None
             self.unexpired_edge_feats = None
@@ -547,8 +556,16 @@ class Feat_buffer:
         return res
 
 
+    def cal_io_mem(self, tensors):
+        res = 0
+        for tensor in tensors:
+            if (tensor is not None):
+                # print(tensor.numel())
+                res += tensor.numel() * 4
+        return res
     def prefetch_after(self):
 
+        io_start = time.time()
         node_num = self.shared_ret_len[0]
         edge_num = self.shared_ret_len[2]
         pre_num = self.shared_ret_len[8]
@@ -570,10 +587,12 @@ class Feat_buffer:
             self.part_edge_feats = None
             part_edge_feats = self.move_to_gpu([self.share_part_edge_feats[:edge_num]])[0]
             part_edge_feats[edge_d_ind] = edge_d_feat
+            self.io_mem += (part_edge_feats.numel() - edge_d_ind.shape[0] * part_edge_feats.shape[1]) * 4
             self.part_edge_map, self.part_edge_feats = part_edge_map, part_edge_feats
 
         part_node_map, part_node_feats = self.share_part_node_map[:node_num].cuda(), self.share_part_node_feats[:node_num].cuda()
         part_node_feats[node_d_ind] = self.get_n_feat(part_node_map[node_d_ind])
+        self.io_mem += (part_node_feats.numel() - node_d_ind.shape[0] * part_node_feats.shape[1]) * 4
         self.part_node_map, self.part_node_feats = part_node_map, part_node_feats
 
 
@@ -604,7 +623,15 @@ class Feat_buffer:
             part_mailbox[cur_same_node] = self.part_mailbox[pre_same_nodes]
             part_mailbox_ts[cur_same_node] = self.part_mailbox_ts[pre_same_nodes]
 
+            same_num = torch.sum(cur_same_node)
+            self.io_mem += (part_memory.numel() - same_num * part_memory.shape[1]) * 4
+            self.io_mem += (part_memory_ts.numel() - same_num) * 4
+            self.io_mem += (part_mailbox.numel() - same_num * part_mailbox.shape[1]) * 4
+            self.io_mem += (part_mailbox_ts.numel() - same_num) * 4
             self.part_memory, self.part_memory_ts,self.part_mailbox,self.part_mailbox_ts = part_memory,part_memory_ts,part_mailbox,part_mailbox_ts
+
+        # self.io_time += time.time() - io_start
+        # self.io_mem += self.cal_io_mem([self.part_memory,self.part_memory_ts,self.part_mailbox,self.part_mailbox_ts,self.part_edge_map, self.part_edge_feats,self.part_node_map, self.part_node_feats])
 
         allo2 = cuda_GB()
         # print(f"prefetch_after: {allo1} -> {allo2}")
@@ -619,7 +646,7 @@ class Feat_buffer:
 
         
         self.cur_batch = cur_batch
-        if (cur_batch % self.batch_num == 0 or test_block > 0):
+        if (cur_batch * self.batch_size in self.bucket_config['bucket_ptr'] or test_block > 0):
             # print(f"cur batch: {cur_batch}, start pre sample and analyze...")
             
 
@@ -1156,7 +1183,7 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (10 * 1024)):
+    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 1024 ** 3, bucket_optimal = True):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path
@@ -1180,6 +1207,11 @@ class Feat_buffer:
         his_mem_threshold = 4 * 1024 ** 3  # 4GB
         his_mem_byte = 0 #单位为字节
 
+        res_config = {}
+        res_config['bucket_ptr'] = [0]
+        res_config['max_node_num'] = 0
+        res_config['max_edge_num'] = 0
+
         left, right = 0, 0
         batch_num = 0
         datas = self.datas
@@ -1190,57 +1222,84 @@ class Feat_buffer:
         total_time = datas['time'].cuda().to(torch.float32)
         total_eid = datas['eid'].cuda().to(torch.int32)
         while True:
+            cur_bucket_allo = 0
             start = time.time()
-            right += batch_size
-            right = min(edge_end, right)
-            if (left >= right):
-                break
 
-            src = total_src[left: right]
-            dst = total_dst[left: right]
-            times = total_time[left: right]
-            eid = total_eid[left: right]
-            root_nodes = torch.cat((src, dst))
-            root_ts = torch.cat((times, times))
-            # root_nodes = torch.from_numpy(root_nodes).cuda()
-            # root_ts = torch.from_numpy(root_ts).cuda()
+            pre_nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
+            pre_eid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
 
-            # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
-            ret_list = self.sampler.sample_layer(root_nodes, root_ts)
-            # print(f"采样用时: {time.time() - start:.8f}s")
-            eid_uni = eid.to(torch.int32).cuda()
-            nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
-            # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
-            root_eids_num = eid_uni.shape[0]
+            # if (left >= right):
+            #     break
+            first_flag = True
+            while True:
+                right += batch_size
+                right = min(edge_end, right)
+                if (left >= right):
+                    break
+                first_flag = False
 
-            for ret in ret_list:
-                #找出每层的所有eid即可
+                src = total_src[left: right]
+                dst = total_dst[left: right]
+                times = total_time[left: right]
+                eid = total_eid[left: right]
+                root_nodes = torch.cat((src, dst))
+                root_ts = torch.cat((times, times))
+                # root_nodes = torch.from_numpy(root_nodes).cuda()
+                # root_ts = torch.from_numpy(root_ts).cuda()
+
+                # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
+                ret_list = self.sampler.sample_layer(root_nodes, root_ts)
+                # print(f"采样用时: {time.time() - start:.8f}s")
+                eid_uni = eid.to(torch.int32).cuda()
+                nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
+                # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
+                root_eids_num = eid_uni.shape[0]
+
+                for ret in ret_list:
+                    #找出每层的所有eid即可
+                    src,dst,outts,outeid,root_nodes,root_ts,dts = ret
+                    eid = outeid[outeid > -1]
+
+                    cur_eid = torch.unique(eid)
+                    eid_uni = torch.cat((cur_eid, eid_uni))
+                    eid_uni = torch.unique(eid_uni)
+                # print(f"t1: {time.time() - start:.8f}s")
+                #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
+                ret = ret_list[-1]
                 src,dst,outts,outeid,root_nodes,root_ts,dts = ret
-                eid = outeid[outeid > -1]
+                del ret_list
+                del outts, outeid, root_ts, dst
+                # emptyCache()
+                mask = src > -1
+                src = src[mask]
+                nid_uni = torch.cat((src, root_nodes))
+                nid_uni = torch.unique(nid_uni)
+                eid_uni,_ = torch.sort(eid_uni)
 
-                cur_eid = torch.unique(eid)
-                eid_uni = torch.cat((cur_eid, eid_uni))
-                eid_uni = torch.unique(eid_uni)
-            # print(f"t1: {time.time() - start:.8f}s")
-            #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
-            ret = ret_list[-1]
-            src,dst,outts,outeid,root_nodes,root_ts,dts = ret
-            del ret_list
-            del outts, outeid, root_ts, dst
-            # emptyCache()
+                nid_uni = torch.unique(torch.cat((nid_uni, pre_nid_uni)))
+                eid_uni = torch.unique(torch.cat((eid_uni, pre_eid_uni)))
+                if (not bucket_optimal):
+                    break
 
-            mask = src > -1
-            src = src[mask]
-            nid_uni = torch.cat((src, root_nodes))
-            nid_uni = torch.unique(nid_uni)
-            # print(f"t2: {time.time() - start:.8f}s")
+                cur_bucket_allo = nid_uni.shape[0] * 1.5 * self.node_feat_dim * 4
+                cur_bucket_allo += eid_uni.shape[0] * 1.5 * self.edge_feat_dim * 4
 
-            #处理这个eid_uni，抽特征然后存就行。这里eid是个全局的
-            #存起来后需要保存一个map，map[i]表示e_feat[i]保存的是哪条边的特征即eid
-            #这里对eid进行排序，目的是保证map是顺序的，在后面就可以不对map排序了
-            # eid_uni, nid_uni = eid_uni.cpu(), nid_uni.cpu()
+                if (cur_bucket_allo < bucket_budget):
+                    pre_nid_uni = nid_uni.clone()
+                    pre_eid_uni = eid_uni.clone()
+                    left = right
+                else:
+                    nid_uni = pre_nid_uni
+                    eid_uni = pre_eid_uni
+                    break
+
+            res_config['max_node_num'] = int(max(res_config['max_node_num'], nid_uni.shape[0] * 1.5))
+            res_config['max_edge_num'] = int(max(res_config['max_edge_num'], eid_uni.shape[0] * 1.5))
+            if (first_flag):
+                break
             his_ind.append(batch_num)
-            eid_uni,_ = torch.sort(eid_uni)
+            res_config['bucket_ptr'].append(right)
+            
             saveBin(torch.tensor([left, right], dtype = torch.int32).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_bound.bin')
 
             cur_eid = eid_uni
@@ -1262,8 +1321,6 @@ class Feat_buffer:
             if (pre_nid is not None):
                 nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
                 cur_nid = nid_uni[nid_incre_mask]
-                if (batch_num == 1605):
-                    asdjlasdk = 1
                 saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map_incre_mask.pt')
 
             if (self.node_feat_dim > 0):
@@ -1292,7 +1349,7 @@ class Feat_buffer:
                 his_mem_byte = 0
             sampleTime = time.time() - start
             
-            print(f"总边数:{eid_uni.shape[0]}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
+            print(f"总结点数:{nid_uni.shape[0]},总边数:{eid_uni.shape[0]},right:{right},max_eid:{torch.max(eid_uni)}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
             pre_eid = eid_uni
             pre_nid = nid_uni
             left = right
@@ -1311,6 +1368,10 @@ class Feat_buffer:
         node_his_max.clear()
         edge_his_max.clear()
         his_ind.clear()
+
+        bucket_config_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/' + f'/bucket_config.json'
+        with open(bucket_config_path, 'w') as json_file:
+            json.dump(res_config, json_file, indent=4)
 
     
     def incre_strategy(self, pre_map, cur_id):

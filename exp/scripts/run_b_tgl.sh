@@ -74,10 +74,10 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "GDELT")
-ds=("BITCOIN")
+ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+ds=("TALK" "STACK" "BITCOIN")
 models=("TGAT" "TimeSGN")
-models=("TGAT")
+models=("TGN")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
@@ -92,17 +92,17 @@ for model in "${models[@]}"; do
 
 
 
-    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-1_res.log &
+    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk_wo' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-1_res.log &
     pid=$!
     memory_usage_file="../res-${timestamp}/${d}/b-${model}-1_res_mem.log"
     monitor_memory_usage $pid
     wait
 
-    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
-    pid=$!
-    memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
-    monitor_memory_usage $pid
-    wait
+    # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
+    # pid=$!
+    # memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
+    # monitor_memory_usage $pid
+    # wait
 
 
     done

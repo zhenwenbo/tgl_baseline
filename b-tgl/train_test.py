@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TimeSGN-2.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -16,7 +16,7 @@ parser.add_argument('--dis_threshold', type=int, default=10, help='distance thre
 parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--seed', type=int, default=41286821, help='use random node featrues')
+parser.add_argument('--seed', type=int, default=412868, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -47,7 +47,7 @@ from utils import *
 from sklearn.metrics import average_precision_score, roc_auc_score
 from utils import emptyCache
 import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 import torch.multiprocessing as multiprocessing
 def set_seed(seed):
     random.seed(seed)
@@ -109,9 +109,9 @@ def eval(mode='val'):
     batch_num = 0
     batch_size = train_param['batch_size']
 
-    if (mailbox is None and mode == 'test'):
-        # 在TGAT下提前加载测试集所在block的数据
-        feat_buffer.run_batch(left // train_param['batch_size'], test_block = left // args.pre_sample_size)
+    # if (mailbox is None and mode == 'test'):
+    #     # 在TGAT下提前加载测试集所在block的数据
+    #     feat_buffer.run_batch(left // train_param['batch_size'], test_block = left // args.pre_sample_size)
 
     with torch.no_grad():
         total_loss = 0
@@ -251,7 +251,7 @@ if __name__ == '__main__':
     
     total_val_res = []
     total_test_res = []
-    test_epo = 1
+    test_epo = 2
     if (args.data == 'GDELT'):
         print(f"GDELT数据集改为只测一轮...")
         test_epo = 1
@@ -269,7 +269,7 @@ if __name__ == '__main__':
         sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
         if (args.data == 'GDELT' or args.data == 'BITCOIN' or args.data == 'STACK'):
             print(f"GDELT和BITCOIN和STACK只跑3个epoch")
-            train_param['epoch'] = 3
+            train_param['epoch'] = 5
         g, df = load_graph(args.data)
 
         if (args.data == 'GDELT' and sample_param['layer'] == 2):
@@ -694,6 +694,9 @@ if __name__ == '__main__':
                     if mailbox is not None:
                         mailbox.reset()
                         model.memory_updater.last_updated_nid = None
+                        eval('test_train')
+                        eval('val')
+                    else:
                         eval('test_train')
                         eval('val')
                     ap, auc = eval('test')

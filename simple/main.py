@@ -7,7 +7,7 @@ if MODULE_PATH not in sys.path:
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1-500.yml')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -59,7 +59,7 @@ if (args.data in ['LASTFM','TALK','STACK']):
 else:
     train_param['interval_to_gpu'] = False
     train_param['pre_load'] = False
-
+train_param['epoch'] = 1
 print(sample_param)
 print(train_param)
 
@@ -368,7 +368,7 @@ for e in range(train_param['epoch']):
             else:
                 mfgs = load_batched_data(mfgs, node_idx, edge_idx, node_feats, edge_feats, node_gpu_mask, node_gpu_local_ids, node_cpu_ids, edge_gpu_mask, edge_gpu_local_ids, edge_cpu_ids, nfeat_buffs, efeat_buffs)
         
-        total_IO += ((node_cpu_ids.shape[0] * (172 + 472) * 4 / 1024**2) + (edge_cpu_ids.shape[0] * 172 * 4 / 1024**2))
+        # total_IO += ((node_cpu_ids.shape[0] * (172 + 472) * 4 / 1024**2) + (edge_cpu_ids.shape[0] * 172 * 4 / 1024**2))
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0], node_idx, node_gpu_mask, node_gpu_local_ids, node_cpu_ids)
         t3 = time.time()
@@ -442,6 +442,7 @@ for e in range(train_param['epoch']):
         time_load_data += t3 - t2
         
         batch_id += 1
+
         time_total_compute_s = time.time()
         optimizer.zero_grad()
 
@@ -483,6 +484,8 @@ for e in range(train_param['epoch']):
         time_per_batch += t_end - t_tot_s
 
     print(f'total_IO: {total_IO}MB')
+
+    print_io(mailbox)
     
     print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s mfgs time:{:.2f}s gen_flags time:{:.2f}s load_data time:{:.2f}s gen_plan time:{:.2f}s up_indicators time:{:.2f}s up_buffs time:{:.2f}s up_mail time:{:.2f}s'.format(time_tot, time_prep, time_sample, time_mfgs, time_gen_flags, time_load_data, time_gen_plan, time_up_indicators, time_up_buffs, time_up_mail))
     print(f"model time: {time_model}, loss time: {time_loss} aver_node_hit: {aver_node_hit:.2f}%, aver_edge_hit: {aver_edge_hit:.2f}% 策略开销: {time_strategy:.4f}s 注意prep time中包含策略开销 ")

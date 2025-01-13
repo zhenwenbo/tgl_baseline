@@ -17,6 +17,7 @@ class GlobalConfig:
         self.node_cache = False
         self.node_reorder = False
         self.node_simple_cache = False
+        self.edge_reorder = True
         self.epoch = -1
         self.pre_sample_size = -1
 

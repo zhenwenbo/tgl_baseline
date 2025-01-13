@@ -2,7 +2,7 @@ import torch
 import dgl
 from layers import TimeEncode
 from torch_scatter import scatter
-
+import time
 class MailBox():
 
     def __init__(self, memory_param, num_nodes, dim_edge_feat, _node_memory=None, _node_memory_ts=None,_mailbox=None, _mailbox_ts=None, _next_mail_pos=None, _update_mail_pos=None):
@@ -17,6 +17,9 @@ class MailBox():
         self.next_mail_pos = torch.zeros((num_nodes), dtype=torch.long) if _next_mail_pos is None else _next_mail_pos
         self.update_mail_pos = _update_mail_pos
         self.device = torch.device('cpu')
+
+        self.io_time = 0
+        self.io_mem = 0
         
     def reset(self):
         self.node_memory.fill_(0)
@@ -61,10 +64,17 @@ class MailBox():
                 torch.index_select(self.mailbox_ts, 0, idx, out=self.pinned_mailbox_ts_buffs[i][:idx.shape[0]])
                 b.srcdata['mail_ts'] = self.pinned_mailbox_ts_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
             else:
+                start = time.time()
                 b.srcdata['mem'] = self.node_memory[b.srcdata['ID'].long()].cuda()
                 b.srcdata['mem_ts'] = self.node_memory_ts[b.srcdata['ID'].long()].cuda()
                 b.srcdata['mem_input'] = self.mailbox[b.srcdata['ID'].long()].cuda().reshape(b.srcdata['ID'].shape[0], -1)
                 b.srcdata['mail_ts'] = self.mailbox_ts[b.srcdata['ID'].long()].cuda()
+                self.io_time += time.time() - start
+                self.io_mem += b.srcdata['mem'].numel() * 4
+                self.io_mem += b.srcdata['mem_ts'].numel() * 4
+                self.io_mem += b.srcdata['mem_input'].numel() * 4
+                self.io_mem += b.srcdata['mail_ts'].numel() * 4
+
 
     def update_memory(self, nid, memory, root_nodes, ts, neg_samples=1):
         if nid is None:

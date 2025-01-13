@@ -472,7 +472,19 @@ def load_batched_data_orca(mfgs, node_idx, edge_idx, node_feats, edge_feats, nod
                 
     return mfgs
 
+io_time = 0
+io_mem = 0
+import time
+
+def print_io(mailbox):
+    global io_time, io_mem
+    io_time += mailbox.io_time
+    io_mem += mailbox.io_mem
+
+    print(f"io time: {io_time:.2f}s io mem: {io_mem / 1024**3}GB")
+    
 def load_batched_data(mfgs, node_idx, edge_idx, node_feats, edge_feats, node_gpu_mask, node_gpu_local_ids, node_cpu_ids, edge_gpu_mask, edge_gpu_local_ids, edge_cpu_ids, nfeat_buffs=None, efeat_buffs=None):
+    global io_time, io_mem
     #remember to initialize the buffs.
     if node_feats is not None:
         for b in mfgs[0]:
@@ -488,8 +500,10 @@ def load_batched_data(mfgs, node_idx, edge_idx, node_feats, edge_feats, node_gpu
                 else:
                     srch = nfeat_buffs[:len(node_idx)]
                 srch[node_gpu_mask] = nfeat_buffs[node_gpu_local_ids]
+                start = time.time()
                 srch[~node_gpu_mask] = node_feats[node_cpu_ids].cuda()
-
+                io_time += time.time() - start
+                io_mem += srch[~node_gpu_mask].numel() * 4
             else:
                 srch = node_feats[node_idx] #all_on_gpu
             b.srcdata['h'] = srch
@@ -512,7 +526,10 @@ def load_batched_data(mfgs, node_idx, edge_idx, node_feats, edge_feats, node_gpu
                         else:
                             srch = efeat_buffs[:len(edge_idx)]
                         srch[edge_gpu_mask] = efeat_buffs[edge_gpu_local_ids]
+                        start = time.time()
                         srch[~edge_gpu_mask] = edge_feats[edge_cpu_ids].cuda()
+                        io_time += time.time() - start
+                        io_mem += srch[~edge_gpu_mask].numel() * 4
                     else:
                         srch = edge_feats[edge_idx]
                     b.edata['f'] = srch

@@ -74,39 +74,61 @@ monitor_memory_usage() {
 
 
 
-ds=("TALK" "STACK")
-ds=("TALK" "STACK")
+ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+ds=("GDELT")
 models=("TGN")
-# models=("TimeSGN")
-layers=("1")
-layers=("1")
-
-ratios=("0.95" "0.99" "0.999")
-# ratios=("0.9")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p "../res-test-${timestamp}"
+mkdir -p "../res-${timestamp}"
 
-for layer in "${layers[@]}"; do
+for model in "${models[@]}"; do
     for d in "${ds[@]}"; do
-        for model in "${models[@]}"; do
-            for r in "${ratios[@]}"; do
 
-                echo "处理 $d"
-                mkdir -p "../res-test-${timestamp}/${d}"
-
-                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train_test.py --reuse_ratio=${r} --data=${d} --train_conf='basic_eval' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-test-${layer}.yml" &>../res-test-${timestamp}/${d}/b-${model}-${r}-${layer}_res.log &
-                pid=$!
-                memory_usage_file="../res-test-${timestamp}/${d}/b-${model}-${r}-${layer}_res_mem.log"
-                monitor_memory_usage $pid
-                wait
+    echo "处理 $d"
+    mkdir -p "../res-${timestamp}/${d}"
 
 
+        # nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-${model}-1_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-1_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
 
-            done
+
+        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-1_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-1_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
 
 
 
-        done
+        nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-${model}-1_res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-1_res_mem.log"
+        monitor_memory_usage $pid
+        wait
+
+
+
+        threshold=0.1
+        if [ "$d" == "GDELT" ]; then
+            threshold=0.01
+        fi
+        if [ "$d" == "BITCOIN" ]; then
+        threshold=0.05
+        fi
+
+        nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" &>../res-${timestamp}/${d}/SIMPLE-${model}-1-res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/SIMPLE-${model}-1-res-mem.log"
+        monitor_memory_usage $pid
+        wait
+
+
+
+
+
+        
     done
 done
