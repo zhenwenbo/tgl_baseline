@@ -17,7 +17,7 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -27,7 +27,7 @@ parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 parser.add_argument('--use_cpu_sample', action='store_true', default=False)
 
 parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='disk', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='wo_bucket', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--pre_sample_size', type=int, default=60000)
 parser.add_argument('--set_epoch', type=int, default=-1, help='distance threshold')

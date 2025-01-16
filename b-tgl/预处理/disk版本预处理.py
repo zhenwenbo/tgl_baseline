@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -11,11 +11,12 @@ parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--only_gen_part', action='store_true', default=False)
 parser.add_argument('--use_async_prefetch', action='store_true', default=False)
-parser.add_argument('--use_stream', action='store_true', default=True)
+parser.add_argument('--use_stream', action='store_true', default=False)
+parser.add_argument('--use_disk', action='store_true', default=True)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
+parser.add_argument('--pre_sample_size', type=int, default=2000, help='pre sample size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -56,7 +57,7 @@ def set_seed(seed):
 if __name__ == '__main__':
 
     node_feats, edge_feats = None,None
-    if (not args.use_stream):
+    if (not args.use_stream and not args.use_disk):
         node_feats, edge_feats = load_feat(args.data)
     
     if (not args.use_stream):
@@ -179,7 +180,7 @@ if __name__ == '__main__':
         feat_buffer.init_feat(node_feats, edge_feats)
         print(f"非流式预处理")
         # print(f"只做train的预处理")
-        feat_buffer.gen_part(incre = True, mode = '')
+        feat_buffer.gen_part(incre = True, mode = '', save_feat= False)
         feat_buffer.val_edge_end = val_edge_end
         feat_buffer.test_edge_end = len(df)
         # if (use_val_test):

@@ -101,9 +101,7 @@ class Feat_buffer:
         # self.pipe = multiprocessing.Pipe(duplex=False)
         # if (d == 'STACK' or d == ''):
 
-        self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
-        with open(self.bucket_config_path, 'r') as json_file:
-            self.bucket_config = json.load(json_file)
+
 
         if (d == 'LASTFM'):
             self.share_edge_num = 500000
@@ -120,12 +118,18 @@ class Feat_buffer:
 
 
         # if (d == 'MAG'):
-        # self.share_edge_num = 10000000
-        # self.share_node_num = 5000000
-        # self.tmp_tensor_num = 500000000
-        self.share_edge_num = self.bucket_config['max_edge_num']
-        self.share_node_num = self.bucket_config['max_node_num']
+        self.share_edge_num = 10000000
+        self.share_node_num = 5000000
         self.tmp_tensor_num = 500000000
+
+
+        # self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
+        # if (os.path.exists(self.bucket_config_path)):
+        #     with open(self.bucket_config_path, 'r') as json_file:
+        #         self.bucket_config = json.load(json_file)
+        #     self.share_edge_num = self.bucket_config['max_edge_num']
+        #     self.share_node_num = self.bucket_config['max_node_num']
+        #     self.tmp_tensor_num = 500000000
         
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
@@ -646,7 +650,8 @@ class Feat_buffer:
 
         
         self.cur_batch = cur_batch
-        if (cur_batch * self.batch_size in self.bucket_config['bucket_ptr'] or test_block > 0):
+        # if (cur_batch * self.batch_size in self.bucket_config['bucket_ptr'] or test_block > 0):
+        if (cur_batch % self.batch_num == 0 or test_block > 0):
             # print(f"cur batch: {cur_batch}, start pre sample and analyze...")
             
 
@@ -987,7 +992,7 @@ class Feat_buffer:
 
 
     
-    def gen_part(self, mode = '', incre = False):
+    def gen_part(self, mode = '', incre = False, save_feat = True, use_unique = True):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path
@@ -1070,22 +1075,24 @@ class Feat_buffer:
 
             if (not incre or pre_eid is None):
                 eid_uni,_ = torch.sort(eid_uni)
-                if (self.edge_feats.shape[0] > 0):
+                if ((self.edge_feats is not None and self.edge_feats.shape[0] > 0) or not (save_feat)):
                     cur_edge_feat = self.select_index('edge_feats',eid_uni.to(torch.int64))
                     save_start = time.time()
                     saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat{mode}.pt')
                     save_time += time.time() - save_start
+                    flush_saveBin_conf()
 
                 save_start = time.time()
                 saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map{mode}.pt')
                 save_time += time.time() - save_start
 
                 nid_uni,_ = torch.sort(nid_uni)
-                if (self.node_feats.shape[0] > 0):
+                if ((self.node_feats is not None and self.node_feats.shape[0] > 0) or not (save_feat)):
                     cur_node_feat = self.select_index('node_feats',nid_uni.to(torch.int64))
                     save_start = time.time()
                     saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat{mode}.pt')
                     save_time += time.time() - save_start
+                    flush_saveBin_conf()
 
                 save_start = time.time()
                 saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map{mode}.pt')
@@ -1095,7 +1102,7 @@ class Feat_buffer:
                 eid_incre_mask = torch.isin(eid_uni, pre_eid, assume_unique=True, invert = True)
                 cur_eid = eid_uni[eid_incre_mask]
 
-                if (self.edge_feats.shape[0] > 0):
+                if (self.edge_feats is not None and self.edge_feats.shape[0] > 0 and save_feat):
                     cur_edge_feat = self.select_index('edge_feats',cur_eid[:cur_eid.shape[0] - root_eids_num].to(torch.int64))
                     save_start = time.time()
                     saveBin(cur_edge_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_feat{mode}_incre.pt')
@@ -1108,7 +1115,7 @@ class Feat_buffer:
                 nid_uni,_ = torch.sort(nid_uni)
                 nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
                 cur_nid = nid_uni[nid_incre_mask]
-                if (self.node_feats.shape[0] > 0):
+                if (self.node_feats is not None and self.node_feats.shape[0] > 0 and save_feat):
                     cur_node_feat = self.select_index('node_feats',cur_nid.to(torch.int64))
                     save_start = time.time()
                     saveBin(cur_node_feat.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_feat{mode}_incre.pt')
@@ -1119,7 +1126,8 @@ class Feat_buffer:
                 save_time += time.time() - save_start
             # mfgs = sampler.gen_mfgs(ret_list)
             
-            print(f"edges: {cur_edge_feat.shape} nodes:{cur_node_feat.shape} batch: {batch_num} totalTime:{time.time() - start:.7f}s sampleTime: {sample_time:.2f}s saveTime: {save_time:.2f}s")
+            print(f"edges: {eid_uni.shape} nodes:{nid_uni.shape} batch: {batch_num} totalTime:{time.time() - start:.7f}s sampleTime: {sample_time:.2f}s saveTime: {save_time:.2f}s")
+            # print(f"edges: {cur_edge_feat.shape} nodes:{cur_node_feat.shape} batch: {batch_num} totalTime:{time.time() - start:.7f}s sampleTime: {sample_time:.2f}s saveTime: {save_time:.2f}s")
             if (incre):
                 pre_eid = eid_uni
                 pre_nid = nid_uni
@@ -1183,7 +1191,7 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 1024 ** 3, bucket_optimal = True):
+    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 1024 ** 3, bucket_optimal = False):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path

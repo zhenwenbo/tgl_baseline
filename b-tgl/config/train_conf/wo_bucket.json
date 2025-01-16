@@ -11,9 +11,9 @@
     "data_incre": true,
     "memory_disk": true,
     "use_async_IO": false,
-    "node_cache": true,
-    "node_reorder": true,
-    "node_simple_cache": true,
+    "node_cache": false,
+    "node_reorder": false,
+    "node_simple_cache": false,
     "epoch": 2,
     "use_bucket": false
     

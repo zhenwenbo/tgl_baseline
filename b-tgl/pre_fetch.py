@@ -218,8 +218,11 @@ class Pre_fetch:
                 self_v[indices] = mems[i]
         else:
             base_shape = mems[0].shape[0]
+            if (base_shape == 0):
+                return
             for i in range(len(mems)):
-                mems[i] = mems[i].reshape(base_shape, -1)
+                if (base_shape > 0):
+                    mems[i] = mems[i].reshape(base_shape, -1)
             total_mem = torch.cat(mems, dim = 1)
 
             self.mem_flag[indices] = True

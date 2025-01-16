@@ -23,8 +23,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--pre_sample_size', type=int, default=4000, help='pre sample size')
+parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
+parser.add_argument('--pre_sample_size', type=int, default=2000, help='pre sample size')
 args=parser.parse_args()
 
 
