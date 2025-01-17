@@ -15,7 +15,7 @@ import json
 import gc
 
 class Feat_buffer:
-    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, edge_num = None, prefetch_conn = None, feat_dim = None):
+    def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, edge_num = None, prefetch_conn = None, feat_dim = None, substream_size = None):
         self.d = d
         self.df = df
         self.datas = datas
@@ -38,6 +38,9 @@ class Feat_buffer:
         self.batch_size = batch_size #预采样做分析的batch_size
         self.train_batch_size = train_batch_size
         self.train_edge_end = train_edge_end
+
+        if (substream_size is not None):
+            self.batch_size = substream_size
 
         assert batch_size % train_batch_size == 0, "预采样batch size必须是训练的batch_size的整数倍!"
         self.batch_num = batch_size / train_batch_size # batch_num是预采样的batch个数
@@ -122,14 +125,16 @@ class Feat_buffer:
         self.share_node_num = 5000000
         self.tmp_tensor_num = 500000000
 
-
+        # self.bucket_config = None
         # self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
         # if (os.path.exists(self.bucket_config_path)):
         #     with open(self.bucket_config_path, 'r') as json_file:
         #         self.bucket_config = json.load(json_file)
-        #     self.share_edge_num = self.bucket_config['max_edge_num']
-        #     self.share_node_num = self.bucket_config['max_node_num']
+        #     self.share_edge_num = self.bucket_config['max_edge_num'] * 2
+        #     self.share_node_num = self.bucket_config['max_node_num'] * 2
         #     self.tmp_tensor_num = 500000000
+
+        #     self.bucket_ptr = self.bucket_config['bucket_ptr']
         
         if (prefetch_conn[0] is None):
             self.prefetch_conn = None
@@ -670,6 +675,9 @@ class Feat_buffer:
             #使用异步策略 此处memory info应当是pre_block的信息，需要在cur_block运行时并行的将pre_block的memory信息刷入内存
             start = ((self.cur_block - 1) * self.batch_num) * self.train_batch_size
             end = min(self.train_edge_end, (((self.cur_block - 1) * self.batch_num) + self.batch_num) * self.train_batch_size)
+
+            # start = self.bucket_ptr[self.cur_block - 1]
+            # end = min(self.train_edge_end, self.bucket_ptr[self.cur_block - 1 + 1])
             if (not self.use_memory):
                 memory_info = None
             else:
@@ -814,6 +822,8 @@ class Feat_buffer:
         
         start = (block_num * self.batch_num) * self.train_batch_size
         end = min(self.train_edge_end, ((block_num * self.batch_num) + self.batch_num) * self.train_batch_size)
+        # start = self.bucket_ptr[block_num]
+        # end = min(self.train_edge_end, self.bucket_ptr[block_num + 1])
         if (self.mode == 'test_train'):
             end = min(self.val_edge_end, ((block_num * self.batch_num) + self.batch_num) * self.train_batch_size)
         if (self.mode == 'test' or self.mode == 'val'):
@@ -1191,7 +1201,7 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 1024 ** 3, bucket_optimal = False):
+    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 1 * 1024 ** 3, bucket_optimal = False):
         #当分区feat不存在的时候做输出
         d = self.d
         path = self.path
@@ -1239,6 +1249,7 @@ class Feat_buffer:
             # if (left >= right):
             #     break
             first_flag = True
+            left_c = left
             while True:
                 right += batch_size
                 right = min(edge_end, right)
@@ -1289,8 +1300,9 @@ class Feat_buffer:
                 if (not bucket_optimal):
                     break
 
-                cur_bucket_allo = nid_uni.shape[0] * 1.5 * self.node_feat_dim * 4
-                cur_bucket_allo += eid_uni.shape[0] * 1.5 * self.edge_feat_dim * 4
+                cur_bucket_allo = nid_uni.shape[0]  * self.node_feat_dim * 4
+                cur_bucket_allo += eid_uni.shape[0]  * self.edge_feat_dim * 4
+                cur_bucket_allo += ((2 * self.node_feat_dim + 2 * self.edge_feat_dim) * 11 ) * (right - left_c) * 4
 
                 if (cur_bucket_allo < bucket_budget):
                     pre_nid_uni = nid_uni.clone()
