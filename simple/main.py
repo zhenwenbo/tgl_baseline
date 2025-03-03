@@ -7,7 +7,7 @@ if MODULE_PATH not in sys.path:
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-2.yml')
+parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -244,6 +244,10 @@ for e in range(train_param['epoch']):
     time_total_epoch_s = time.time()
     total_IO = 0
 
+    time_total1_sample = 0
+    time_total1_load = 0
+    time_total1_compute = 0
+
     time_model = 0
     time_loss = 0
     total_loss = 0
@@ -308,6 +312,8 @@ for e in range(train_param['epoch']):
                 mfgs = to_dgl_blocks_orca(ret)
         node_num = mfgs[0][0].num_nodes()
         edge_num = mfgs[0][0].num_edges()
+        time_total1_sample += time.time() - t_tot_s
+        total1_load_s = time.time()
         # aver_node_num = (aver_node_num * batch_num + node_num)
         # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
 
@@ -444,6 +450,8 @@ for e in range(train_param['epoch']):
         batch_id += 1
 
         time_total_compute_s = time.time()
+        time_total1_load += time.time() - total1_load_s
+        total1_compute_s = time.time()
         optimizer.zero_grad()
 
         time_model_s = time.time()
@@ -482,11 +490,13 @@ for e in range(train_param['epoch']):
         
         time_total_update += time.time() - time_total_update_s
         time_per_batch += t_end - t_tot_s
+        time_total1_compute += time.time() - total1_compute_s
 
     print(f'total_IO: {total_IO}MB')
 
     print_io(mailbox)
     
+    print(f"loading:{time_total1_load:.4f}s, sampling: {time_total1_sample:.4f}s, compute: {time_total1_compute:.4f}s")
     print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s mfgs time:{:.2f}s gen_flags time:{:.2f}s load_data time:{:.2f}s gen_plan time:{:.2f}s up_indicators time:{:.2f}s up_buffs time:{:.2f}s up_mail time:{:.2f}s'.format(time_tot, time_prep, time_sample, time_mfgs, time_gen_flags, time_load_data, time_gen_plan, time_up_indicators, time_up_buffs, time_up_mail))
     print(f"model time: {time_model}, loss time: {time_loss} aver_node_hit: {aver_node_hit:.2f}%, aver_edge_hit: {aver_edge_hit:.2f}% 策略开销: {time_strategy:.4f}s 注意prep time中包含策略开销 ")
     t0 = time.time()

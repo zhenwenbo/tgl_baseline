@@ -23,8 +23,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')
-parser.add_argument('--pre_sample_size', type=int, default=2000, help='pre sample size')
+parser.add_argument('--data', type=str, help='dataset name', default='MOOC')
+parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
 args=parser.parse_args()
 
 
@@ -382,7 +382,7 @@ def init_memory(dim_edge_feat, num_nodes):
     # saveBin(total_memory, path + '/total_memory.bin')
 
 feat_len = 128
-if (data in ['TALK', 'STACK', 'BITCOIN']):
+if (data in ['TALK', 'STACK', 'BITCOIN', 'MOOC']):
     feat_len = 172
 init_memory(feat_len, node_num)
 

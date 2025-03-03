@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', default='TALK', type=str, help='dataset name')
-parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGN-1.yml', type=str, help='path to config file')
+parser.add_argument('--data', default='LASTFM', type=str, help='dataset name')
+parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGN-2.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -35,13 +35,13 @@ def preparation(ret_list, node_list, ts_list, node_feats, edge_feats, history, t
             if not flag2:
                 if node_data is not None:
                     node_data = node_data.cuda()
-                    print(f"node data: {node_data.shape[0]}")
+                    # print(f"node data: {node_data.shape[0]}")
                 if edge_data is not None:
                     edge_data = edge_data.cuda()
-                    print(f"edge_data: {edge_data.shape[0]}")
-                io_time += time.time() - start
-                io_mem += node_data.numel() * 4 if node_data is not None else 0
-                io_mem += edge_data.numel() * 4 if edge_data is not None else 0
+                    # print(f"edge_data: {edge_data.shape[0]}")
+                # io_time += time.time() - start
+                # io_mem += node_data.numel() * 4 if node_data is not None else 0
+                # io_mem += edge_data.numel() * 4 if edge_data is not None else 0
                 
                 mfgs = feat_reconstruct(mfgs, node_data, edge_data, inv_node, inv_edge)
                 node_data, edge_data = None, None
@@ -282,6 +282,10 @@ if __name__ == '__main__':
         time_total_epoch = 0
         time_total_epoch_s = time.time()
 
+        time_tt_sample = 0
+        time_tt_load = 0
+        time_tt_compute = 0
+
         total_loss = 0
         # training
         model.train()
@@ -341,6 +345,8 @@ if __name__ == '__main__':
         count = 0
         time_total_prep += time.time() - time_total_prep_s
         batch_edge_count = 0
+
+        time_tt_sample += time.time() - time_total_prep_s
         for batch_num, rows in df[:train_edge_end].groupby(train_group_index):
 
             batch_edge_count += len(rows)
@@ -358,6 +364,8 @@ if __name__ == '__main__':
             #get_data
             mfgs, uni_node, inv_node, uni_edge, inv_edge, uni_node_r, inv_node_r, edge_r, node_data, edge_data = q.get()
             #refresh uni_mem
+            time_tt_sample += time.time() - t0
+            time_tt_load_s = time.time()
             if mailbox is not None:
                 start = time.time()
                 uni_mem, uni_mem_ts, uni_mem_input, uni_mail_ts = \
@@ -386,6 +394,8 @@ if __name__ == '__main__':
 
             time_total_compute_s = time.time()
             #start pipelining
+            time_tt_load += time.time() - time_tt_load_s
+            time_tt_compute_s = time.time()
             optimizer.zero_grad()
             pred_pos, pred_neg = model(mfgs)
             loss = creterion(pred_pos, torch.ones_like(pred_pos))
@@ -413,7 +423,9 @@ if __name__ == '__main__':
             time_tot += t3-t0
 
             time_per_batch += time.time() - t0
+            time_tt_compute += time.time() - time_tt_compute_s
         prep_thread.join()
+        print(f"sample: {time_tt_sample:.4f}s load:{time_tt_load:.4f}s compute:{time_tt_compute:.4f}s")
         print(f"io time: {io_time:.2f}s io mem: {io_mem / 1024**3}GB")
         print('\ttotal time:{:.2f}s prep time:{:.2f}s sample time:{:.2f}s'.format(time_tot, time_prep, time_sample))
 

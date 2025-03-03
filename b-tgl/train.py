@@ -17,8 +17,8 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -27,9 +27,9 @@ parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 parser.add_argument('--use_cpu_sample', action='store_true', default=False)
 
 parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='disk', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='wo_memory_strategy', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
-parser.add_argument('--pre_sample_size', type=int, default=60000)
+parser.add_argument('--pre_sample_size', type=int, default=600000)
 parser.add_argument('--set_epoch', type=int, default=-1, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -76,7 +76,7 @@ if (args.data in ['BITCOIN', 'STACK', 'GDELT'] and 'TGN' not in args.config):
 train_param['epoch'] = 2
 if (args.set_epoch != -1):
     train_param['epoch'] = args.set_epoch
-train_param['epoch'] = 1
+train_param['epoch'] = 2
 print(f"=================================================================epoch强制设置为1")
 print(sample_param)
 print(train_param)
@@ -340,6 +340,9 @@ if __name__ == '__main__':
         elif (args.data == 'WIKI'):
             gnn_dim_edge = 0
             gnn_dim_node = 0
+        elif (args.data == 'MOOC'):
+            gnn_dim_edge = 0
+            gnn_dim_node = 172
         else:
             raise RuntimeError("have not this dataset config!")
         
@@ -476,6 +479,10 @@ if __name__ == '__main__':
             time_total_compute = 0
             time_total_update = 0
             time_total_epoch = 0
+
+            time_tt_sample = 0
+            time_tt_load = 0
+            time_tt_compute = 0
             # training
             time_total_epoch_s = time.time()
             model.train()
@@ -499,6 +506,7 @@ if __name__ == '__main__':
             batch_num = 0
             batch_size = train_param['batch_size']
             while True:
+                time_tt_sample_s = time.time()
                 right += batch_size
                 right = min(train_edge_end, right)
                 if (left >= right):
@@ -584,6 +592,8 @@ if __name__ == '__main__':
                 # emptyCache()
                 # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
                 time_gen_dgl += time.time() - t_gen_dgl_s
+                time_tt_sample += time.time() - time_tt_sample_s
+                time_tt_load_s = time.time()
                 #对依赖进行分析
                 # node_num = rows.src.values.shape[0]
                 # src_node = torch.tensor(root_nodes[:node_num]).to(torch.int32)
@@ -603,6 +613,7 @@ if __name__ == '__main__':
                 # print(f"feat时间: {time.time() - time_feat_s:.7f}s")
 
                 time_total_compute_s = time.time()
+                time_tt_load += time.time() - time_tt_load_s
                 optimizer.zero_grad()
                 # print(f"数据转dgl图流程: {time.time() - time1:.4f}")
                 
@@ -660,7 +671,9 @@ if __name__ == '__main__':
 
                 left = right
                 batch_num += 1
+                time_tt_compute += time.time() - time_total_compute_s
 
+            print(f"sample: {time_tt_sample:.4f}s load:{time_tt_load:.4f}s compute:{time_tt_compute:.4f}s")
             print(f"io time: {feat_buffer.io_time:.2f}s io mem: {feat_buffer.io_mem / 1024**3}GB")
             feat_buffer.io_mem = 0
             print(f"total loop use time: {time.time() - startTime:.4f}")
@@ -731,7 +744,7 @@ if __name__ == '__main__':
             else:
                 print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
     except Exception as e:
-        print(e)
+        raise
     finally:
         print(f"训练完成，退出子进程")
         # if (use_async_prefetch):

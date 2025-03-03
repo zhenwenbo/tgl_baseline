@@ -71,6 +71,8 @@ class Pre_fetch:
 
         self.share_tmp = share_tmp_tensor
 
+        self.has_edge_feat = self.part_edge_map.shape[0] > 0
+
     def prefetch_after(self, prefetch_res):
         node_info = prefetch_res
         
@@ -81,8 +83,9 @@ class Pre_fetch:
 
         self.part_node_map[:self.shared_ret_len[0]] = prefetch_res[0]
         self.part_node_feats[:self.shared_ret_len[1]] = prefetch_res[1]
-        self.part_edge_map[:self.shared_ret_len[2]] = prefetch_res[2]
-        self.part_edge_feats[:self.shared_ret_len[3]] = prefetch_res[3]
+        if (self.has_edge_feat):
+            self.part_edge_map[:self.shared_ret_len[2]] = prefetch_res[2]
+            self.part_edge_feats[:self.shared_ret_len[3]] = prefetch_res[3]
 
         if (self.use_memory):
             self.part_memory[:self.shared_ret_len[4]] = prefetch_res[4]
@@ -95,7 +98,8 @@ class Pre_fetch:
 
         
         self.node_d_ind[:self.shared_ret_len[10]] = prefetch_res[10]
-        self.edge_d_ind[:self.shared_ret_len[11]] = prefetch_res[11]
+        if (self.has_edge_feat):
+            self.edge_d_ind[:self.shared_ret_len[11]] = prefetch_res[11]
 
         # print(f"pre_fetch处理后cuda需要新增 {total_allo * 4 / 1024**3:.4f}GB显存 边数为: {self.shared_ret_len[2]} 节点数为{self.shared_ret_len[0]}")
 
@@ -529,9 +533,11 @@ class Pre_fetch:
             else:
                 load_paths = [path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat.pt']
                 tags = ['part_edge_feat', 'part_node_feat']
-        pos_edge_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map.pt')
+
+        if (self.has_edge_feat):
+            pos_edge_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map.pt')
+            pos_edge_shape = pos_edge_map.shape[0]
         pos_node_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map.pt')
-        pos_edge_shape = pos_edge_map.shape[0]
         pos_node_shape = pos_node_map.shape[0]
         use_async = False
 
@@ -548,19 +554,22 @@ class Pre_fetch:
         # test_f = torch.zeros(100000000 * 3, dtype = torch.float32).share_memory_()
         # print(f"创建{test_f.reshape(-1).shape[0] * 4 / 1024 ** 3:.3f}GB的共享向量用时{time.time() - allo_s:.5f}s")
         part_node_map = part_node_map.cpu()
-        part_edge_map = part_edge_map.cpu()
+        if (self.has_edge_feat):
+            part_edge_map = part_edge_map.cpu()
 
         
         if (self.use_bucket and incre_bucket):
             node_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map_incre_mask.pt')
-            edge_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map_incre_mask.pt')
+            if (self.has_edge_feat):
+                edge_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map_incre_mask.pt')
 
         if (not self.use_bucket):
             start_t = time.time()
 
             pos_node_feats = self.self_select('node_feats', pos_node_map.long())
             if (not self.use_valid_edge):
-                pos_edge_feats = self.self_select('edge_feats', pos_edge_map.long())
+                if (self.has_edge_feat):
+                    pos_edge_feats = self.self_select('edge_feats', pos_edge_map.long())
             # print(f"no bucket load time:{time.time() - start_t}")
 
 
@@ -644,14 +653,17 @@ class Pre_fetch:
 
         t4 = time.time() - t0
         t0 = time.time()
-        dis_ind = torch.isin(neg_eids, pos_edge_map, assume_unique=True,invert=True)
-        dis_neg_eids = neg_eids[dis_ind]
+        if (self.has_edge_feat):
+            dis_ind = torch.isin(neg_eids, pos_edge_map, assume_unique=True,invert=True)
+            dis_neg_eids = neg_eids[dis_ind]
 
-        edge_dd_ind = torch.isin(dis_neg_eids, part_edge_map, assume_unique=True,invert=True)
-        if (not self.data_incre):
-            # 实验：若不使用增量加载，此处作完整加载
-            edge_dd_ind.fill_(True)
-        dd_neg_eids = dis_neg_eids[edge_dd_ind]
+
+        if (self.has_edge_feat):
+            edge_dd_ind = torch.isin(dis_neg_eids, part_edge_map, assume_unique=True,invert=True)
+            if (not self.data_incre):
+                # 实验：若不使用增量加载，此处作完整加载
+                edge_dd_ind.fill_(True)
+            dd_neg_eids = dis_neg_eids[edge_dd_ind]
         # print(f"preFetch的block中含有需要做IO加载的负边个数: {dis_neg_eids.shape[0]} 若除去上一个block中出现的边特征，那么剩余{dd_neg_eids.shape[0]}")
 
 
@@ -660,21 +672,21 @@ class Pre_fetch:
         # print(f"neg_nodes: {neg_nodes.shape[0]}, neg_eids: {neg_eids.shape[0]}, dis_neg_nodes: {dis_neg_nodes.shape[0]},dis_neg_eids: {dis_neg_eids.shape[0]}")
         
 
-
-        if (has_ef and not self.use_valid_edge):
-            
-            edge_conf = self.feat_conf['edge_feats']
-            dis_neg_eids_feat = torch.zeros((dis_neg_eids.shape[0], edge_conf['shape'][1]), dtype = getattr(torch,edge_conf['dtype']))
-            if (dd_neg_eids.shape[0] > 0):
-                if (not self.use_disk):
-                    dis_neg_eids_feat[edge_dd_ind] = self.self_select('edge_feats',dd_neg_eids.to(torch.int64))
-                else:
-                    if (self.use_edge_reorder):
-                        reorder_ind = self.edge_reorder_map[dd_neg_eids.long()]
-                        reorder_ind,indices = torch.sort(reorder_ind)
-                        dis_neg_eids_feat[torch.nonzero(edge_dd_ind).reshape(-1)[indices]]= self.self_select('edge_features_reorder',reorder_ind, use_slice=False)
+        if (self.has_edge_feat):
+            if (has_ef and not self.use_valid_edge):
+                
+                edge_conf = self.feat_conf['edge_feats']
+                dis_neg_eids_feat = torch.zeros((dis_neg_eids.shape[0], edge_conf['shape'][1]), dtype = getattr(torch,edge_conf['dtype']))
+                if (dd_neg_eids.shape[0] > 0):
+                    if (not self.use_disk):
+                        dis_neg_eids_feat[edge_dd_ind] = self.self_select('edge_feats',dd_neg_eids.to(torch.int64))
                     else:
-                        dis_neg_eids_feat[edge_dd_ind]= self.self_select('edge_features',dd_neg_eids, use_slice=False)
+                        if (self.use_edge_reorder):
+                            reorder_ind = self.edge_reorder_map[dd_neg_eids.long()]
+                            reorder_ind,indices = torch.sort(reorder_ind)
+                            dis_neg_eids_feat[torch.nonzero(edge_dd_ind).reshape(-1)[indices]]= self.self_select('edge_features_reorder',reorder_ind, use_slice=False)
+                        else:
+                            dis_neg_eids_feat[edge_dd_ind]= self.self_select('edge_features',dd_neg_eids, use_slice=False)
                 
 
             
@@ -683,17 +695,18 @@ class Pre_fetch:
 
         t5 = time.time() - t0
         t0 = time.time()
-        if (self.use_bucket and incre_bucket):
-            edge_d_map = torch.cat((edge_incre_mask, edge_dd_ind))
-        else:
-            edge_d_map = torch.cat((torch.ones(pos_edge_map.shape[0], dtype = torch.bool), edge_dd_ind))
+        if (self.has_edge_feat):
+            if (self.use_bucket and incre_bucket):
+                edge_d_map = torch.cat((edge_incre_mask, edge_dd_ind))
+            else:
+                edge_d_map = torch.cat((torch.ones(pos_edge_map.shape[0], dtype = torch.bool), edge_dd_ind))
 
-        if (self.use_valid_edge and not self.use_bucket):
-            pos_edge_map_clone = pos_edge_map.clone()
-        pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
-        pos_edge_map,edge_indices = torch.sort(pos_edge_map)
+            if (self.use_valid_edge and not self.use_bucket):
+                pos_edge_map_clone = pos_edge_map.clone()
+            pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
+            pos_edge_map,edge_indices = torch.sort(pos_edge_map)
 
-        edge_d_map = torch.nonzero(~edge_d_map[edge_indices]).reshape(-1)
+            edge_d_map = torch.nonzero(~edge_d_map[edge_indices]).reshape(-1)
 
         t6 = time.time() - t0
         t0 = time.time()
@@ -755,7 +768,7 @@ class Pre_fetch:
         if (pos_node_map.shape[0] > self.part_node_map.shape[0]):
             self.prefetch_conn.send(f'node extension, {pos_node_map.shape[0]} -> {self.part_node_map.shape[0]}')
             self.prefetch_conn.recv()
-        if (pos_edge_map.shape[0] > self.part_edge_map.shape[0]):
+        if ((self.has_edge_feat) and pos_edge_map.shape[0] > self.part_edge_map.shape[0]):
             self.prefetch_conn.send(f'edge extension, {pos_edge_map.shape[0]} -> {self.part_edge_map.shape[0]}')
             self.prefetch_conn.recv()
         t8 = time.time() - t0
@@ -788,7 +801,7 @@ class Pre_fetch:
                 reorder_s = time.time()
                 node_feats = node_feats[node_indices]
                 reorder_time += time.time() - reorder_s
-            elif (tag == 'part_edge_feat' and has_ef):
+            elif (tag == 'part_edge_feat' and has_ef and (self.has_edge_feat)):
                 # print(tag)
                 if (self.use_bucket):
                     if (incre_bucket):
@@ -808,7 +821,9 @@ class Pre_fetch:
         t0 = time.time()
 
         # time.sleep(0.05)
-
+        if (not self.has_edge_feat):
+            pos_edge_map = None
+            edge_d_map = None
         self.prefetch_after([pos_node_map, node_feats, pos_edge_map, edge_feats, part_memory,\
                               part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes, node_d_map, edge_d_map])
         # self.preFetchDataCache.put({'node_info': [pos_node_map, node_feats], 'edge_info': [pos_edge_map, edge_feats],\

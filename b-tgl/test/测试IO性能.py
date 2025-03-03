@@ -2,7 +2,7 @@ import numpy as np
 import time
 
 # 设置文件大小为1GB
-file_size_gb = 1
+file_size_gb = 5
 file_size_bytes = file_size_gb * 1024 * 1024 * 1024
 import gc
 

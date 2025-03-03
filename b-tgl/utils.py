@@ -187,6 +187,8 @@ def loadBin(path, device = None):
     if directory not in confs:
         loadConf(path)
 
+    if not (path in confs[directory]):
+        return None
     cur_conf = confs[directory][path]
 
     
@@ -398,7 +400,8 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     if d == 'LASTFM':
         edge_feats = torch.randn(1293103, 128)
     elif d == 'MOOC':
-        edge_feats = torch.randn(411749, rand_de)
+        ef_num = 0
+        ef_len = 172
     elif d == 'STACK':
         ef_num = 63497049
         ef_len = 172
@@ -414,7 +417,8 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     if d == 'LASTFM':
         node_feats = torch.randn(1980, 128)
     elif d == 'MOOC':
-        node_feats = torch.randn(7144, rand_dn)
+        nf_num = 7144
+        nf_len = 172
     elif d == 'STACK':
         nf_num = 2601977
         nf_len = 172

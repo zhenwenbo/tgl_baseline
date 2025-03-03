@@ -31,7 +31,7 @@ def saveBin(tensor,savePath,addSave=False):
         tensor.cpu().numpy().tofile(savePath)
     elif isinstance(tensor, np.ndarray):
         tensor.tofile(savePath)
-data = 'STACK'
+data = 'MOOC'
 
 
 import sys
@@ -89,7 +89,7 @@ def df2bin():
         json.dump(dataset_conf, f, indent=4)
 
 
-# df2bin()
+df2bin()
 
 # eid = torch.from_numpy(g['eid']).cuda()
 # print(f'eid shape: {eid.shape} unique shape: {torch.unique(eid).shape}')

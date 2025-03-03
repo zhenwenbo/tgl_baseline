@@ -81,7 +81,7 @@ class Feat_buffer:
         self.err_num = 0
         use_detection = False
 
-        self.err_detection = use_detection
+        self.err_detection = False
         if (self.err_detection):
             self.det_node_feats, self.det_edge_feats = load_feat(self.d)
 
@@ -124,6 +124,9 @@ class Feat_buffer:
         self.share_edge_num = 10000000
         self.share_node_num = 5000000
         self.tmp_tensor_num = 500000000
+
+        if (d == 'MAG' or d == 'MOOC'):
+            self.share_edge_num = 0
 
         # self.bucket_config = None
         # self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
@@ -771,7 +774,7 @@ class Feat_buffer:
         path = self.path
         if (self.edge_feat_dim > 0):
             self.part_edge_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_feat.pt').cuda()
-        self.part_edge_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
+            self.part_edge_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_edge_map.pt').cuda()
         if (self.node_feat_dim > 0):
             self.part_node_feats = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_feat.pt').cuda()
         self.part_node_map = loadBin(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{part_num}_node_map.pt').cuda()
@@ -970,19 +973,20 @@ class Feat_buffer:
 
 
 
-        table1 = torch.zeros_like(neg_eids) - 1
-        table2 = torch.zeros_like(self.part_edge_map) - 1
-        dgl.findSameNode(neg_eids, self.part_edge_map, table1, table2)
-        dis_ind = table1 == -1
-        dis_neg_eids = neg_eids[dis_ind]
+        
         if (self.edge_feat_dim > 0):
+            table1 = torch.zeros_like(neg_eids) - 1
+            table2 = torch.zeros_like(self.part_edge_map) - 1
+            dgl.findSameNode(neg_eids, self.part_edge_map, table1, table2)
+            dis_ind = table1 == -1
+            dis_neg_eids = neg_eids[dis_ind]
             dis_neg_eids_feat = self.select_index('edge_feats',dis_neg_eids.cpu().to(torch.int64)).cuda()
             if (hasattr(self.config, 'use_pin_memory') and self.config.use_pin_memory):
                 dis_neg_eids_feat = dis_neg_eids_feat.cpu().pin_memory()
 
         
-        self.part_edge_map = torch.cat((self.part_edge_map, dis_neg_eids))
-        self.part_edge_map,indices = torch.sort(self.part_edge_map)
+            self.part_edge_map = torch.cat((self.part_edge_map, dis_neg_eids))
+            self.part_edge_map,indices = torch.sort(self.part_edge_map)
         #TODO 当part_edge过大的时候，这里会产生一个较大的显存管理开销
         if (self.edge_feat_dim > 0):
             self.part_edge_feats = torch.cat((self.part_edge_feats, dis_neg_eids_feat))
@@ -1220,7 +1224,7 @@ class Feat_buffer:
         node_his_max = []
         edge_his_max = []
         node_window_size = int(budget_byte * 0.9 / 4 / self.node_feat_dim)
-        edge_window_size = int(budget_byte * 0.9 / 4 / self.edge_feat_dim)
+        edge_window_size = int(budget_byte * 0.9 / 4 / self.edge_feat_dim) if self.edge_feat_dim != 0 else 0
         history_datas = []
         his_mem_threshold = 4 * 1024 ** 3  # 4GB
         his_mem_byte = 0 #单位为字节
@@ -1235,10 +1239,18 @@ class Feat_buffer:
         datas = self.datas
         pre_eid, pre_nid = None, None
         edge_end = datas['src'].shape[0]
-        total_src = datas['src'].cuda().to(torch.int32)
-        total_dst = datas['dst'].cuda().to(torch.int32)
-        total_time = datas['time'].cuda().to(torch.float32)
-        total_eid = datas['eid'].cuda().to(torch.int32)
+        if (self.d == 'MAG'):
+            total_src = datas['src'].pin_memory().to(torch.int32)
+            total_dst = datas['dst'].pin_memory().to(torch.int32)
+            total_time = datas['time'].pin_memory().to(torch.float32)
+            total_eid = datas['eid'].pin_memory().to(torch.int32)
+        else:
+            total_src = datas['src'].cuda().to(torch.int32)
+            total_dst = datas['dst'].cuda().to(torch.int32)
+            total_time = datas['time'].cuda().to(torch.float32)
+            total_eid = datas['eid'].cuda().to(torch.int32)
+        
+        
         while True:
             cur_bucket_allo = 0
             start = time.time()
@@ -1261,8 +1273,8 @@ class Feat_buffer:
                 dst = total_dst[left: right]
                 times = total_time[left: right]
                 eid = total_eid[left: right]
-                root_nodes = torch.cat((src, dst))
-                root_ts = torch.cat((times, times))
+                root_nodes = torch.cat((src, dst)).cuda()
+                root_ts = torch.cat((times, times)).cuda()
                 # root_nodes = torch.from_numpy(root_nodes).cuda()
                 # root_ts = torch.from_numpy(root_ts).cuda()
 
@@ -1361,7 +1373,8 @@ class Feat_buffer:
                 node_his.clear()
                 node_his_max.clear()
 
-                self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+                if (edge_window_size > 0):
+                    self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
                 edge_his.clear()
                 edge_his_max.clear()
 
@@ -1383,7 +1396,8 @@ class Feat_buffer:
         self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
         node_his.clear()
 
-        self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+        if (edge_window_size > 0):
+            self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
         edge_his.clear()
         node_his_max.clear()
         edge_his_max.clear()
@@ -1393,7 +1407,249 @@ class Feat_buffer:
         with open(bucket_config_path, 'w') as json_file:
             json.dump(res_config, json_file, indent=4)
 
-    
+
+
+    #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
+    def gen_part_stream_bucket_cache(self, budget = (10 * 1024), bucket_budget = 1 * 1024 ** 3):
+        #当分区feat不存在的时候做输出
+        d = self.d
+        path = self.path
+        # if os.path.exists(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}'):
+        #     print(f"already  partfeat")
+        #     return
+
+        df = self.df
+        batch_size = self.batch_size
+        # node_feats, edge_feats = load_feat(d)
+
+        budget_byte = budget * 1024 * 1024
+        his_ind = []
+        node_his = []
+        edge_his = []
+        node_his_max = []
+        edge_his_max = []
+        node_window_size = int(budget_byte * 0.9 / 4 / self.node_feat_dim)
+        edge_window_size = int(budget_byte * 0.9 / 4 / self.edge_feat_dim) if self.edge_feat_dim != 0 else 0
+        history_datas = []
+        his_mem_threshold = 0.5 * 1024 ** 3  # 4GB
+        his_mem_byte = 0 #单位为字节
+
+        res_config = {}
+        res_config['bucket_ptr'] = [0]
+        res_config['max_node_num'] = 0
+        res_config['max_edge_num'] = 0
+
+        left, right = 0, 0
+        batch_num = 0
+        datas = self.datas
+        pre_eid, pre_nid = None, None
+        edge_end = datas['src'].shape[0]
+        if (self.d == 'MAG'):
+            total_src = datas['src'].pin_memory().to(torch.int32)
+            total_dst = datas['dst'].pin_memory().to(torch.int32)
+            total_time = datas['time'].pin_memory().to(torch.float32)
+            total_eid = datas['eid'].pin_memory().to(torch.int32)
+        else:
+            total_src = datas['src'].cuda().to(torch.int32)
+            total_dst = datas['dst'].cuda().to(torch.int32)
+            total_time = datas['time'].cuda().to(torch.float32)
+            total_eid = datas['eid'].cuda().to(torch.int32)
+        
+        count = torch.zeros(121751665, dtype = torch.int32, device = 'cuda:0')
+        batch_count = []
+        # eid_uni = torch.
+        while True:
+            start = time.time()
+            first_flag = True
+
+            right += batch_size
+            right = min(edge_end, right)
+            if (left >= right):
+                break
+            first_flag = False
+
+            src = total_src[left: right]
+            dst = total_dst[left: right]
+            times = total_time[left: right]
+            eid = total_eid[left: right]
+            root_nodes = torch.cat((src, dst)).cuda()
+            root_ts = torch.cat((times, times)).cuda()
+
+            ret_list = self.sampler.sample_layer(root_nodes, root_ts)
+            # eid_uni = eid.to(torch.int32).cuda()
+            nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
+            # root_eids_num = eid_uni.shape[0]
+
+            for ret in ret_list:
+                #找出每层的所有eid即可
+                src,dst,outts,outeid,root_nodes,root_ts,dts = ret
+                eid = outeid[outeid > -1]
+
+                cur_eid = torch.unique(eid)
+                # eid_uni = torch.cat((cur_eid, eid_uni))
+                # eid_uni = torch.unique(eid_uni)
+            # print(f"t1: {time.time() - start:.8f}s")
+
+            ret = ret_list[-1]
+            src,dst,outts,outeid,root_nodes,root_ts,dts = ret
+            del ret_list
+            del outts, outeid, root_ts, dst
+            # emptyCache()
+            mask = src > -1
+            src = src[mask]
+            nid_uni = torch.cat((src, root_nodes))
+            nid_uni = torch.unique(nid_uni)
+            nid_uni,_ = torch.sort(nid_uni)
+            # eid_uni,_ = torch.sort(eid_uni)
+
+            count[nid_uni.long()] += 1
+            batch_count.append(nid_uni)
+
+
+            res_config['max_node_num'] = int(max(res_config['max_node_num'], nid_uni.shape[0] * 1.5))
+            # res_config['max_edge_num'] = int(max(res_config['max_edge_num'], eid_uni.shape[0] * 1.5))
+            if (first_flag):
+                break
+            his_ind.append(batch_num)
+            res_config['bucket_ptr'].append(right)
+            
+            # saveBin(torch.tensor([left, right], dtype = torch.int32).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_bound.bin')
+
+            # cur_eid = eid_uni
+            # if (pre_eid is not None):
+            #     eid_incre_mask = torch.isin(eid_uni, pre_eid, assume_unique=True, invert = True)
+            #     cur_eid = eid_uni[eid_incre_mask]
+            #     cur_eid = cur_eid[:cur_eid.shape[0] - root_eids_num]
+            #     saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map_incre_mask.pt')
+
+            # if (self.edge_feat_dim > 0):
+            #     edge_his.append(cur_eid.cpu())
+            #     edge_his_max.append(torch.max(cur_eid).cpu() if cur_eid.shape[0] > 0 else 0)
+            #     his_mem_byte += cur_eid.numel() * cur_eid.element_size()
+
+            # saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
+
+
+            threshold = 166
+            cache_num = 10000000
+            if (batch_num > 0 and batch_num % threshold == 0):
+                count_sort, count_idx = torch.sort(count, descending=True)
+                cache_idx = count_idx[:cache_num]
+                cur_count = 0
+                for batch_info in batch_count:
+                    nid_uni = batch_info
+                    cur_nid = nid_uni
+                    
+                    if (pre_nid is not None):
+                        nid_incre_mask = torch.isin(nid_uni, cache_idx, assume_unique=True, invert=True)
+                        nid_incre_mask = torch.bitwise_and(nid_incre_mask, torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True))
+                        
+                        cur_nid = nid_uni[nid_incre_mask]
+                        saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num-threshold+cur_count}_node_map_incre_mask.pt')
+
+                    if (self.node_feat_dim > 0):
+                        node_his.append(cur_nid.cpu())
+                        node_his_max.append(torch.max(cur_nid).cpu())
+                        his_mem_byte += cur_nid.numel() * cur_nid.element_size()
+
+                    saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num-threshold+cur_count}_node_map.pt')
+                    pre_nid = nid_uni
+
+                    cur_count += 1
+
+                count.fill_(0)
+                batch_count = []
+                saveBin(cache_idx.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_cache_{batch_num-threshold}_nidx.bin')
+                    
+
+            # saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
+
+
+            # nid_uni,_ = torch.sort(nid_uni)
+            # cur_nid = nid_uni
+            # if (pre_nid is not None):
+            #     nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
+            #     cur_nid = nid_uni[nid_incre_mask]
+            #     saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map_incre_mask.pt')
+
+            # if (self.node_feat_dim > 0):
+            #     node_his.append(cur_nid.cpu())
+            #     node_his_max.append(torch.max(cur_nid).cpu())
+            #     his_mem_byte += cur_nid.numel() * cur_nid.element_size()
+
+            # saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
+
+            
+            if (his_mem_byte >= his_mem_threshold):
+                print(f"达到计数上限, his_mem: {his_mem_byte / 1024 ** 2}MB")
+                node_feat_path = f'{path}/node_features.bin'
+                edge_feat_path =  f'{path}/edge_features.bin'
+                node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
+                edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
+                self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
+                node_his.clear()
+                node_his_max.clear()
+
+                # if (edge_window_size > 0):
+                #     self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+                # edge_his.clear()
+                # edge_his_max.clear()
+
+                his_ind.clear()
+                his_mem_byte = 0
+            sampleTime = time.time() - start
+            
+            print(f"总结点数:{nid_uni.shape[0]}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
+            # pre_eid = eid_uni
+            
+            left = right
+            batch_num += 1
+        # batch_num -= 1
+        if (batch_count):
+            pre_batch_count = len(batch_count)
+            count_sort, count_idx = torch.sort(count, descending=True)
+            cache_idx = count_idx[:cache_num]
+
+            for i, batch_info in enumerate(batch_count):
+                
+                nid_uni = batch_info
+                cur_nid = nid_uni
+                if (pre_nid is not None):
+                    nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
+                    nid_incre_mask = torch.bitwise_and(nid_incre_mask, torch.isin(nid_uni, cache_idx, assume_unique=True, invert=True))
+                    cur_nid = nid_uni[nid_incre_mask]
+                    saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num - pre_batch_count + i}_node_map_incre_mask.pt')
+
+                if (cur_nid.shape[0] > 0 and self.node_feat_dim > 0):
+                    node_his.append(cur_nid.cpu())
+                    node_his_max.append(torch.max(cur_nid).cpu())
+                    his_mem_byte += cur_nid.numel() * cur_nid.element_size()
+
+                saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num - pre_batch_count + i}_node_map.pt')
+                pre_nid = nid_uni
+
+            count.fill_(0)
+            batch_count = []
+            saveBin(cache_idx.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_cache_{batch_num - pre_batch_count}_nidx.bin')
+            
+        node_feat_path = f'{path}/node_features.bin'
+        edge_feat_path =  f'{path}/edge_features.bin'
+        node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
+        edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
+        self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
+        node_his.clear()
+
+        if (edge_window_size > 0):
+            self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+        edge_his.clear()
+        node_his_max.clear()
+        edge_his_max.clear()
+        his_ind.clear()
+
+        bucket_config_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/' + f'/bucket_config.json'
+        with open(bucket_config_path, 'w') as json_file:
+            json.dump(res_config, json_file, indent=4)
+
     def incre_strategy(self, pre_map, cur_id):
         # 要做的就是找出上一次没有出现过的节点
         pre_map_sort, pre_map_sort_indices = torch.sort(pre_map)

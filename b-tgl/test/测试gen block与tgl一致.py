@@ -32,7 +32,7 @@ def set_seed(seed):
 
 set_seed(0)
 
-d = 'TALK'
+d = 'MAG'
 batch_size = 2000
 df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
 g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
