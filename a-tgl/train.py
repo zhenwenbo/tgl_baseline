@@ -2,12 +2,13 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
 parser.add_argument('--model_eval', action='store_true')
+parser.add_argument('--bs', type=int, default=1000)
 parser.add_argument('--rand_edge_features', type=int, default=0, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=0, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
@@ -44,6 +45,10 @@ if (args.data == 'GDELT' and sample_param['layer'] == 2):
 
 # if (args.data == 'BITCOIN'):
 train_param['epoch'] = 1
+if (args.bs != -1):
+    train_param['batch_size'] = args.bs
+    print(f"batch size修改为 {args.bs}")
+batch_size = train_param['batch_size']
 
 if (args.data in ['BITCOIN']):
     train_edge_end = 86063713
@@ -188,6 +193,7 @@ if 'reorder' in train_param:
     for i in range(1, train_param['reorder']):
         additional_idx = np.zeros(train_param['batch_size'] // train_param['reorder'] * i) - 1
         group_indexes.append(np.concatenate([additional_idx, base_idx])[:base_idx.shape[0]])
+
 for e in range(train_param['epoch']):
     print('Epoch {:d}:'.format(e))
     time_sample = 0
@@ -287,7 +293,7 @@ for e in range(train_param['epoch']):
         time_per_batch += time.time() - t_tot_s
         time_tt_compute += time.time() - time_tt_compute_s
 
-    print_io(mailbox)
+    # print_io(mailbox)
     print(f"sample: {time_tt_sample:.4f}s load:{time_tt_load:.4f}s compute:{time_tt_compute:.4f}s")
     time_total_epoch += time.time() - time_total_epoch_s
     time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update

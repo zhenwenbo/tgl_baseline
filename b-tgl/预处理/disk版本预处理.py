@@ -60,7 +60,16 @@ if __name__ == '__main__':
     node_feats, edge_feats = None,None
     if (not args.use_stream and not args.use_disk):
         node_feats, edge_feats = load_feat(args.data)
-    
+    cur_train = {
+        'node_feat_type': 'float32',
+        'edge_feat_type': 'float32',
+        'dataset': args.data
+    }
+    if (args.data == 'MAG'):
+        cur_train['node_feat_type'] = 'float16'
+    with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
+        json.dump(cur_train, f)
+
     if (not args.use_stream):
         g, df = load_graph(args.data)
         # train_edge_end = 0

@@ -77,6 +77,7 @@ monitor_memory_usage() {
 ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 # ds=("STACK")
 models=("TGN")
+bss=(4000 500 1000 1500 2000)
 
 
 timestamp=$(date +%Y%m%d-%H%M%S)
@@ -84,31 +85,32 @@ mkdir -p "../res-${timestamp}"
 
 for model in "${models[@]}"; do
     for d in "${ds[@]}"; do
+    for bs in "${bss[@]}"; do
 
     echo "处理 $d"
     mkdir -p "../res-${timestamp}/${d}"
 
 
-        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-${model}-1_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --bs=${bs} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-1_res.log &
         pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-1_res_mem.log"
+        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-1_res_mem.log"
         monitor_memory_usage $pid
         wait
 
 
-        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/TGL-${model}-2_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --bs=${bs} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-2_res.log &
         pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-2_res_mem.log"
+        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-2_res_mem.log"
         monitor_memory_usage $pid
         wait
 
 
 
-        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-1_res.log &
-        # pid=$!
-        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-1_res_mem.log"
-        # monitor_memory_usage $pid
-        # wait
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --bs=${bs} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-batchsize${bs}-1_res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/b-${model}-batchsize${bs}-1_res_mem.log"
+        monitor_memory_usage $pid
+        wait
 
 
         threshold=0.1
@@ -125,18 +127,18 @@ for model in "${models[@]}"; do
         # monitor_memory_usage $pid
         # wait
 
-        # nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-${model}-1_res.log &
-        # pid=$!
-        # memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-1_res_mem.log"
-        # monitor_memory_usage $pid
-        # wait
+        nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --bs=${bs} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-1_res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-1_res_mem.log"
+        monitor_memory_usage $pid
+        wait
 
         
-        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
-        # pid=$!
-        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
-        # monitor_memory_usage $pid
-        # wait
+        nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --bs=${bs} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-batchsize${bs}-2_res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/b-${model}-batchsize${bs}-2_res_mem.log"
+        monitor_memory_usage $pid
+        wait
 
         # if [ "$d" != "GDELT" ]; then
         #     nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
@@ -146,15 +148,11 @@ for model in "${models[@]}"; do
         #     wait
         # fi
 
-
-
-
-
-        # nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/ETC-${model}-2_res.log &
-        # pid=$!
-        # memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-2_res_mem.log"
-        # monitor_memory_usage $pid
-        # wait
+        nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --bs=${bs} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-2_res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-2_res_mem.log"
+        monitor_memory_usage $pid
+        wait
 
 
         
@@ -168,7 +166,7 @@ for model in "${models[@]}"; do
         # fi
 
 
-
+        done
         
     done
 done

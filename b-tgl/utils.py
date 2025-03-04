@@ -195,13 +195,75 @@ def loadBin(path, device = None):
     if (device is None):
         device = cur_conf['device']
     res = torch.from_numpy(np.fromfile(path, dtype = getattr(np, cur_conf['dtype'].replace('bool', 'bool_')))).to(device).reshape(cur_conf['shape'])
-    if (cur_conf['dtype'] == 'float16'):
+    if (cur_conf['dtype'] == 'float16' and 'MAG' not in path):
         res = res.to(torch.float32)
     return res
 
 import concurrent.futures
 
-def read_data_from_file_concurrent(file_path, indices, shape, dtype=np.float32, batch_size=8192, use_slice = False):
+from multiprocessing import shared_memory
+# def store_task_sha_v2(start, end, output, index, sha_name, shape, dtype):
+#     fname = "%s_worker_%s.csv" % (output, index)
+#     exist_sham = shared_memory.SharedMemory(name=sha_name)
+#     data = np.ndarray(shape, dtype=dtype, buffer=exist_sham.buf)
+#     print(sha_name, data.shape, index)
+#     np.savetxt(fname, data[start: end], delimiter='\t')
+#     del data
+#     exist_sham.close()
+
+# def mp_pool_sha(file_path, indices, shape, dtype=np.float32):
+#     total_data_bytes = indices.shape[0] * shape[1] * dtype.itemsize
+#     shm = shared_memory.SharedMemory(create=True, size=total_data_bytes)
+#     b = np.ndarray(indices.shape[0] * shape[0], dtype=dtype, buffer=shm.buf)
+#     b[:] = big_data[:]
+#     print(b.shape)
+#     with ProcessPoolExecutor(max_workers=worker_num) as pool:
+#         tasks = []
+#         for i in range(worker_num):
+#             start = i * task_num
+#             end = (i+1) * task_num
+#             tasks.append(
+#                 pool.submit(store_task_sha_v2, 
+#                     start, end, 'testdata/mp_pool_sha', i ,
+#                     shm.name, b.shape, b.dtype))
+#         for t in tasks:
+#             # Note! 在这里捕获异常，ProcessPoolExecutor推荐这么使用!
+#             try:
+#                 print(t.result())
+#             except Exception as e:
+#                 print(f'{e}')
+#     del b
+#     shm.close()
+#     shm.unlink() 
+
+def read_data_from_file_concurrent1(file_path, indices, shape, dtype=np.float32, batch_size=1024, use_slice = False):
+    # 利用 numpy 的内存映射函数来映射整个文件
+    data = np.memmap(file_path, dtype=dtype, mode='r', shape=(shape[0], shape[1]))
+    result = np.zeros(indices.shape[0] * shape[1], dtype= dtype)
+    
+    # 定义读取批次数据的函数
+    def read_batch(root_indices, batch_indices):
+        result[root_indices[0]:root_indices[1]] = data[batch_indices].reshape(-1)
+    
+    # 使用多线程池读取数据
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # 分批次并行提交任务
+        futures = []
+        for i in range(0, len(indices), batch_size):
+            batch_indices = indices[i:i+batch_size]
+            futures.append(executor.submit(read_batch, (i,i+batch_size), batch_indices))
+        
+        # 收集读取结果
+        for future in concurrent.futures.as_completed(futures):
+            asd = 1
+    
+    # 将结果合并成一个tensor
+    # if len(result) == 0:
+    #     return torch.from_numpy(np.empty(0, dtype=dtype))
+    return torch.from_numpy(result).reshape(-1, shape[1])
+
+
+def read_data_from_file_concurrent(file_path, indices, shape, dtype=np.float32, batch_size=1024, use_slice = False):
     # 利用 numpy 的内存映射函数来映射整个文件
     data = np.memmap(file_path, dtype=dtype, mode='r', shape=shape)
     result = []
@@ -323,6 +385,9 @@ def loadBinDisk(path, ind, use_slice = False):
         loadConf(path)
 
     cur_conf = confs[directory][path]
+    use_conc = False
+    if (use_conc):
+        return read_data_from_file_concurrent(path, ind, (cur_conf['shape'][0], cur_conf['shape'][1]), dtype = getattr(np, cur_conf['dtype']))
     
     if (only_compute_io):
         create_interval_map(ind, cur_conf['shape'][1], 'read')
@@ -335,7 +400,7 @@ def loadBinDisk(path, ind, use_slice = False):
     # res = read_binary_file_indices(file_path=path, indices=ind, feat_len=cur_conf['shape'][1], dtype=getattr(np, cur_conf['dtype']))
     
     res = read_data_from_file(file_path=path, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
-    if (cur_conf['dtype'] == 'float16'):
+    if (cur_conf['dtype'] == 'float16' and not('MAG' in path)):
         res = res.to(torch.float32)
 
     time_use = time.time() - read_disk_s

@@ -17,8 +17,8 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -27,9 +27,10 @@ parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 parser.add_argument('--use_cpu_sample', action='store_true', default=False)
 
 parser.add_argument('--reuse_ratio', type=float, default=0.9, help='reuse_ratio')
-parser.add_argument('--train_conf', type=str, default='wo_memory_strategy', help='name of stored model')
+parser.add_argument('--train_conf', type=str, default='disk', help='name of stored model')
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
-parser.add_argument('--pre_sample_size', type=int, default=600000)
+parser.add_argument('--pre_sample_size', type=int, default=60000)
+parser.add_argument('--bs', type=int, default=2000)
 parser.add_argument('--set_epoch', type=int, default=-1, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
@@ -95,6 +96,17 @@ if (config.model_eval):
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 print(f"训练配置: {config.config_data}")
+
+cur_train = {
+    'node_feat_type': 'float32',
+    'edge_feat_type': 'float32',
+    'dataset': args.data
+}
+if (args.data == 'MAG'):
+    cur_train['node_feat_type'] = 'float16'
+
+with open('./cur_train.json', mode = 'w') as f:
+    json.dump(cur_train, f)
 
 
 # os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
@@ -257,6 +269,10 @@ def count_judge(src_node, dst_node):
 if __name__ == '__main__':
 
     try:
+        if (args.bs != -1):
+            train_param['batch_size'] = args.bs
+            print(f"batch size修改为 {args.bs}")
+        batch_size = train_param['batch_size']
         global node_feats, edge_feats
         node_feats, edge_feats = None,None
 
@@ -504,7 +520,7 @@ if __name__ == '__main__':
             sampler_gpu.mask_time = 0
             left, right = 0, 0
             batch_num = 0
-            batch_size = train_param['batch_size']
+            
             while True:
                 time_tt_sample_s = time.time()
                 right += batch_size
@@ -744,7 +760,7 @@ if __name__ == '__main__':
             else:
                 print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
     except Exception as e:
-        raise
+        print(e)
     finally:
         print(f"训练完成，退出子进程")
         # if (use_async_prefetch):

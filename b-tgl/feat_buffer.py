@@ -29,6 +29,12 @@ class Feat_buffer:
         self.total_node_num = node_num
         self.total_edge_num = edge_num
 
+        with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode='r') as f:
+            conf = json.load(f)
+        self.node_feat_type = conf['node_feat_type']
+        self.edge_feat_type = conf['edge_feat_type']
+        self.dataset = conf['dataset']
+
         self.node_feat_dim, self.edge_feat_dim = feat_dim
         self.memory_param = memory_param
         self.use_memory = memory_param['type'] != 'none'
@@ -189,10 +195,10 @@ class Feat_buffer:
         
 
         part_node_map = torch.zeros(node_num, dtype = torch.int32).share_memory_()
-        node_feats = torch.zeros((node_num, node_feat_dim), dtype = torch.float32).share_memory_()
+        node_feats = torch.zeros((node_num, node_feat_dim), dtype = getattr(torch, self.node_feat_type)).share_memory_()
 
         part_edge_map = torch.zeros(edge_num, dtype = torch.int32).share_memory_()
-        edge_feats = torch.zeros((edge_num, edge_feat_dim), dtype = torch.float32).share_memory_()
+        edge_feats = torch.zeros((edge_num, edge_feat_dim), dtype = getattr(torch, self.edge_feat_type)).share_memory_()
 
         if (self.use_memory):
             mem_dim = self.memory_param['dim_out']
@@ -1431,7 +1437,7 @@ class Feat_buffer:
         node_window_size = int(budget_byte * 0.9 / 4 / self.node_feat_dim)
         edge_window_size = int(budget_byte * 0.9 / 4 / self.edge_feat_dim) if self.edge_feat_dim != 0 else 0
         history_datas = []
-        his_mem_threshold = 0.5 * 1024 ** 3  # 4GB
+        his_mem_threshold = 0.05 * 1024 ** 3  # 4GB
         his_mem_byte = 0 #单位为字节
 
         res_config = {}
@@ -1586,12 +1592,12 @@ class Feat_buffer:
                 edge_feat_path =  f'{path}/edge_features.bin'
                 node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
                 edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
-                self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
+                self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,getattr(np, self.node_feat_type))
                 node_his.clear()
                 node_his_max.clear()
 
                 # if (edge_window_size > 0):
-                #     self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+                #     self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,getattr(np, self.edge_feat_type))
                 # edge_his.clear()
                 # edge_his_max.clear()
 
@@ -1636,11 +1642,11 @@ class Feat_buffer:
         edge_feat_path =  f'{path}/edge_features.bin'
         node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
         edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
-        self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
+        self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,getattr(np, self.node_feat_type))
         node_his.clear()
 
         if (edge_window_size > 0):
-            self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+            self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,getattr(np, self.edge_feat_type))
         edge_his.clear()
         node_his_max.clear()
         edge_his_max.clear()

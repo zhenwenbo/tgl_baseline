@@ -14,7 +14,14 @@ class Pre_fetch:
         self.conn = conn
         self.prefetch_conn = prefetch_child_conn
         self.use_memory = False
+        with open('./cur_train.json', mode='r') as f:
+            conf = json.load(f)
 
+        with open('./cur_train.json', mode='r') as f:
+            conf = json.load(f)
+        self.node_feat_type = conf['node_feat_type']
+        self.edge_feat_type = conf['edge_feat_type']
+        self.dataset = conf['dataset']
         self.config = GlobalConfig()
         self.use_valid_edge = self.config.use_valid_edge
         self.use_disk = self.config.use_disk
@@ -132,6 +139,7 @@ class Pre_fetch:
         if name == 'edge_feats' and self.use_valid_edge:
             return self.get_ef_valid(indices)
         self_v = getattr(self,name,None)
+        use_concurrent = True
         if (self_v is not None or self.use_disk):
             if (self.use_disk):
                 res = loadBinDisk(getattr(self, f'{name}_path'), indices, use_slice)
@@ -633,7 +641,7 @@ class Pre_fetch:
         t0 = time.time()
         if (has_nf):
             node_conf = self.feat_conf['node_feats']
-            neg_node_feats = torch.zeros((dis_neg_nodes.shape[0], node_conf['shape'][1]), dtype = torch.float32)
+            neg_node_feats = torch.zeros((dis_neg_nodes.shape[0], node_conf['shape'][1]), dtype = getattr(torch, self.node_feat_type))
             if dd_neg_nodes.shape[0] > 0:
                 neg_node_feats[node_dd_ind] = self.self_select('node_feats', dd_neg_nodes.to(torch.int64))
                 # print(neg_node_feats[node_dd_ind])
@@ -647,6 +655,7 @@ class Pre_fetch:
 
         pos_node_map = torch.cat((pos_node_map, dis_neg_nodes))
         pos_node_map,node_indices = torch.sort(pos_node_map)
+        # time.sleep(5)
         
         node_d_map = torch.nonzero(~node_d_map[node_indices]).reshape(-1)
 
@@ -776,7 +785,7 @@ class Pre_fetch:
 
         reorder_time = 0
         asy_time = 0
-        node_feats, edge_feats = torch.empty(0, dtype = torch.float32), torch.empty(0, dtype = torch.float32)
+        node_feats, edge_feats = torch.empty(0, dtype = getattr(torch, self.node_feat_type)), torch.empty(0, dtype = getattr(torch, self.edge_feat_type))
         for tag in tags:
             asy_time_s = time.time()
             if (use_async):
