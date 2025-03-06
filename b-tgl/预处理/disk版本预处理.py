@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -16,7 +16,7 @@ parser.add_argument('--use_disk', action='store_true', default=True)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--substream_size', type=int, default=600000, help='substream size')
+parser.add_argument('--substream_size', type=int, default=60000, help='substream size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 parser.add_argument('--opt', action='store_true', default=False)
 args=parser.parse_args()
@@ -60,15 +60,6 @@ if __name__ == '__main__':
     node_feats, edge_feats = None,None
     if (not args.use_stream and not args.use_disk):
         node_feats, edge_feats = load_feat(args.data)
-    cur_train = {
-        'node_feat_type': 'float32',
-        'edge_feat_type': 'float32',
-        'dataset': args.data
-    }
-    if (args.data == 'MAG'):
-        cur_train['node_feat_type'] = 'float16'
-    with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
-        json.dump(cur_train, f)
 
     if (not args.use_stream):
         g, df = load_graph(args.data)
@@ -122,6 +113,9 @@ if __name__ == '__main__':
         raise RuntimeError("have not this dataset config!")
     
 
+
+    
+
     combine_first = False
     if 'combine_neighs' in train_param and train_param['combine_neighs']:
         combine_first = True
@@ -139,6 +133,19 @@ if __name__ == '__main__':
 
     node_num = g['indptr'].shape[0] - 1
     edge_num = g['indices'].shape[0]
+    cur_train = {
+        'node_feat_type': 'float32',
+        'edge_feat_type': 'float32',
+        'dataset': args.data,
+        'node_feat_dim': gnn_dim_node,
+        'edge_feat_dim': gnn_dim_edge,
+        'node_num': node_num,
+        'edge_num': edge_num
+    }
+    if (args.data == 'MAG'):
+        cur_train['node_feat_type'] = 'float16'
+    with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
+        json.dump(cur_train, f)
     import torch.multiprocessing as multiprocessing
     multiprocessing.set_start_method("spawn")
     from pre_fetch import *
@@ -207,7 +214,7 @@ if __name__ == '__main__':
         if (args.data == 'MAG' or args.data == 'MOOC'):
             feat_buffer.gen_part_stream_bucket_cache()
         else:
-            feat_buffer.gen_part_stream()
+            feat_buffer.gen_part_stream(bucket_optimal=False)
 
     # feat_buffer.gen_part_incre()
     flush_saveBin_conf()

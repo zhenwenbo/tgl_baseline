@@ -55,8 +55,6 @@ class Pre_fetch:
 
     def init_share_tensor(self, shared_tensor):
 
-
-
         part_node_map, node_feats, part_edge_map, edge_feats, part_memory, part_memory_ts, part_mailbox, part_mailbox_ts, pre_same_nodes, cur_same_nodes, shared_node_d_map, shared_edge_d_map, shared_ret_len, share_tmp_tensor = shared_tensor
 
         self.node_d_ind = shared_node_d_map
@@ -79,6 +77,14 @@ class Pre_fetch:
         self.share_tmp = share_tmp_tensor
 
         self.has_edge_feat = self.part_edge_map.shape[0] > 0
+
+
+    def init_bucket_cache(self, caches, path, prefix):
+        self.path = path
+        self.bucket_cache_node_feat, self.bucket_cache_edge_feat = caches
+
+        self.bucket_cache_node_map = loadBin(self.path + f'{prefix}/node_bucket_cache_idx_0.pt')
+        self.bucket_cache_edge_map = loadBin(self.path + f'{prefix}/edge_bucket_cache_idx_0.pt')
 
     def prefetch_after(self, prefetch_res):
         node_info = prefetch_res
@@ -485,8 +491,8 @@ class Pre_fetch:
                     if ('edge_feat' in tags[i]):
                         cur_rootef_bound = loadBin(paths[i].replace('edge_feat_incre','edge_bound'))
                         other_ef = loadBin(paths[i])
-                        root_ef = loadBinDisk(self.part_path + f'/edge_features.bin', torch.arange(cur_rootef_bound[0], cur_rootef_bound[1], dtype = torch.int32))
-                        self.async_load_dic[tags[i]] = torch.cat((other_ef, root_ef))
+                        # root_ef = loadBinDisk(self.part_path + f'/edge_features.bin', torch.arange(cur_rootef_bound[0], cur_rootef_bound[1], dtype = torch.int32))
+                        self.async_load_dic[tags[i]] = other_ef
                     else:
                         self.async_load_dic[tags[i]] = loadBin(paths[i])
         else:
@@ -527,6 +533,24 @@ class Pre_fetch:
 
         #incre_ef, part_ef, part_nf
         self.block_num = block_num
+        if (os.path.exists(path + f'/part-{batch_size}-{fan_nums}/cache_edge_feat_{block_num}.bin')):
+            # 更新bucket缓存
+            cache_eid_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/cache_eid_incre_mask_{block_num}.bin')
+            cache_edge_feat_incre = loadBin(path + f'/part-{batch_size}-{fan_nums}/cache_edge_feat_{block_num}.bin')
+
+            self.bucket_cache_edge_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/edge_bucket_cache_idx_{block_num}.bin')
+
+            self.bucket_cache_edge_feat[cache_eid_incre_mask] = cache_edge_feat_incre
+            del cache_edge_feat_incre
+            cache_nid_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/cache_nid_incre_mask_{block_num}.bin')
+            cache_node_feat_incre = loadBin(path + f'/part-{batch_size}-{fan_nums}/cache_node_feat_{block_num}.bin')
+
+            self.bucket_cache_node_map = loadBin(path + f'/part-{batch_size}-{fan_nums}/node_bucket_cache_idx_{block_num}.bin')
+
+            self.bucket_cache_node_feat[cache_nid_incre_mask] = cache_node_feat_incre
+            del cache_node_feat_incre
+
+
         if (self.use_bucket and incre_bucket):
             if (self.use_valid_edge):
                 load_paths = [path + f'/part-{self.batch_size}/part{block_num}_edge_incre.pt', path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_feat_incre.pt',path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_feat_incre.pt']
@@ -654,11 +678,18 @@ class Pre_fetch:
             node_d_map = torch.cat((torch.ones(pos_node_map.shape[0], dtype = torch.bool), node_dd_ind))
 
         pos_node_map = torch.cat((pos_node_map, dis_neg_nodes))
-        pos_node_map,node_indices = torch.sort(pos_node_map)
-        # time.sleep(5)
-        
-        node_d_map = torch.nonzero(~node_d_map[node_indices]).reshape(-1)
+        pos_node_map,node_indices = torch.sort(pos_node_map) # 此时pos_node_map为混合桶中的节点id (sort后有序且唯一)
+        # 找到混合桶中出现在bucket_cache的节点
+        # hybrid_node_cache_mask = torch.isin(pos_node_map, self.bucket_cache_node_map)
+        # hybrid_node_cache_feat = self.bucket_cache_node_feat[torch.isin(self.bucket_cache_node_map, pos_node_map)]
 
+        hybrid_node_cache_mask = torch.isin(pos_node_map, self.bucket_cache_node_map, assume_unique=True)
+        pos_in_cache = pos_node_map[hybrid_node_cache_mask]
+        bucket_cache_node_map_sort, bucket_cache_node_map_indices = torch.sort(self.bucket_cache_node_map)
+        result = bucket_cache_node_map_indices[torch.searchsorted(bucket_cache_node_map_sort, pos_in_cache)]
+        hybrid_node_cache_feat = self.bucket_cache_node_feat[result]
+
+        node_d_map = torch.nonzero(~node_d_map[node_indices]).reshape(-1)
 
         t4 = time.time() - t0
         t0 = time.time()
@@ -714,6 +745,13 @@ class Pre_fetch:
                 pos_edge_map_clone = pos_edge_map.clone()
             pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
             pos_edge_map,edge_indices = torch.sort(pos_edge_map)
+
+            
+            hybrid_edge_cache_mask = torch.isin(pos_edge_map, self.bucket_cache_edge_map, assume_unique=True)
+            pos_in_cache = pos_edge_map[hybrid_edge_cache_mask]
+            bucket_cache_edge_map_sort, bucket_cache_edge_map_indices = torch.sort(self.bucket_cache_edge_map)
+            result = bucket_cache_edge_map_indices[torch.searchsorted(bucket_cache_edge_map_sort, pos_in_cache)]
+            hybrid_edge_cache_feat = self.bucket_cache_edge_feat[result]
 
             edge_d_map = torch.nonzero(~edge_d_map[edge_indices]).reshape(-1)
 
@@ -808,7 +846,9 @@ class Pre_fetch:
                         pos_node_feats = data
                 node_feats = torch.cat((pos_node_feats, neg_node_feats))
                 reorder_s = time.time()
-                node_feats = node_feats[node_indices]
+                node_feats = node_feats[node_indices] # 此处是有序后的混合桶节点特征
+                
+                node_feats[hybrid_node_cache_mask] = hybrid_node_cache_feat
                 reorder_time += time.time() - reorder_s
             elif (tag == 'part_edge_feat' and has_ef and (self.has_edge_feat)):
                 # print(tag)
@@ -823,6 +863,7 @@ class Pre_fetch:
                 edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
                 reorder_s = time.time()
                 edge_feats = edge_feats[edge_indices]
+                edge_feats[hybrid_edge_cache_mask] = hybrid_edge_cache_feat
                 reorder_time += time.time() - reorder_s
 
             # print(f"cur tag: {tag} use time:{time.time() - asy_time_s:.4f}s")
