@@ -127,9 +127,9 @@ class Feat_buffer:
 
 
         # if (d == 'MAG'):
-        self.share_edge_num = 10000000
-        self.share_node_num = 5000000
-        self.tmp_tensor_num = 500000000
+        # self.share_edge_num = 10000000
+        # self.share_node_num = 5000000
+        # self.tmp_tensor_num = 500000000
 
         if (d == 'MAG' or d == 'MOOC'):
             self.share_edge_num = 0
@@ -1256,6 +1256,8 @@ class Feat_buffer:
             total_time = datas['time'].cuda().to(torch.float32)
             total_eid = datas['eid'].cuda().to(torch.int32)
         
+        bucket_his = []
+        count = torch.zeros(self.total_node_num, dtype = torch.int32, device = 'cuda:0')
         
         while True:
             cur_bucket_allo = 0
@@ -1386,7 +1388,6 @@ class Feat_buffer:
 
                 his_ind.clear()
                 his_mem_byte = 0
-            sampleTime = time.time() - start
             
             print(f"总结点数:{nid_uni.shape[0]},总边数:{eid_uni.shape[0]},right:{right},max_eid:{torch.max(eid_uni)}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
             pre_eid = eid_uni

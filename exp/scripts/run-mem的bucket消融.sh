@@ -67,43 +67,46 @@ monitor_memory_usage() {
 
     
     echo "平均内存占用: $average_memory_usage_mb MB" >> $memory_usage_file
-    echo "峰值内存占用: $((peak_memory_usage_kb / 1024)) MB, $((peak_memory_usage_kb / 1024 / 1024)) GB" >> $memory_usage_file
+    echo "峰值内存占用: $((peak_memory_usage_kb / 1024)) MB, $(echo "scale=2; $peak_memory_usage_kb / 1024 / 1024" | bc) GB" >> $memory_usage_file
     echo "峰值显存占用 $peak_gpu_usage MB" >> $memory_usage_file
 }
 
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
-ds=("STACK")
-models=("TGAT" "TimeSGN")
+ds=("BITCOIN" "GDELT")
+# ds=("BITCOIN")
+# ds=("GDELT")
 models=("TGN")
+# models=("TGN" "TGAT" "TimeSGN")
+# configs=("mem" "disk")
+configs=("mem_w_bucket")
+
+layers=("1")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
 
-for model in "${models[@]}"; do
-    for d in "${ds[@]}"; do
+for d in "${ds[@]}"; do
+    for layer in "${layers[@]}"; do
+        for model in "${models[@]}"; do
+            
+            for config in "${configs[@]}"; do
 
-    echo "处理 $d"
-    mkdir -p "../res-${timestamp}/${d}"
-
-
-
-
-
-    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-1_res.log &
-    pid=$!
-    memory_usage_file="../res-${timestamp}/${d}/b-${model}-1_res_mem.log"
-    monitor_memory_usage $pid
-    wait
-
-    # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
-    # pid=$!
-    # memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
-    # monitor_memory_usage $pid
-    # wait
+                echo "处理 $d-$model-$layer-$config"
+                mkdir -p "../res-${timestamp}/${d}"
 
 
+                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res.log &
+                pid=$!
+                memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${config}_res_mem.log"
+                monitor_memory_usage $pid
+                wait
+
+
+            done
+
+
+        done
     done
 done

@@ -74,10 +74,10 @@ monitor_memory_usage() {
 
 
 
-ds=("BITCOIN" "GDELT")
+ds=("STACK")
 # ds=("STACK")
 models=("TGN")
-bss=(500 1000)
+fanouts=(50)
 
 
 timestamp=$(date +%Y%m%d-%H%M%S)
@@ -85,30 +85,36 @@ mkdir -p "../res-${timestamp}"
 
 for model in "${models[@]}"; do
     for d in "${ds[@]}"; do
-    for bs in "${bss[@]}"; do
+    for fanout in "${fanouts[@]}"; do
 
     echo "处理 $d"
     mkdir -p "../res-${timestamp}/${d}"
 
-
-        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --bs=${bs} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-1_res.log &
-        pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-1_res_mem.log"
-        monitor_memory_usage $pid
-        wait
-
-
-        nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --bs=${bs} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-2_res.log &
-        pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-batchsize${bs}-2_res_mem.log"
-        monitor_memory_usage $pid
-        wait
-
-
-
-        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --bs=${bs} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-batchsize${bs}-1_res.log &
+        
+        # nohup python -u /home/guorui/workspace/dgnn/b-tgl/预处理/disk版本预处理.py --data=${d} --fanout=${fanout} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-pre${fanout}-1_res.log &
         # pid=$!
-        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-batchsize${bs}-1_res_mem.log"
+        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-pre${fanout}-1_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
+
+        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --fanout=${fanout} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-batchsize${fanout}-1_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-batchsize${fanout}-1_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
+        
+        # nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --fanout=${fanout} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-${model}-batchsize${fanout}-1_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-batchsize${fanout}-1_res_mem.log"
+        # monitor_memory_usage $pid
+        # wait
+
+        
+        
+
+        # nohup python -u /raid/guorui/workspace/dgnn/a-tgl/train.py --data=${d} --fanout=${fanout} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/TGL-${model}-batchsize${fanout}-1_res.log &
+        # pid=$!
+        # memory_usage_file="../res-${timestamp}/${d}/TGL-${model}-batchsize${fanout}-1_res_mem.log"
         # monitor_memory_usage $pid
         # wait
 
@@ -127,43 +133,17 @@ for model in "${models[@]}"; do
         # monitor_memory_usage $pid
         # wait
 
-        nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --bs=${bs} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-1_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --fanout=${fanout} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" --threshold=${threshold} &>../res-${timestamp}/${d}/simple-1-pre-${fanout}-${threshold}.log &
         pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-1_res_mem.log"
+        memory_usage_file="../res-${timestamp}/${d}/simple-1-pre-${fanout}-${threshold}-mem.log"
         monitor_memory_usage $pid
         wait
 
-        
-        # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --bs=${bs} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-batchsize${bs}-2_res.log &
-        # pid=$!
-        # memory_usage_file="../res-${timestamp}/${d}/b-${model}-batchsize${bs}-2_res_mem.log"
-        # monitor_memory_usage $pid
-        # wait
-
-        # if [ "$d" != "GDELT" ]; then
-        #     nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
-        #     pid=$!
-        #     memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
-        #     monitor_memory_usage $pid
-        #     wait
-        # fi
-
-        nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --bs=${bs} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-2_res.log &
+        nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --fanout=${fanout} --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" &>../res-${timestamp}/${d}/SIMPLE-${model}-1-${fanout}-res.log &
         pid=$!
-        memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-batchsize${bs}-2_res_mem.log"
+        memory_usage_file="../res-${timestamp}/${d}/SIMPLE-${model}-1-${fanout}-res-mem.log"
         monitor_memory_usage $pid
         wait
-
-
-        
-
-        # if [ "$d" != "GDELT" ]; then
-        #     nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-2.yml" &>../res-${timestamp}/${d}/SIMPLE-${model}-2-res.log &
-        #     pid=$!
-        #     memory_usage_file="../res-${timestamp}/${d}/SIMPLE-${model}-2-res-mem.log"
-        #     monitor_memory_usage $pid
-        #     wait
-        # fi
 
 
         done

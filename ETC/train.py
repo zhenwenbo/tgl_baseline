@@ -2,11 +2,12 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', default='LASTFM', type=str, help='dataset name')
-parser.add_argument('--bs', type=int, default=4000)
-parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGN-2.yml', type=str, help='path to config file')
+parser.add_argument('--data', default='STACK', type=str, help='dataset name')
+parser.add_argument('--bs', type=int, default=2000)
+parser.add_argument('--config', default='/raid/guorui/workspace/dgnn/ETC/config/TGN-1.yml', type=str, help='path to config file')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
+parser.add_argument('--fanout', type=int, default=100)
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
@@ -66,11 +67,20 @@ if __name__ == '__main__':
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
+    sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+    if (args.data == 'GDELT' and sample_param['layer'] == 2):
+        print(f"GDELT二跳估计epoch时间")
+        print(f"GDELT直接返回")
+        exit(-1)
+        use_estime = True
+    if (args.fanout != -1):
+        print(f"自定义fanout")
+        sample_param['neighbor'] = [args.fanout]
 
     node_feats, edge_feats = load_feat(args.data)
     g, df = load_graph(args.data)
     print('load initial data finish.')
-    sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+    # sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
     if (args.bs != -1):
         train_param['batch_size'] = args.bs
         print(f"batch size修改为 {args.bs}")

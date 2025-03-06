@@ -8,12 +8,14 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default = 'TALK')
+parser.add_argument('--data', type=str, help='dataset name', default = 'STACK')
 parser.add_argument('--config', type=str, help='path to config file', default = '/raid/guorui/workspace/dgnn/simple/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--dim_edge_feat', type=int, default=128, help='dim of edge feat')
 parser.add_argument('--dim_node_feat', type=int, default=128, help='dim of node feat')
+parser.add_argument('--bs', type=int, default=2000)
+parser.add_argument('--fanout', type=int, default=-1)
 parser.add_argument('--mem_dim', type=int, default=100, help='dim of state vector')
 parser.add_argument('--threshold',type=float, default=0.1, help='placement budget')
 parser.add_argument('--mode',type=str, default='seq', help='placement strategy for multiple data types (sequential or parallel)')
@@ -273,6 +275,15 @@ print('loading graph takes:{:.2f}s'.format(t1-t0))
 print('start intializing...')
 t0 = time.time()
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+
+if (args.fanout != -1):
+    print(f"自定义fanout")
+    sample_param['neighbor'] = [args.fanout]
+
+if (args.bs != -1):
+    train_param['batch_size'] = args.bs
+    print(f"batch size修改为 {args.bs}")
+batch_size = train_param['batch_size']
 
 if (args.data == 'GDELT' and sample_param['layer'] == 2):
     sample_param['neighbor'] = [8, 8]

@@ -74,36 +74,50 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 ds=("STACK")
-models=("TGAT" "TimeSGN")
+# ds=("BITCOIN")
 models=("TGN")
+batchsize=("4000" "500" "1000")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
+mkdir -p "../res-pre-simple-${timestamp}"
 
-for model in "${models[@]}"; do
-    for d in "${ds[@]}"; do
+for d in "${ds[@]}"; do
+    for model in "${models[@]}"; do
+    for bs in "${batchsize[@]}"; do
 
     echo "处理 $d"
     mkdir -p "../res-${timestamp}/${d}"
+    mkdir -p "../res-pre-simple-${timestamp}/${d}"
 
 
 
 
+        threshold=0.1
+        if [ "$d" == "GDELT" ]; then
+            threshold=0.01
+        fi
+        if [ "$d" == "BITCOIN" ]; then
+        threshold=0.05
+        fi
 
-    nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-1.yml" &>../res-${timestamp}/${d}/b-${model}-1_res.log &
-    pid=$!
-    memory_usage_file="../res-${timestamp}/${d}/b-${model}-1_res_mem.log"
-    monitor_memory_usage $pid
-    wait
+        nohup python -u /raid/guorui/workspace/dgnn/simple/SIMPLE/buffer_plan_preprocessing.py --bs=${bs} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" --threshold=${threshold} &>/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${bs}-${threshold}.log &
+        pid=$!
+        memory_usage_file="/raid/guorui/workspace/dgnn/exp/res-pre-simple-${timestamp}/${d}/simple-1-${bs}-${threshold}-mem.log"
+        monitor_memory_usage $pid
+        wait
 
-    # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf='basic_conf_disk' --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-2.yml" &>../res-${timestamp}/${d}/b-${model}-2_res.log &
-    # pid=$!
-    # memory_usage_file="../res-${timestamp}/${d}/b-${model}-2_res_mem.log"
-    # monitor_memory_usage $pid
-    # wait
+        nohup python -u /raid/guorui/workspace/dgnn/simple/main.py --bs=${bs} --threshold=${threshold} --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-simple-1.yml" &>../res-${timestamp}/${d}/SIMPLE-${model}-1-${bs}-res.log &
+        pid=$!
+        memory_usage_file="../res-${timestamp}/${d}/SIMPLE-${model}-1-${bs}-res-mem.log"
+        monitor_memory_usage $pid
+        wait
 
 
+
+
+        
+        done
     done
 done

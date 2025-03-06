@@ -75,8 +75,8 @@ monitor_memory_usage() {
 
 
 ds=("LASTFM" "TALK" "STACK" "GDELT")
-ds=("GDELT")
-models=("TGN" "TGAT" "TimeSGN")
+ds=("STACK")
+models=("TGN")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
@@ -88,18 +88,18 @@ for model in "${models[@]}"; do
     mkdir -p "../res-${timestamp}/${d}"
 
 
-    #   nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-1_res.log &
-    #   pid=$!
-    #   memory_usage_file="../res-${timestamp}/${d}/ETC-1_res_mem.log"
-    #   monitor_memory_usage $pid
-    #   wait
+      nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-1.yml" &>../res-${timestamp}/${d}/ETC-1_res.log &
+      pid=$!
+      memory_usage_file="../res-${timestamp}/${d}/ETC-1_res_mem.log"
+      monitor_memory_usage $pid
+      wait
 
 
-    nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/ETC-${model}-2_res.log &
-    pid=$!
-    memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-2_res_mem.log"
-    monitor_memory_usage $pid
-    wait
+    # nohup python -u /raid/guorui/workspace/dgnn/ETC/train.py --data=${d} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-2.yml" &>../res-${timestamp}/${d}/ETC-${model}-2_res.log &
+    # pid=$!
+    # memory_usage_file="../res-${timestamp}/${d}/ETC-${model}-2_res_mem.log"
+    # monitor_memory_usage $pid
+    # wait
 
     done
 done

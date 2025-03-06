@@ -13,6 +13,8 @@ parser.add_argument('--model_eval', action='store_true')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--rand_edge_features', type=int, default=100, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=100, help='use random node featrues')
+parser.add_argument('--bs', type=int, default=2000)
+parser.add_argument('--fanout', type=int, default=-1)
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 parser.add_argument('--threshold',type=float, default=0.1, help='placement budget')
 args=parser.parse_args()
@@ -44,6 +46,16 @@ g, df = load_graph(args.data)
 num_node = g['indptr'].shape[0] - 1
 num_edge = len(df)
 sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+
+if (args.fanout != -1):
+    print(f"自定义fanout")
+    sample_param['neighbor'] = [args.fanout]
+
+if (args.bs != -1):
+    train_param['batch_size'] = args.bs
+    print(f"batch size修改为 {args.bs}")
+batch_size = train_param['batch_size']
+
 train_param['epoch'] = 1
 if (args.data == 'BITCOIN'):
     train_param['epoch'] = 1
