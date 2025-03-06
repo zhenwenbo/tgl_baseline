@@ -759,8 +759,8 @@ if __name__ == '__main__':
                 print('\ttest AP:{:4f}  test MRR:{:4f}'.format(ap, auc))
             else:
                 print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
-    except Exception as e:
-        print(e)
+    # except Exception as e:
+        
     finally:
         print(f"训练完成，退出子进程")
         # if (use_async_prefetch):
