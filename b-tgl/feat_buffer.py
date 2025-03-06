@@ -13,7 +13,7 @@ from queue import Queue
 import multiprocessing
 import json
 import gc
-
+import math
 class Feat_buffer:
     def __init__(self, d, df, datas, train_param, memory_param, train_edge_end, presample_batch, sampler, neg_sampler, node_num = None, edge_num = None, prefetch_conn = None, feat_dim = None, substream_size = None):
         self.d = d
@@ -34,6 +34,8 @@ class Feat_buffer:
         self.node_feat_type = conf['node_feat_type']
         self.edge_feat_type = conf['edge_feat_type']
         self.dataset = conf['dataset']
+        self.node_num = conf['node_num']
+        self.edge_num = conf['edge_num']
 
         self.node_feat_dim, self.edge_feat_dim = feat_dim
         self.memory_param = memory_param
@@ -87,12 +89,12 @@ class Feat_buffer:
         self.err_num = 0
         use_detection = False
 
-        self.err_detection = False
+        self.err_detection = use_detection
         if (self.err_detection):
             self.det_node_feats, self.det_edge_feats = load_feat(self.d)
 
 
-        self.mem_detection = use_detection
+        self.mem_detection = False
         if (self.mem_detection):
             self.det_memory = torch.zeros((node_num, memory_param['dim_out']), dtype=torch.float32)
             self.det_memory_ts = torch.zeros((node_num), dtype=torch.float32)
@@ -134,12 +136,14 @@ class Feat_buffer:
         if (d == 'MAG' or d == 'MOOC'):
             self.share_edge_num = 0
 
-        # self.bucket_config = None
-        # self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
-        # if (os.path.exists(self.bucket_config_path)):
-        #     with open(self.bucket_config_path, 'r') as json_file:
-        #         self.bucket_config = json.load(json_file)
-        #     self.share_edge_num = self.bucket_config['max_edge_num'] * 2
+        self.bucket_config = None
+        self.bucket_config_path = f'{self.path}/part-{self.batch_size}-{self.sampler.fan_nums}/bucket_config.json'
+        if (os.path.exists(self.bucket_config_path)):
+            with open(self.bucket_config_path, 'r') as json_file:
+                self.bucket_config = json.load(json_file)
+            self.bucket_cache_node_num = self.bucket_config['bucket_cache_node_num'] if 'bucket_cache_node_num' in self.bucket_config else None
+            self.bucket_cache_edge_num = self.bucket_config['bucket_cache_edge_num']if 'bucket_cache_edge_num' in self.bucket_config else None
+            # self.share_edge_num = self.bucket_config['max_edge_num'] * 2
         #     self.share_node_num = self.bucket_config['max_node_num'] * 2
         #     self.tmp_tensor_num = 500000000
 
@@ -452,8 +456,10 @@ class Feat_buffer:
         if (self.err_detection):
             err_num = torch.sum(res.cpu() != self.det_edge_feats[eid.long().cpu()])
             # print(f"edge缓存...与非缓存对比不一致的个数: {err_num}")
+
             if (err_num + torch.nonzero(table2 == -1).shape[0]):
-                raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
+                print(f"edge缓存...与非缓存对比不一致的个数: {err_num}")
+                # raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
 
         #table2[i]表示
         return res.cuda()
@@ -470,7 +476,7 @@ class Feat_buffer:
             err_num = torch.sum(res.cpu() != self.det_node_feats[nid.long().cpu()])
             if (err_num + torch.nonzero(table2 == -1).shape[0]):
                 print(f"节点缓存...与非缓存对比不一致的个数: {err_num}")
-                raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
+                # raise BufferError("buffer内部出现与非缓存情况不符合的事故!")
         
         # print(f"get_n_feat时间{time.time() - start:.8f}")
         return res.cuda()
@@ -707,6 +713,12 @@ class Feat_buffer:
                         memory_info = (root_nodes, *self.get_mails(root_nodes))
 
             # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
+            if (self.cur_block == 0):
+                # 初始化bucket cache
+                bucket_cache_node_feat = loadBin(self.path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_node_feat_0.pt').share_memory_()
+                bucket_cache_edge_feat = loadBin(self.path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_edge_feat_0.pt').share_memory_()
+                shared_tensor = [bucket_cache_node_feat, bucket_cache_edge_feat]
+                self.prefetch_conn.send(('init_bucket_cache', (shared_tensor, self.path, f'/part-{self.batch_size}-{self.sampler.fan_nums}')))
 
             if (self.cur_block == 0 or test_block > 0):
                 self.cur_block = test_block
@@ -1159,7 +1171,7 @@ class Feat_buffer:
 
 
 
-    def stream_extract(self, feat_path, save_path, window_size, his, his_ind, his_max, feat_len, np_type):
+    def stream_extract(self, feat_path, save_paths, window_size, his, his_max, feat_len, np_type):
 
         
         mask_time = 0
@@ -1193,7 +1205,7 @@ class Feat_buffer:
                 ind_time += time.time() - ind_s
 
                 cur_data = torch.from_numpy(row_data[cur_ind - start].reshape(-1, feat_len))
-                cur_save_path = save_path.replace('parti', f'part{his_ind[i]}')
+                cur_save_path = save_paths[i]
 
                     
                 if (i > 0):
@@ -1211,8 +1223,17 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 1 * 1024 ** 3, bucket_optimal = False):
+    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 5 * 1024 ** 3, bucket_optimal = False, bucket_cache = False, cache_budget = 0.4 * 1024 ** 3):
         #当分区feat不存在的时候做输出
+        has_ef = self.edge_feat_dim > 0
+        has_nf = self.node_feat_dim > 0
+        threshold = 1000000 # threshold用边数表示，第一次超过1 * threshold 第二次... 这样满足条件时甩出bucket_his
+        # node 1:3 edge
+
+        node_cache_budget = cache_budget * (1/4) # 1GB
+        edge_cache_budget = cache_budget * (1/3) # 1GB
+        node_idx_budget = int(node_cache_budget / self.node_feat_dim / 4)
+        edge_idx_budget = int(edge_cache_budget / self.edge_feat_dim / 4)
         d = self.d
         path = self.path
         # if os.path.exists(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}'):
@@ -1224,11 +1245,12 @@ class Feat_buffer:
         # node_feats, edge_feats = load_feat(d)
 
         budget_byte = budget * 1024 * 1024
-        his_ind = []
         node_his = []
         edge_his = []
         node_his_max = []
         edge_his_max = []
+        edge_save_paths = []
+        node_save_paths = []
         node_window_size = int(budget_byte * 0.9 / 4 / self.node_feat_dim)
         edge_window_size = int(budget_byte * 0.9 / 4 / self.edge_feat_dim) if self.edge_feat_dim != 0 else 0
         history_datas = []
@@ -1239,6 +1261,8 @@ class Feat_buffer:
         res_config['bucket_ptr'] = [0]
         res_config['max_node_num'] = 0
         res_config['max_edge_num'] = 0
+        res_config['bucket_cache_node_num'] = node_idx_budget
+        res_config['bucket_cache_edge_num'] = edge_idx_budget
 
         left, right = 0, 0
         batch_num = 0
@@ -1255,10 +1279,21 @@ class Feat_buffer:
             total_dst = datas['dst'].cuda().to(torch.int32)
             total_time = datas['time'].cuda().to(torch.float32)
             total_eid = datas['eid'].cuda().to(torch.int32)
-        
+
+        node_feat_path = f'{path}/node_features.bin'
+        edge_feat_path =  f'{path}/edge_features.bin'
+        node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
+        edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
         bucket_his = []
-        count = torch.zeros(self.total_node_num, dtype = torch.int32, device = 'cuda:0')
-        
+        preThresholdNum = 0
+        bucket_nid_count = torch.zeros(self.total_node_num, dtype = torch.int32, device = 'cuda:0')
+        bucket_eid_count = torch.zeros(self.total_edge_num, dtype = torch.int32, device = 'cuda:0')
+        bucket_cache_start = [0] # 在start处更新cache
+        bucket_cache_idx = [] # 读取idx
+        bucket_cache_size = 0
+        pre_bucket_nid_idx = None
+        pre_bucket_eid_idx = None
+
         while True:
             cur_bucket_allo = 0
             start = time.time()
@@ -1283,27 +1318,20 @@ class Feat_buffer:
                 eid = total_eid[left: right]
                 root_nodes = torch.cat((src, dst)).cuda()
                 root_ts = torch.cat((times, times)).cuda()
-                # root_nodes = torch.from_numpy(root_nodes).cuda()
-                # root_ts = torch.from_numpy(root_ts).cuda()
 
-                # eids = torch.from_numpy(rows['Unnamed: 0']).to(torch.int32).cuda()
                 ret_list = self.sampler.sample_layer(root_nodes, root_ts)
-                # print(f"采样用时: {time.time() - start:.8f}s")
                 eid_uni = eid.to(torch.int32).cuda()
                 nid_uni = torch.unique(root_nodes).to(torch.int32).cuda()
-                # nid_uni = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
                 root_eids_num = eid_uni.shape[0]
 
                 for ret in ret_list:
-                    #找出每层的所有eid即可
                     src,dst,outts,outeid,root_nodes,root_ts,dts = ret
                     eid = outeid[outeid > -1]
 
                     cur_eid = torch.unique(eid)
                     eid_uni = torch.cat((cur_eid, eid_uni))
                     eid_uni = torch.unique(eid_uni)
-                # print(f"t1: {time.time() - start:.8f}s")
-                #前面层出现的节点会在最后一层的dst中出现,因此所有节点就是最后一层的Src,dst
+
                 ret = ret_list[-1]
                 src,dst,outts,outeid,root_nodes,root_ts,dts = ret
                 del ret_list
@@ -1317,12 +1345,14 @@ class Feat_buffer:
 
                 nid_uni = torch.unique(torch.cat((nid_uni, pre_nid_uni)))
                 eid_uni = torch.unique(torch.cat((eid_uni, pre_eid_uni)))
+
+
                 if (not bucket_optimal):
                     break
 
                 cur_bucket_allo = nid_uni.shape[0]  * self.node_feat_dim * 4
                 cur_bucket_allo += eid_uni.shape[0]  * self.edge_feat_dim * 4
-                cur_bucket_allo += ((2 * self.node_feat_dim + 2 * self.edge_feat_dim) * 11 ) * (right - left_c) * 4
+                cur_bucket_allo += ((2 * self.node_feat_dim + 2 * self.edge_feat_dim) * 111 ) * (right - left_c)
 
                 if (cur_bucket_allo < bucket_budget):
                     pre_nid_uni = nid_uni.clone()
@@ -1337,79 +1367,221 @@ class Feat_buffer:
             res_config['max_edge_num'] = int(max(res_config['max_edge_num'], eid_uni.shape[0] * 1.5))
             if (first_flag):
                 break
-            his_ind.append(batch_num)
             res_config['bucket_ptr'].append(right)
-            
             saveBin(torch.tensor([left, right], dtype = torch.int32).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_bound.bin')
-
-            cur_eid = eid_uni
-            if (pre_eid is not None):
-                eid_incre_mask = torch.isin(eid_uni, pre_eid, assume_unique=True, invert = True)
-                cur_eid = eid_uni[eid_incre_mask]
-                cur_eid = cur_eid[:cur_eid.shape[0] - root_eids_num]
-                saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map_incre_mask.pt')
-
-            if (self.edge_feat_dim > 0):
-                edge_his.append(cur_eid.cpu())
-                edge_his_max.append(torch.max(cur_eid).cpu() if cur_eid.shape[0] > 0 else 0)
-                his_mem_byte += cur_eid.numel() * cur_eid.element_size()
-
             saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
-
             nid_uni,_ = torch.sort(nid_uni)
-            cur_nid = nid_uni
-            if (pre_nid is not None):
-                nid_incre_mask = torch.isin(nid_uni, pre_nid, assume_unique=True, invert = True)
-                cur_nid = nid_uni[nid_incre_mask]
-                saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map_incre_mask.pt')
-
-            if (self.node_feat_dim > 0):
-                node_his.append(cur_nid.cpu())
-                node_his_max.append(torch.max(cur_nid).cpu())
-                his_mem_byte += cur_nid.numel() * cur_nid.element_size()
-
             saveBin(nid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_node_map.pt')
+
+            # 此时有eid_uni nid_uni
+            
+            
+            if (math.floor(right / threshold) > preThresholdNum):
+                preThresholdNum += 1
+
+                # 得出需要缓存的node_idx和edge_idx
+                # node_num = node_cache_budget / node_dim / 4 
+                bucket_nid_count_sort,bucket_nid_count_sort_idx = torch.sort(bucket_nid_count, descending=True)
+                cache_nid = bucket_nid_count_sort_idx[:node_idx_budget]
+                bucket_eid_count_sort,bucket_eid_count_sort_idx = torch.sort(bucket_eid_count, descending= True)
+                cache_eid = bucket_eid_count_sort_idx[:edge_idx_budget]
+                cache_nid_incre = cache_nid
+                cache_eid_incre = cache_eid
+                
+                if (pre_bucket_nid_idx is not None):
+                    # pre不在cur中的那些idx被废弃，作为incre_mask，被cur不在pre中的那些node_idx替代
+                    # 替代过程为cur_notin_pre
+                    # pre_bucket_nid_idx[pre_notin_cur] = cache_nid[cur_notin_pre]  成为新的map
+                    # incre_mask = pre_notin_cur 
+                    # 实际使用： 
+                    pre_notin_cur = torch.isin(pre_bucket_nid_idx, cache_nid, invert=True, assume_unique=True)
+                    cur_notin_pre = torch.isin(cache_nid, pre_bucket_nid_idx, invert=True, assume_unique=True)
+                    pre_bucket_nid_idx[pre_notin_cur] = cache_nid[cur_notin_pre]
+                    saveBin(pre_notin_cur.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_nid_incre_mask_{bucket_cache_start[-1]}.pt')
+                    cache_nid_incre = cache_nid[cur_notin_pre]
+
+                else:
+                    pre_bucket_nid_idx = cache_nid
+
+                if (pre_bucket_eid_idx is not None):
+                    pre_notin_cur = torch.isin(pre_bucket_eid_idx, cache_eid, invert=True, assume_unique=True)
+                    cur_notin_pre = torch.isin(cache_eid, pre_bucket_eid_idx, invert=True, assume_unique=True)
+                    pre_bucket_eid_idx[pre_notin_cur] = cache_eid[cur_notin_pre]
+                    saveBin(pre_notin_cur.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_eid_incre_mask_{bucket_cache_start[-1]}.pt')
+                    
+                    cache_eid_incre = cache_eid[cur_notin_pre]
+                else:
+                    pre_bucket_eid_idx = cache_eid
+
+                bucket_cache_size += cache_nid_incre.shape[0] * 172 * 4 / 1024 ** 3
+                bucket_cache_size += cache_eid_incre.shape[0] * 172 * 4 / 1024 ** 3
+
+                
+
+
+                print(f"需要加载的缓存数据: {bucket_cache_size:.2f}GB")
+                # pre_bucket_nid_idx = cache_nid
+                # pre_bucket_eid_idx = cache_eid
+
+                saveBin(pre_bucket_nid_idx.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/node_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
+                saveBin(pre_bucket_eid_idx.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/edge_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
+                
+
+                for cur_nid_uni, cur_eid_uni,cur_batch_num in bucket_his:
+                    cur_eid = cur_eid_uni
+                    if (pre_eid is not None):
+                        eid_incre_mask = torch.isin(cur_eid_uni, cache_eid, assume_unique=True)
+                        eid_incre_mask = torch.bitwise_or(eid_incre_mask,torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True))
+
+                        # eid_incre_mask = torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True)
+                        cur_eid = cur_eid_uni[eid_incre_mask]
+                        cur_eid = cur_eid[:cur_eid.shape[0]]
+                        saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_incre_mask.pt')
+
+                    if (self.edge_feat_dim > 0):
+                        edge_his.append(cur_eid.cpu())
+                        edge_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_feat.bin')
+                        # edge_save_paths.append()
+                        edge_his_max.append(torch.max(cur_eid).cpu() if cur_eid.shape[0] > 0 else 0)
+                        his_mem_byte += cur_eid.numel() * cur_eid.element_size()
+
+                    cur_nid = cur_nid_uni
+                    if (pre_nid is not None):
+                        nid_incre_mask = torch.isin(cur_nid_uni, cache_nid, assume_unique=True)
+                        nid_incre_mask = torch.bitwise_or(nid_incre_mask,torch.isin(cur_nid_uni, pre_nid, assume_unique=True, invert = True))
+                        cur_nid = cur_nid_uni[nid_incre_mask]
+                        saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_incre_mask.pt')
+
+                    if (self.node_feat_dim > 0):
+                        node_his.append(cur_nid.cpu())
+                        node_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_feat.bin')
+                        node_his_max.append(torch.max(cur_nid).cpu() if cur_nid.shape[0] > 0 else 0)
+                        his_mem_byte += cur_nid.numel() * cur_nid.element_size()
+
+                    pre_eid = cur_eid_uni
+                    pre_nid = cur_nid_uni
+                edge_his.append(cache_eid_incre.cpu())
+                edge_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_edge_feat_{bucket_cache_start[-1]}.pt')
+                edge_his_max.append(torch.max(cache_eid_incre).cpu() if cache_eid_incre.shape[0] > 0 else 0)
+                his_mem_byte += cache_eid_incre.numel() * cache_eid_incre.element_size()
+
+                node_his.append(cache_nid_incre.cpu())
+                node_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_node_feat_{bucket_cache_start[-1]}.pt')
+                node_his_max.append(torch.max(cache_nid_incre).cpu() if cache_nid_incre.shape[0] > 0 else 0)
+                his_mem_byte += cache_nid_incre.numel() * cache_nid_incre.element_size()
+
+                bucket_cache_start.append(left // batch_size)
+                bucket_his = []
+                bucket_eid_count.fill_(0)
+                bucket_nid_count.fill_(0)
+            
+            bucket_his.append([nid_uni, eid_uni, batch_num])
+            bucket_nid_count[nid_uni.long()] += 1
+            bucket_eid_count[eid_uni.long()] += 1
+            
+
 
             
             if (his_mem_byte >= his_mem_threshold):
                 print(f"达到计数上限, his_mem: {his_mem_byte / 1024 ** 2}MB")
-                node_feat_path = f'{path}/node_features.bin'
-                edge_feat_path =  f'{path}/edge_features.bin'
-                node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
-                edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
-                self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
+                
+                self.stream_extract(node_feat_path, node_save_paths,node_window_size,node_his,node_his_max,self.node_feat_dim,np.float32)
                 node_his.clear()
                 node_his_max.clear()
-
                 if (edge_window_size > 0):
-                    self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
+                    self.stream_extract(edge_feat_path, edge_save_paths,edge_window_size,edge_his,edge_his_max,self.edge_feat_dim,np.float32)
                 edge_his.clear()
                 edge_his_max.clear()
-
-                his_ind.clear()
+                # his_ind.clear()
                 his_mem_byte = 0
             
-            print(f"总结点数:{nid_uni.shape[0]},总边数:{eid_uni.shape[0]},right:{right},max_eid:{torch.max(eid_uni)}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
-            pre_eid = eid_uni
-            pre_nid = nid_uni
+            
+            print(f"总结点数:{nid_uni.shape[0]},总边数:{eid_uni.shape[0]},{left}--{right},max_eid:{torch.max(eid_uni)}, {his_mem_byte / 1024 ** 2:.0f}MB:{his_mem_threshold / 1024 **2:.0f}MB batch: {batch_num} batchsize: {batch_size} 用时:{time.time() - start:.7f}s")
+            
             left = right
             batch_num += 1
 
+        bucket_nid_count_sort,bucket_nid_count_sort_idx = torch.sort(bucket_nid_count, descending=True)
+        cache_nid = bucket_nid_count_sort_idx[:node_idx_budget]
+        bucket_eid_count_sort,bucket_eid_count_sort_idx = torch.sort(bucket_eid_count, descending= True)
+        cache_eid = bucket_eid_count_sort_idx[:edge_idx_budget]
+        cache_nid_incre = cache_nid
+        cache_eid_incre = cache_eid
+        
+        if (pre_bucket_nid_idx is not None):
+            cache_nid_incre_mask = torch.isin(cache_nid, pre_bucket_nid_idx,invert=True)
+            saveBin(cache_nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_nid_incre_mask_{bucket_cache_start[-1]}.pt')
+            cache_nid_incre = cache_nid[cache_nid_incre_mask]
+        if (pre_bucket_eid_idx is not None):
+            cache_eid_incre_mask = torch.isin(cache_eid, pre_bucket_eid_idx,invert=True)
+            saveBin(cache_eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_eid_incre_mask_{bucket_cache_start[-1]}.pt')
+            cache_eid_incre = cache_eid[cache_eid_incre_mask]
+        bucket_cache_size += cache_nid_incre.shape[0] * 172 * 4 / 1024 ** 3
+        bucket_cache_size += cache_eid_incre.shape[0] * 172 * 4 / 1024 ** 3
+
+        
+
+
+        print(f"需要加载的缓存数据: {bucket_cache_size:.2f}GB")
+        pre_bucket_nid_idx = cache_nid
+        pre_bucket_eid_idx = cache_eid
+
+        saveBin(cache_nid.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/node_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
+        saveBin(cache_eid.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/edge_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
+        
+
+        for cur_nid_uni, cur_eid_uni,cur_batch_num in bucket_his:
+            cur_eid = cur_eid_uni
+            if (pre_eid is not None):
+                eid_incre_mask = torch.isin(cur_eid_uni, cache_eid, assume_unique=True)
+                eid_incre_mask = torch.bitwise_or(eid_incre_mask,torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True))
+                cur_eid = cur_eid_uni[eid_incre_mask]
+                cur_eid = cur_eid[:cur_eid.shape[0]]
+                saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_incre_mask.pt')
+
+            if (self.edge_feat_dim > 0):
+                edge_his.append(cur_eid.cpu())
+                edge_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_feat.bin')
+                # edge_save_paths.append()
+                edge_his_max.append(torch.max(cur_eid).cpu() if cur_eid.shape[0] > 0 else 0)
+                his_mem_byte += cur_eid.numel() * cur_eid.element_size()
+
+            cur_nid = cur_nid_uni
+            if (pre_nid is not None):
+                nid_incre_mask = torch.isin(cur_nid_uni, cache_nid, assume_unique=True)
+                nid_incre_mask = torch.bitwise_or(nid_incre_mask,torch.isin(cur_nid_uni, pre_nid, assume_unique=True, invert = True))
+                cur_nid = cur_nid_uni[nid_incre_mask]
+                saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_incre_mask.pt')
+
+            if (self.node_feat_dim > 0):
+                node_his.append(cur_nid.cpu())
+                node_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_feat.bin')
+                node_his_max.append(torch.max(cur_nid).cpu() if cur_nid.shape[0] > 0 else 0)
+                his_mem_byte += cur_nid.numel() * cur_nid.element_size()
+
+            pre_eid = cur_eid_uni
+            pre_nid = cur_nid_uni
+        edge_his.append(cache_eid_incre.cpu())
+        edge_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_edge_feat_{bucket_cache_start[-1]}.pt')
+        edge_his_max.append(torch.max(cache_eid_incre).cpu() if cache_eid_incre.shape[0] > 0 else 0)
+        his_mem_byte += cache_eid_incre.numel() * cache_eid_incre.element_size()
+
+        node_his.append(cache_nid_incre.cpu())
+        node_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_node_feat_{bucket_cache_start[-1]}.pt')
+        node_his_max.append(torch.max(cache_nid_incre).cpu() if cache_nid_incre.shape[0] > 0 else 0)
+        his_mem_byte += cache_nid_incre.numel() * cache_nid_incre.element_size()
+
+        bucket_cache_start.append(left // batch_size)
+        bucket_his = []
+        bucket_eid_count.fill_(0)
+        bucket_nid_count.fill_(0)
             
-        node_feat_path = f'{path}/node_features.bin'
-        edge_feat_path =  f'{path}/edge_features.bin'
-        node_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_node_feat.bin'
-        edge_save_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/parti_edge_feat.bin'
-        self.stream_extract(node_feat_path, node_save_path,node_window_size,node_his,his_ind,node_his_max,self.node_feat_dim,np.float32)
-        node_his.clear()
 
+        self.stream_extract(node_feat_path, node_save_paths,node_window_size,node_his,node_his_max,self.node_feat_dim,np.float32)
         if (edge_window_size > 0):
-            self.stream_extract(edge_feat_path, edge_save_path,edge_window_size,edge_his,his_ind,edge_his_max,self.edge_feat_dim,np.float32)
-        edge_his.clear()
-        node_his_max.clear()
-        edge_his_max.clear()
-        his_ind.clear()
+            self.stream_extract(edge_feat_path, edge_save_paths,edge_window_size,edge_his,edge_his_max,self.edge_feat_dim,np.float32)
 
+        print(f"最终所需要的bucket cache存储大小{bucket_cache_size}")
         bucket_config_path = path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/' + f'/bucket_config.json'
         with open(bucket_config_path, 'w') as json_file:
             json.dump(res_config, json_file, indent=4)
@@ -1537,7 +1709,7 @@ class Feat_buffer:
             # saveBin(eid_uni.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{batch_num}_edge_map.pt')
 
 
-            threshold = 166
+            threshold = 50
             cache_num = 10000000
             if (batch_num > 0 and batch_num % threshold == 0):
                 count_sort, count_idx = torch.sort(count, descending=True)

@@ -61,15 +61,6 @@ if __name__ == '__main__':
     node_feats, edge_feats = None,None
     if (not args.use_stream and not args.use_disk):
         node_feats, edge_feats = load_feat(args.data)
-    cur_train = {
-        'node_feat_type': 'float32',
-        'edge_feat_type': 'float32',
-        'dataset': args.data
-    }
-    if (args.data == 'MAG'):
-        cur_train['node_feat_type'] = 'float16'
-    with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
-        json.dump(cur_train, f)
 
     if (not args.use_stream):
         g, df = load_graph(args.data)
@@ -127,6 +118,9 @@ if __name__ == '__main__':
         raise RuntimeError("have not this dataset config!")
     
 
+
+    
+
     combine_first = False
     if 'combine_neighs' in train_param and train_param['combine_neighs']:
         combine_first = True
@@ -144,6 +138,19 @@ if __name__ == '__main__':
 
     node_num = g['indptr'].shape[0] - 1
     edge_num = g['indices'].shape[0]
+    cur_train = {
+        'node_feat_type': 'float32',
+        'edge_feat_type': 'float32',
+        'dataset': args.data,
+        'node_feat_dim': gnn_dim_node,
+        'edge_feat_dim': gnn_dim_edge,
+        'node_num': node_num,
+        'edge_num': edge_num
+    }
+    if (args.data == 'MAG'):
+        cur_train['node_feat_type'] = 'float16'
+    with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
+        json.dump(cur_train, f)
     import torch.multiprocessing as multiprocessing
     multiprocessing.set_start_method("spawn")
     from pre_fetch import *
@@ -212,7 +219,7 @@ if __name__ == '__main__':
         if (args.data == 'MAG' or args.data == 'MOOC'):
             feat_buffer.gen_part_stream_bucket_cache()
         else:
-            feat_buffer.gen_part_stream()
+            feat_buffer.gen_part_stream(bucket_optimal=False)
 
     # feat_buffer.gen_part_incre()
     flush_saveBin_conf()

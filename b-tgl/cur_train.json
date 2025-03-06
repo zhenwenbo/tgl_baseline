@@ -1,1 +1,1 @@
-{"node_feat_type": "float32", "edge_feat_type": "float32", "dataset": "STACK"}
+{"node_feat_type": "float32", "edge_feat_type": "float32", "dataset": "TALK", "node_feat_dim": 172, "edge_feat_dim": 172, "node_num": 1140149, "edge_num": 7833139}

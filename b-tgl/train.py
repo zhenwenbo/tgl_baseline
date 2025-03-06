@@ -17,8 +17,8 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-2.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -397,6 +397,20 @@ if __name__ == '__main__':
         sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], emb_buffer)
         node_num = g['indptr'].shape[0] - 1
         edge_num = g['indices'].shape[0]
+        cur_train = {
+            'node_feat_type': 'float32',
+            'edge_feat_type': 'float32',
+            'dataset': args.data,
+            'node_feat_dim': gnn_dim_node,
+            'edge_feat_dim': gnn_dim_edge,
+            'node_num': node_num,
+            'edge_num': edge_num
+        }
+        if (args.data == 'MAG'):
+            cur_train['node_feat_type'] = 'float16'
+        with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
+            json.dump(cur_train, f)
+            
 
         if not (('no_sample' in sample_param and sample_param['no_sample']) or (use_gpu_sample)):
             sampler = ParallelSampler(g['indptr'], g['indices'], g['eid'], g['ts'].astype(np.float32),
