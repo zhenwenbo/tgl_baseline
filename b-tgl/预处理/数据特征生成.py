@@ -31,7 +31,7 @@ def saveBin(tensor,savePath,addSave=False):
         tensor.cpu().numpy().tofile(savePath)
     elif isinstance(tensor, np.ndarray):
         tensor.tofile(savePath)
-data = 'MOOC'
+data = 'MAG'
 
 
 import sys
@@ -41,7 +41,7 @@ if root_dir not in sys.path:
     sys.path.append(root_dir)
 from utils import *
 
-# gen_feat(data, use_pt = True, budget = 10 * 1024 ** 3)
+gen_feat(data, use_pt = True, budget = 10 * 1024 ** 3)
 
 
 
@@ -89,7 +89,7 @@ def df2bin():
         json.dump(dataset_conf, f, indent=4)
 
 
-df2bin()
+# df2bin()
 
 # eid = torch.from_numpy(g['eid']).cuda()
 # print(f'eid shape: {eid.shape} unique shape: {torch.unique(eid).shape}')
@@ -114,4 +114,4 @@ def reorder_edge():
     # saveBin(ef.cpu(), f'/raid/guorui/DG/dataset/{data}/edge_features_reorder.bin')
     saveBin(res.cpu().to(torch.int32), f'/raid/guorui/DG/dataset/{data}/edge_reorder_map.bin')
 
-reorder_edge()
+# reorder_edge()

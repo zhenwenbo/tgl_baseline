@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='STACK')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -17,8 +17,8 @@ parser.add_argument('--dis_threshold', type=int, default=10, help='distance thre
 parser.add_argument('--fanout', type=int, default=-1)
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--substream_size', type=int, default=60000, help='substream size')
-parser.add_argument('--cache_budget', type=int, default=4)
+parser.add_argument('--substream_size', type=int, default=600000, help='substream size')
+parser.add_argument('--cache_budget', type=int, default=10)
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 parser.add_argument('--opt', action='store_true', default=False)
 args=parser.parse_args()
@@ -217,7 +217,7 @@ if __name__ == '__main__':
         if (not use_async_prefetch):
             feat_buffer.init_feat(node_feats, edge_feats)
         
-        if (args.data == 'MAG' or args.data == 'MOOC'):
+        if (args.data == 'MAG1' or args.data == 'MOOC1'):
             feat_buffer.gen_part_stream_bucket_cache()
         else:
             feat_buffer.gen_part_stream(bucket_optimal=False, cache_budget=args.cache_budget * 1024 ** 3)

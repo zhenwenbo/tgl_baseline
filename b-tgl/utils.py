@@ -497,6 +497,8 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     elif d == 'BITCOIN':
         ef_num = 0
         ef_len = 172
+    elif d == 'MAG':
+        ef_num = 0
 
     if d == 'LASTFM':
         node_feats = torch.randn(1980, 128)
@@ -514,10 +516,13 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     elif d == 'BITCOIN':
         nf_num = 24575383
         nf_len = 172
+    elif d == 'MAG':
+        nf_num = 121751665
+        nf_len = 768
     
     if (budget is not None):
-        stream_rand_save(path + '/edge_features.pt', ef_num, ef_len, budget, torch.float32)
-        stream_rand_save(path + '/node_features.pt', nf_num, nf_len, budget, torch.float32)
+        # stream_rand_save(path + '/edge_features.pt', ef_num, ef_len, budget, torch.float32)
+        stream_rand_save(path + '/node_features.pt', nf_num, nf_len, budget, torch.float16)
     else:
         if (edge_feats != None):
             saveBin(edge_feats, path + '/edge_features.pt', use_pt = use_pt)
