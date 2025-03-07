@@ -1223,15 +1223,19 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 5 * 1024 ** 3, bucket_optimal = False, bucket_cache = False, cache_budget = 0.4 * 1024 ** 3):
+    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 5 * 1024 ** 3, bucket_optimal = False, bucket_cache = False, cache_budget = 4 * 1024 ** 3):
         #当分区feat不存在的时候做输出
         has_ef = self.edge_feat_dim > 0
         has_nf = self.node_feat_dim > 0
-        threshold = 1000000 # threshold用边数表示，第一次超过1 * threshold 第二次... 这样满足条件时甩出bucket_his
+        threshold = 10000000 # threshold用边数表示，第一次超过1 * threshold 第二次... 这样满足条件时甩出bucket_his
         # node 1:3 edge
 
-        node_cache_budget = cache_budget * (1/4) # 1GB
-        edge_cache_budget = cache_budget * (1/3) # 1GB
+        if (self.d == 'BITCOIN'):
+            node_cache_budget = cache_budget * (1/3.5) # 1GB
+            edge_cache_budget = cache_budget * (2.5/2.5) # 1GB
+        else:
+            node_cache_budget = cache_budget * (1/4) # 1GB
+            edge_cache_budget = cache_budget * (3/4) # 1GB
         node_idx_budget = int(node_cache_budget / self.node_feat_dim / 4)
         edge_idx_budget = int(edge_cache_budget / self.edge_feat_dim / 4)
         d = self.d
@@ -1430,13 +1434,24 @@ class Feat_buffer:
                 for cur_nid_uni, cur_eid_uni,cur_batch_num in bucket_his:
                     cur_eid = cur_eid_uni
                     if (pre_eid is not None):
-                        eid_incre_mask = torch.isin(cur_eid_uni, cache_eid, assume_unique=True)
-                        eid_incre_mask = torch.bitwise_or(eid_incre_mask,torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True))
+                        posincache = torch.isin(cur_eid_uni, pre_bucket_eid_idx, assume_unique=True)
+                        posinpre = torch.isin(cur_eid_uni, pre_eid, assume_unique=True)
+                        pos_cache_indices = find_indices(cur_eid_uni[posincache], pre_bucket_eid_idx.to(torch.int32))
+                        # 训练时不能判断具体索引
+                        # 给出pos_in_cache pos_in_pre cache_pos_indices
+                        # 训练时：pos_feats[pos_in_cache] = cache_feats[pos_indices]
+                        #        pos_feats[not pos_in_pre and not pos_in_cache] = incre_feat
+                        #        pos_feats[pos_in_pre and not pos_in_cache] = cache_feats[]
 
                         # eid_incre_mask = torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True)
-                        cur_eid = cur_eid_uni[eid_incre_mask]
-                        cur_eid = cur_eid[:cur_eid.shape[0]]
-                        saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_incre_mask.pt')
+                        cur_eid = cur_eid_uni[torch.bitwise_and(~posincache, ~posinpre)]
+
+                        saveBin(posincache.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_pos_in_cache.pt')
+                        saveBin(posinpre.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_pos_in_pre.pt')
+                        saveBin(pos_cache_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_pos_cache_indices.pt')
+                        
+                        # saveBin(torch.bitwise_and(notincache, notinpre).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_incre_mask.pt')
+                        # saveBin(torch.nonzero(torch.bitwise_and(notincache, ~notinpre)).reshape(-1).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_pre_incre_idx.pt')
 
                     if (self.edge_feat_dim > 0):
                         edge_his.append(cur_eid.cpu())
@@ -1447,10 +1462,21 @@ class Feat_buffer:
 
                     cur_nid = cur_nid_uni
                     if (pre_nid is not None):
-                        nid_incre_mask = torch.isin(cur_nid_uni, cache_nid, assume_unique=True)
-                        nid_incre_mask = torch.bitwise_or(nid_incre_mask,torch.isin(cur_nid_uni, pre_nid, assume_unique=True, invert = True))
-                        cur_nid = cur_nid_uni[nid_incre_mask]
-                        saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_incre_mask.pt')
+                        posincache = torch.isin(cur_nid_uni, pre_bucket_nid_idx, assume_unique=True)
+                        posinpre = torch.isin(cur_nid_uni, pre_nid, assume_unique=True)
+                        pos_cache_indices = find_indices(cur_nid_uni[posincache], pre_bucket_nid_idx.to(torch.int32))
+                        # self.bucket_cache_node_feat[node_cache_indices]
+                        cur_nid = cur_nid_uni[torch.bitwise_and(~posincache, ~posinpre)]
+
+                        saveBin(posincache.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_pos_in_cache.pt')
+                        saveBin(posinpre.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_pos_in_pre.pt')
+                        saveBin(pos_cache_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_pos_cache_indices.pt')
+
+                        # notincache = torch.isin(cur_nid_uni, cache_nid, assume_unique=True, invert=True)
+                        # notinpre = torch.isin(cur_nid_uni, pre_nid, assume_unique=True, invert = True)
+                        # cur_nid = cur_nid_uni[torch.bitwise_and(notincache, notinpre)]
+                        # saveBin(torch.bitwise_and(notincache, notinpre).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_incre_mask.pt')
+                        # saveBin(torch.nonzero(torch.bitwise_and(notincache, ~notinpre)).reshape(-1).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_pre_incre_idx.pt')
 
                     if (self.node_feat_dim > 0):
                         node_his.append(cur_nid.cpu())
@@ -1509,13 +1535,30 @@ class Feat_buffer:
         cache_eid_incre = cache_eid
         
         if (pre_bucket_nid_idx is not None):
-            cache_nid_incre_mask = torch.isin(cache_nid, pre_bucket_nid_idx,invert=True)
-            saveBin(cache_nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_nid_incre_mask_{bucket_cache_start[-1]}.pt')
-            cache_nid_incre = cache_nid[cache_nid_incre_mask]
+            # pre不在cur中的那些idx被废弃，作为incre_mask，被cur不在pre中的那些node_idx替代
+            # 替代过程为cur_notin_pre
+            # pre_bucket_nid_idx[pre_notin_cur] = cache_nid[cur_notin_pre]  成为新的map
+            # incre_mask = pre_notin_cur 
+            # 实际使用： 
+            pre_notin_cur = torch.isin(pre_bucket_nid_idx, cache_nid, invert=True, assume_unique=True)
+            cur_notin_pre = torch.isin(cache_nid, pre_bucket_nid_idx, invert=True, assume_unique=True)
+            pre_bucket_nid_idx[pre_notin_cur] = cache_nid[cur_notin_pre]
+            saveBin(pre_notin_cur.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_nid_incre_mask_{bucket_cache_start[-1]}.pt')
+            cache_nid_incre = cache_nid[cur_notin_pre]
+
+        else:
+            pre_bucket_nid_idx = cache_nid
+
         if (pre_bucket_eid_idx is not None):
-            cache_eid_incre_mask = torch.isin(cache_eid, pre_bucket_eid_idx,invert=True)
-            saveBin(cache_eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_eid_incre_mask_{bucket_cache_start[-1]}.pt')
-            cache_eid_incre = cache_eid[cache_eid_incre_mask]
+            pre_notin_cur = torch.isin(pre_bucket_eid_idx, cache_eid, invert=True, assume_unique=True)
+            cur_notin_pre = torch.isin(cache_eid, pre_bucket_eid_idx, invert=True, assume_unique=True)
+            pre_bucket_eid_idx[pre_notin_cur] = cache_eid[cur_notin_pre]
+            saveBin(pre_notin_cur.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_eid_incre_mask_{bucket_cache_start[-1]}.pt')
+            
+            cache_eid_incre = cache_eid[cur_notin_pre]
+        else:
+            pre_bucket_eid_idx = cache_eid
+
         bucket_cache_size += cache_nid_incre.shape[0] * 172 * 4 / 1024 ** 3
         bucket_cache_size += cache_eid_incre.shape[0] * 172 * 4 / 1024 ** 3
 
@@ -1523,21 +1566,34 @@ class Feat_buffer:
 
 
         print(f"需要加载的缓存数据: {bucket_cache_size:.2f}GB")
-        pre_bucket_nid_idx = cache_nid
-        pre_bucket_eid_idx = cache_eid
+        # pre_bucket_nid_idx = cache_nid
+        # pre_bucket_eid_idx = cache_eid
 
-        saveBin(cache_nid.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/node_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
-        saveBin(cache_eid.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/edge_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
+        saveBin(pre_bucket_nid_idx.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/node_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
+        saveBin(pre_bucket_eid_idx.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/edge_bucket_cache_idx_{bucket_cache_start[-1]}.pt')
         
 
         for cur_nid_uni, cur_eid_uni,cur_batch_num in bucket_his:
             cur_eid = cur_eid_uni
             if (pre_eid is not None):
-                eid_incre_mask = torch.isin(cur_eid_uni, cache_eid, assume_unique=True)
-                eid_incre_mask = torch.bitwise_or(eid_incre_mask,torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True))
-                cur_eid = cur_eid_uni[eid_incre_mask]
-                cur_eid = cur_eid[:cur_eid.shape[0]]
-                saveBin(eid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_incre_mask.pt')
+                posincache = torch.isin(cur_eid_uni, pre_bucket_eid_idx, assume_unique=True)
+                posinpre = torch.isin(cur_eid_uni, pre_eid, assume_unique=True)
+                pos_cache_indices = find_indices(cur_eid_uni[posincache], pre_bucket_eid_idx.to(torch.int32))
+                # 训练时不能判断具体索引
+                # 给出pos_in_cache pos_in_pre cache_pos_indices
+                # 训练时：pos_feats[pos_in_cache] = cache_feats[pos_indices]
+                #        pos_feats[not pos_in_pre and not pos_in_cache] = incre_feat
+                #        pos_feats[pos_in_pre and not pos_in_cache] = cache_feats[]
+
+                # eid_incre_mask = torch.isin(cur_eid_uni, pre_eid, assume_unique=True, invert = True)
+                cur_eid = cur_eid_uni[torch.bitwise_and(~posincache, ~posinpre)]
+
+                saveBin(posincache.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_pos_in_cache.pt')
+                saveBin(posinpre.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_pos_in_pre.pt')
+                saveBin(pos_cache_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_pos_cache_indices.pt')
+                
+                # saveBin(torch.bitwise_and(notincache, notinpre).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_incre_mask.pt')
+                # saveBin(torch.nonzero(torch.bitwise_and(notincache, ~notinpre)).reshape(-1).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_pre_incre_idx.pt')
 
             if (self.edge_feat_dim > 0):
                 edge_his.append(cur_eid.cpu())
@@ -1548,10 +1604,21 @@ class Feat_buffer:
 
             cur_nid = cur_nid_uni
             if (pre_nid is not None):
-                nid_incre_mask = torch.isin(cur_nid_uni, cache_nid, assume_unique=True)
-                nid_incre_mask = torch.bitwise_or(nid_incre_mask,torch.isin(cur_nid_uni, pre_nid, assume_unique=True, invert = True))
-                cur_nid = cur_nid_uni[nid_incre_mask]
-                saveBin(nid_incre_mask.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_incre_mask.pt')
+                posincache = torch.isin(cur_nid_uni, pre_bucket_nid_idx, assume_unique=True)
+                posinpre = torch.isin(cur_nid_uni, pre_nid, assume_unique=True)
+                pos_cache_indices = find_indices(cur_nid_uni[posincache], pre_bucket_nid_idx.to(torch.int32))
+                # self.bucket_cache_node_feat[node_cache_indices]
+                cur_nid = cur_nid_uni[torch.bitwise_and(~posincache, ~posinpre)]
+
+                saveBin(posincache.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_pos_in_cache.pt')
+                saveBin(posinpre.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_pos_in_pre.pt')
+                saveBin(pos_cache_indices.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_pos_cache_indices.pt')
+
+                # notincache = torch.isin(cur_nid_uni, cache_nid, assume_unique=True, invert=True)
+                # notinpre = torch.isin(cur_nid_uni, pre_nid, assume_unique=True, invert = True)
+                # cur_nid = cur_nid_uni[torch.bitwise_and(notincache, notinpre)]
+                # saveBin(torch.bitwise_and(notincache, notinpre).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_incre_mask.pt')
+                # saveBin(torch.nonzero(torch.bitwise_and(notincache, ~notinpre)).reshape(-1).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_node_map_pre_incre_idx.pt')
 
             if (self.node_feat_dim > 0):
                 node_his.append(cur_nid.cpu())
@@ -1575,6 +1642,8 @@ class Feat_buffer:
         bucket_his = []
         bucket_eid_count.fill_(0)
         bucket_nid_count.fill_(0)
+    
+
             
 
         self.stream_extract(node_feat_path, node_save_paths,node_window_size,node_his,node_his_max,self.node_feat_dim,np.float32)

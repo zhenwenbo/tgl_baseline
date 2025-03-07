@@ -591,17 +591,9 @@ class Pre_fetch:
 
         
         if (self.use_bucket and incre_bucket):
-            node_in_cache = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_pos_in_cache.pt')
-            node_in_pre = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_pos_in_pre.pt')
-            node_cache_indices = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_pos_cache_indices.pt')
-            # node_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map_incre_mask.pt')
-            # node_pre_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map_pre_incre_idx.pt')
+            node_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_node_map_incre_mask.pt')
             if (self.has_edge_feat):
-                edge_in_cache = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_pos_in_cache.pt')
-                edge_in_pre = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_pos_in_pre.pt')
-                edge_cache_indices = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_pos_cache_indices.pt')
-                # edge_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map_incre_mask.pt')
-                # edge_pre_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map_pre_incre_idx.pt')
+                edge_incre_mask = loadBin(path + f'/part-{batch_size}-{fan_nums}/part{block_num}_edge_map_incre_mask.pt')
 
         if (not self.use_bucket):
             start_t = time.time()
@@ -664,10 +656,12 @@ class Pre_fetch:
         # 此处为负节点邻域涉及的节点，新加一个判断：这个节点集合是否在上一个block训练的所有节点集合中，若在则后续在下一个block接收时再填充他们的特征。
         # 验证：当使用负节点采样重用时，这个操作是否能减少大部分的IO开销？
         node_dd_ind = torch.isin(dis_neg_nodes, part_node_map, assume_unique=True,invert=True)
+        node_dd_cache = torch.isin(dis_neg_nodes, self.bucket_cache_node_map, assume_unique=True,invert=True)
+        node_dd_load = torch.bitwise_and(node_dd_ind, node_dd_cache)
         if (not self.data_incre):
             # 实验：若不使用增量加载，此处作完整加载
             node_dd_ind.fill_(True)
-        dd_neg_nodes = dis_neg_nodes[node_dd_ind].long()
+        dd_neg_nodes = dis_neg_nodes[node_dd_load].long()
         # print(f"preFetch的block中含有需要做IO加载的负节点邻域个数: {dis_neg_nodes.shape[0]} 若除去上一个block中出现的节点，那么剩余{dd_neg_nodes.shape[0]}")
         t3 = time.time() - t0
         t0 = time.time()
@@ -675,15 +669,14 @@ class Pre_fetch:
             node_conf = self.feat_conf['node_feats']
             neg_node_feats = torch.zeros((dis_neg_nodes.shape[0], node_conf['shape'][1]), dtype = getattr(torch, self.node_feat_type))
             if dd_neg_nodes.shape[0] > 0:
-                neg_node_feats[node_dd_ind] = self.self_select('node_feats', dd_neg_nodes.to(torch.int64))
+                neg_node_feats[node_dd_load] = self.self_select('node_feats', dd_neg_nodes.to(torch.int64))
                 # print(neg_node_feats[node_dd_ind])
             
             # neg_node_feats = self.self_select('node_feats', dis_neg_nodes.to(torch.int64))
 
+        node_dd_ind = torch.bitwise_or(node_dd_ind, ~node_dd_cache)
         if (self.use_bucket and incre_bucket):
-            # cur_node_pre_incre_mask = torch.ones(node_incre_mask.shape[0], dtype = torch.bool)
-            # cur_node_pre_incre_mask[node_pre_incre_mask] = False
-            node_d_map = torch.cat((~node_in_pre, node_dd_ind))
+            node_d_map = torch.cat((node_incre_mask, node_dd_ind))
         else:
             node_d_map = torch.cat((torch.ones(pos_node_map.shape[0], dtype = torch.bool), node_dd_ind))
 
@@ -693,11 +686,11 @@ class Pre_fetch:
         # hybrid_node_cache_mask = torch.isin(pos_node_map, self.bucket_cache_node_map)
         # hybrid_node_cache_feat = self.bucket_cache_node_feat[torch.isin(self.bucket_cache_node_map, pos_node_map)]
 
-        # hybrid_node_cache_mask = torch.isin(pos_node_map, self.bucket_cache_node_map, assume_unique=True)
-        # pos_in_cache = pos_node_map[hybrid_node_cache_mask]
-        # bucket_cache_node_map_sort, bucket_cache_node_map_indices = torch.sort(self.bucket_cache_node_map)
-        # result = bucket_cache_node_map_indices[torch.searchsorted(bucket_cache_node_map_sort, pos_in_cache)]
-        # hybrid_node_cache_feat = self.bucket_cache_node_feat[result]
+        hybrid_node_cache_mask = torch.isin(pos_node_map, self.bucket_cache_node_map, assume_unique=True)
+        pos_in_cache = pos_node_map[hybrid_node_cache_mask]
+        bucket_cache_node_map_sort, bucket_cache_node_map_indices = torch.sort(self.bucket_cache_node_map)
+        result = bucket_cache_node_map_indices[torch.searchsorted(bucket_cache_node_map_sort, pos_in_cache)]
+        hybrid_node_cache_feat = self.bucket_cache_node_feat[result]
 
         node_d_map = torch.nonzero(~node_d_map[node_indices]).reshape(-1)
 
@@ -710,33 +703,27 @@ class Pre_fetch:
 
         if (self.has_edge_feat):
             edge_dd_ind = torch.isin(dis_neg_eids, part_edge_map, assume_unique=True,invert=True)
+            edge_dd_cache = torch.isin(dis_neg_eids, self.bucket_cache_edge_map, assume_unique=True,invert=True)
+            edge_dd_load = torch.bitwise_and(edge_dd_ind, edge_dd_cache)
             if (not self.data_incre):
                 # 实验：若不使用增量加载，此处作完整加载
                 edge_dd_ind.fill_(True)
-            dd_neg_eids = dis_neg_eids[edge_dd_ind]
-        # print(f"preFetch的block中含有需要做IO加载的负边个数: {dis_neg_eids.shape[0]} 若除去上一个block中出现的边特征，那么剩余{dd_neg_eids.shape[0]}")
+            dd_neg_eids = dis_neg_eids[edge_dd_load]
 
-
-        #测试重排序带来的效益
-
-        # print(f"neg_nodes: {neg_nodes.shape[0]}, neg_eids: {neg_eids.shape[0]}, dis_neg_nodes: {dis_neg_nodes.shape[0]},dis_neg_eids: {dis_neg_eids.shape[0]}")
-        
-
-        if (self.has_edge_feat):
             if (has_ef and not self.use_valid_edge):
                 
                 edge_conf = self.feat_conf['edge_feats']
                 dis_neg_eids_feat = torch.zeros((dis_neg_eids.shape[0], edge_conf['shape'][1]), dtype = getattr(torch,edge_conf['dtype']))
                 if (dd_neg_eids.shape[0] > 0):
                     if (not self.use_disk):
-                        dis_neg_eids_feat[edge_dd_ind] = self.self_select('edge_feats',dd_neg_eids.to(torch.int64))
+                        dis_neg_eids_feat[edge_dd_load] = self.self_select('edge_feats',dd_neg_eids.to(torch.int64))
                     else:
                         if (self.use_edge_reorder):
                             reorder_ind = self.edge_reorder_map[dd_neg_eids.long()]
                             reorder_ind,indices = torch.sort(reorder_ind)
-                            dis_neg_eids_feat[torch.nonzero(edge_dd_ind).reshape(-1)[indices]]= self.self_select('edge_features_reorder',reorder_ind, use_slice=False)
+                            dis_neg_eids_feat[torch.nonzero(edge_dd_load).reshape(-1)[indices]]= self.self_select('edge_features_reorder',reorder_ind, use_slice=False)
                         else:
-                            dis_neg_eids_feat[edge_dd_ind]= self.self_select('edge_features',dd_neg_eids, use_slice=False)
+                            dis_neg_eids_feat[edge_dd_load]= self.self_select('edge_features',dd_neg_eids, use_slice=False)
                 
 
             
@@ -746,10 +733,9 @@ class Pre_fetch:
         t5 = time.time() - t0
         t0 = time.time()
         if (self.has_edge_feat):
+            edge_dd_ind = torch.bitwise_or(edge_dd_ind, ~edge_dd_cache)
             if (self.use_bucket and incre_bucket):
-                # cur_edge_incre_mask = torch.ones(edge_incre_mask.shape[0], dtype = torch.bool)
-                # cur_edge_incre_mask[edge_pre_incre_mask] = False
-                edge_d_map = torch.cat((~edge_in_pre, edge_dd_ind))
+                edge_d_map = torch.cat((edge_incre_mask, edge_dd_ind))
             else:
                 edge_d_map = torch.cat((torch.ones(pos_edge_map.shape[0], dtype = torch.bool), edge_dd_ind))
 
@@ -758,12 +744,12 @@ class Pre_fetch:
             pos_edge_map = torch.cat((pos_edge_map, dis_neg_eids))
             pos_edge_map,edge_indices = torch.sort(pos_edge_map)
 
-            start_1 = time.time()
-            # hybrid_edge_cache_mask = torch.isin(pos_edge_map, self.bucket_cache_edge_map, assume_unique=True)
-            # pos_in_cache = pos_edge_map[hybrid_edge_cache_mask]
-            # bucket_cache_edge_map_sort, bucket_cache_edge_map_indices = torch.sort(self.bucket_cache_edge_map)
-            # result = bucket_cache_edge_map_indices[torch.searchsorted(bucket_cache_edge_map_sort, pos_in_cache)]
-            # hybrid_edge_cache_feat = self.bucket_cache_edge_feat[result]
+            
+            hybrid_edge_cache_mask = torch.isin(pos_edge_map, self.bucket_cache_edge_map, assume_unique=True)
+            pos_in_cache = pos_edge_map[hybrid_edge_cache_mask]
+            bucket_cache_edge_map_sort, bucket_cache_edge_map_indices = torch.sort(self.bucket_cache_edge_map)
+            result = bucket_cache_edge_map_indices[torch.searchsorted(bucket_cache_edge_map_sort, pos_in_cache)]
+            hybrid_edge_cache_feat = self.bucket_cache_edge_feat[result]
 
             edge_d_map = torch.nonzero(~edge_d_map[edge_indices]).reshape(-1)
 
@@ -853,22 +839,21 @@ class Pre_fetch:
                 if (self.use_bucket):
                     if (incre_bucket):
                         pos_node_feats = torch.zeros((pos_node_shape, data.shape[1]), dtype = data.dtype)
-                        pos_node_feats[torch.bitwise_and(~node_in_pre, ~node_in_cache)] = data
-                        pos_node_feats[node_in_cache] = self.bucket_cache_node_feat[node_cache_indices]
+                        pos_node_feats[node_incre_mask] = data
                     else:
                         pos_node_feats = data
                 node_feats = torch.cat((pos_node_feats, neg_node_feats))
                 reorder_s = time.time()
                 node_feats = node_feats[node_indices] # 此处是有序后的混合桶节点特征
                 
+                node_feats[hybrid_node_cache_mask] = hybrid_node_cache_feat
                 reorder_time += time.time() - reorder_s
             elif (tag == 'part_edge_feat' and has_ef and (self.has_edge_feat)):
                 # print(tag)
                 if (self.use_bucket):
                     if (incre_bucket):
                         pos_edge_feats = torch.zeros((pos_edge_shape, data.shape[1]), dtype = data.dtype)
-                        pos_edge_feats[torch.bitwise_and(~edge_in_pre, ~edge_in_cache)] = data
-                        pos_edge_feats[edge_in_cache] = self.bucket_cache_edge_feat[edge_cache_indices]
+                        pos_edge_feats[edge_incre_mask] = data
                     else:
                         pos_edge_feats = data
                 if (not self.use_bucket and self.use_valid_edge):
@@ -876,6 +861,7 @@ class Pre_fetch:
                 edge_feats = torch.cat((pos_edge_feats, dis_neg_eids_feat))
                 reorder_s = time.time()
                 edge_feats = edge_feats[edge_indices]
+                edge_feats[hybrid_edge_cache_mask] = hybrid_edge_cache_feat
                 reorder_time += time.time() - reorder_s
 
             # print(f"cur tag: {tag} use time:{time.time() - asy_time_s:.4f}s")
@@ -900,9 +886,9 @@ class Pre_fetch:
         #nodes做sort + unique找出最终的indices
         self.print_time()
 
-        print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
-        print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
-        print(f"pre fetch over...")
+        # print(f"tt:{tt:.2f}s t1:{t1:.2f}s t1_1:{t1_1:.2f}s t2:{t2:.2f}s t3:{t3:.2f}s t4:{t4:.2f}s", end=" ")
+        # print(f"t5:{t5:.2f}s t6:{t6:.2f}s t7:{t7:.2f}s t8:{t8:.2f}s t9:{t9:.2f}s rt: {reorder_time:.2f}s ast: {asy_time:.2f}s t10:{t10:.2f}s")
+        # print(f"pre fetch over...")
 
     def run(self):
         while True:

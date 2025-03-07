@@ -93,9 +93,28 @@ def flush_saveBin_conf():
         with open(json_path, 'w') as f:
             json.dump(conf_dic[json_path], f, indent=4)
 
+def find_indices(tensor1, tensor2):
+    tensor2, tensor2_sort_indices = torch.sort(tensor2)
+    
+    table1 = torch.zeros_like(tensor1, dtype = torch.int32) - 1
+    table2 = torch.zeros_like(tensor2, dtype = torch.int32) - 1
+
+    dgl.findSameIndex(tensor1, tensor2, table1, table2)
+    res = tensor2_sort_indices[table1.long()]
+    return res
+
+
+
+total_save = 0
 conf_dic = {}
 #在当前目录下保存这个tensor的数据类型以及所处容器(cpu or cuda)以便恢复
+def print_total():
+    print(f"共保存{total_save}GB数据")
+    
 def saveBin(tensor,savePath,addSave=False, use_pt = False):
+    global total_save
+    total_save += tensor.numel() * tensor.element_size() / 1024 ** 3
+    # return
 
     total_s = time.time()
     if (not use_pt):
