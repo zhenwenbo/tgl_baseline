@@ -3,7 +3,7 @@ import os
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='MAG')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -217,7 +217,7 @@ if __name__ == '__main__':
         if (not use_async_prefetch):
             feat_buffer.init_feat(node_feats, edge_feats)
         
-        if (args.data == 'MAG' or args.data == 'MOOC'):
+        if (args.data == 'MAG1' or args.data == 'MOOC1'):
             feat_buffer.gen_part_stream_bucket_cache()
         else:
             feat_buffer.gen_part_stream(bucket_optimal=False, cache_budget=args.cache_budget * 1024 ** 3)
