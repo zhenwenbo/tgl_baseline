@@ -74,12 +74,12 @@ monitor_memory_usage() {
 
 
 
-ds=("STACK")
+ds=("MAG")
 models=("TGN")
 configs=("disk")
 
-layers=("1" "2")
-bucketcaches=("4" "8")
+layers=("1")
+bucketcaches=("10")
 
 timestamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p "../res-${timestamp}"
@@ -99,11 +99,14 @@ for layer in "${layers[@]}"; do
                 monitor_memory_usage $pid
                 wait
 
-                nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${bc}_res.log &
-                pid=$!
-                memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${bc}_res_mem.log"
-                monitor_memory_usage $pid
-                wait
+                # nohup python -u /raid/guorui/workspace/dgnn/b-tgl/train.py --data=${d} --train_conf=${config} --config="/raid/guorui/workspace/dgnn/exp/scripts/${model}-b-${layer}.yml" &>../res-${timestamp}/${d}/b-${model}-${layer}-${bc}_res.log &
+                # pid=$!
+                # memory_usage_file="../res-${timestamp}/${d}/b-${model}-${layer}-${bc}_res_mem.log"
+                # monitor_memory_usage $pid
+                # wait
+
+                # rm -rf '/raid/guorui/DG/dataset/STACK/part-60000-[10]'
+                # rm -rf '/raid/guorui/DG/dataset/STACK/part-60000-[10, 10]'
 
 
             done

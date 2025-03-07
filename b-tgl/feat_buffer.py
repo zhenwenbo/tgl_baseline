@@ -1223,11 +1223,11 @@ class Feat_buffer:
 
 
     #流式... budget为内存预算，单位为MB, 默认16GB内存预算，默认10%的内存预算分配给window size...
-    def gen_part_stream(self, budget = (10 * 1024), bucket_budget = 5 * 1024 ** 3, bucket_optimal = False, bucket_cache = False, cache_budget = 4 * 1024 ** 3):
+    def gen_part_stream(self, budget = (20 * 1024), bucket_budget = 5 * 1024 ** 3, bucket_optimal = False, bucket_cache = False, cache_budget = 4 * 1024 ** 3):
         #当分区feat不存在的时候做输出
         has_ef = self.edge_feat_dim > 0
         has_nf = self.node_feat_dim > 0
-        threshold = 10000000 # threshold用边数表示，第一次超过1 * threshold 第二次... 这样满足条件时甩出bucket_his
+        threshold = 100000000 # threshold用边数表示，第一次超过1 * threshold 第二次... 这样满足条件时甩出bucket_his
         # node 1:3 edge
 
         if (self.d == 'BITCOIN'):
