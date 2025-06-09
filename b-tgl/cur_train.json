@@ -1,1 +1,1 @@
-{"node_feat_type": "float16", "edge_feat_type": "float32", "dataset": "MAG", "node_feat_dim": 768, "edge_feat_dim": 0, "node_num": 121751665, "edge_num": 1297748926}
+{"node_feat_type": "float32", "edge_feat_type": "float32", "dataset": "GDELT"}

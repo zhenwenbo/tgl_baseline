@@ -1,20 +1,21 @@
 import argparse
 import os
-import tqdm
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
+parser.add_argument('--model_eval', action='store_true')
+parser.add_argument('--bs', type=int, default=4000)
+parser.add_argument('--fanout', type=int, default=-1)
 parser.add_argument('--rand_edge_features', type=int, default=0, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=0, help='use random node featrues')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-
 import torch
 import time
 import random
@@ -32,12 +33,35 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 # set_seed(0)
+sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
+if (args.data == 'GDELT' and sample_param['layer'] == 2):
+    print(f"GDELT二跳估计epoch时间")
+    print(f"GDELT直接返回")
+    exit(-1)
+    use_estime = True
+
+if (args.fanout != -1):
+    print(f"自定义fanout")
+    sample_param['neighbor'] = [args.fanout]
 
 node_feats, edge_feats = load_feat(args.data, args.rand_edge_features, args.rand_node_features)
 g, df = load_graph(args.data)
-sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-train_edge_end = df[df['ext_roll'].gt(0)].index[0]
-val_edge_end = df[df['ext_roll'].gt(1)].index[0]
+
+
+
+
+# if (args.data == 'BITCOIN'):
+if (args.bs == -1):
+    train_param['batch_size'] = args.bs
+    print(f"batch size修改为 {args.bs}")
+batch_size = train_param['batch_size']
+
+if (args.data in ['BITCOIN']):
+    train_edge_end = 86063713
+    val_edge_end = 110653345
+else:
+    train_edge_end = df[df['ext_roll'].gt(0)].index[0]
+    val_edge_end = df[df['ext_roll'].gt(1)].index[0]
 
 def get_inductive_links(df, train_edge_end, val_edge_end):
     train_df = df[:train_edge_end]
@@ -91,11 +115,7 @@ if args.use_inductive:
     print("inductive nodes", len(inductive_nodes))
     neg_link_sampler = NegLinkInductiveSampler(inductive_nodes)
 else:
-    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1)
-
-
-train_neg_link_sampler = TrainNegLinkSampler(g['indptr'].shape[0] - 1)
-
+    neg_link_sampler = NegLinkSampler(g['indptr'].shape[0] - 1, g['indices'].shape[0])
 
 def eval(mode='val'):
     neg_samples = 1
@@ -179,23 +199,28 @@ if 'reorder' in train_param:
     for i in range(1, train_param['reorder']):
         additional_idx = np.zeros(train_param['batch_size'] // train_param['reorder'] * i) - 1
         group_indexes.append(np.concatenate([additional_idx, base_idx])[:base_idx.shape[0]])
-# 获取当前进程
-import psutil
-process = psutil.Process(os.getpid())
-# 在训练开始前记录内存使用量
-start_memory = process.memory_info().rss / 1024 ** 3  # 转换为 GB
-# 在训练开始前记录时间和内存使用量
-start_time = time.time()
-start_memory = process.memory_info().rss / 1024 ** 3  # 转换为 GB
 
-# 假设 num_epochs 是训练的 epoch 数
 for e in range(train_param['epoch']):
     print('Epoch {:d}:'.format(e))
-    epoch_start_time = time.time()
     time_sample = 0
     time_prep = 0
     time_tot = 0
     total_loss = 0
+    time_per_batch = 0
+
+
+    
+    time_total_prep = 0
+    time_total_strategy = 0
+    time_total_compute = 0
+    time_total_update = 0
+    time_total_epoch = 0
+    time_total_epoch_s = time.time()
+
+    time_tt_load = 0
+    time_tt_sample = 0
+    time_tt_compute = 0
+
     # training
     model.train()
     if sampler is not None:
@@ -203,9 +228,11 @@ for e in range(train_param['epoch']):
     if mailbox is not None:
         mailbox.reset()
         model.memory_updater.last_updated_nid = None
-    for cur_batch, rows in tqdm(df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)])):
+
+    for batch_num, rows in df[:train_edge_end].groupby(group_indexes[random.randint(0, len(group_indexes) - 1)]):
         t_tot_s = time.time()
-        root_nodes = np.concatenate([rows.src.values, rows.dst.values, train_neg_link_sampler.sample(len(rows), cur_batch = cur_batch)]).astype(np.int32)
+        time_total_prep_s = time.time()
+        root_nodes = np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)
         ts = np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)
         if sampler is not None:
             if 'no_neg' in sample_param and sample_param['no_neg']:
@@ -216,18 +243,35 @@ for e in range(train_param['epoch']):
             ret = sampler.get_ret()
             time_sample += ret[0].sample_time()
 
+        if (batch_num > 0 and batch_num % 100 == 0):
+            print(f"平均每个batch用时{time_per_batch / 100:.5f}s, 预计epoch时间: {(time_per_batch / 100 * (train_edge_end/train_param['batch_size'])):.3f}s")
+            print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s")
+
+            time_per_batch = 0
+
+            print(f"当前已执行 {batch_num * 2000}条边,共需要运行{train_edge_end}条边，预计总时间: {((time.time() - time_total_epoch_s) / (batch_num * 2000)) * train_edge_end}")
+
+            # if (use_estime and batch_num == 3):
+            #     exit(-1)
 
         t_prep_s = time.time()
         if gnn_param['arch'] != 'identity':
             mfgs = to_dgl_blocks(ret, sample_param['history'])
         else:
             mfgs = node_to_dgl_blocks(root_nodes, ts)
+        time_tt_sample += time.time() - t_tot_s
+        time_tt_load_s = time.time()
+
+        # print(f"node num: {mfgs[0][0].num_nodes()} edge num: {mfgs[0][0].num_edges()}")
         mfgs = prepare_input(mfgs, node_feats, edge_feats, combine_first=combine_first)
         if mailbox is not None:
             mailbox.prep_input_mails(mfgs[0])
         time_prep += time.time() - t_prep_s
+        time_total_prep += time.time() - time_total_prep_s
 
-
+        time_total_compute_s = time.time()
+        time_tt_load += time.time() - time_tt_load_s
+        time_tt_compute_s = time.time()
         optimizer.zero_grad()
         pred_pos, pred_neg = model(mfgs)
         loss = creterion(pred_pos, torch.ones_like(pred_pos))
@@ -235,37 +279,43 @@ for e in range(train_param['epoch']):
         total_loss += float(loss) * train_param['batch_size']
         loss.backward()
         optimizer.step()
-
+        time_total_compute += time.time() - time_total_compute_s
 
         t_prep_s = time.time()
+        time_total_update_s = time.time()
         if mailbox is not None:
             eid = rows['Unnamed: 0'].values
             mem_edge_feats = edge_feats[eid] if edge_feats is not None else None
             block = None
             if memory_param['deliver_to'] == 'neighbors':
-                block = to_dgl_blocks(ret, sample_param['history'], reverse=True)[0][0]
+                blocks = to_dgl_blocks(ret, sample_param['history'], reverse=True)
+                block = blocks[0][0]
             mailbox.update_mailbox(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, ts, mem_edge_feats, block)
             mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts)
         time_prep += time.time() - t_prep_s
-
+        time_total_update += time.time() - time_total_update_s
 
         time_tot += time.time() - t_tot_s
-    epoch_end_time = time.time()
-    epoch_time = epoch_end_time - epoch_start_time
-    print(f"Epoch {e} training time: {epoch_time:.2f} s")
-    ap, auc = eval('val')
+        time_per_batch += time.time() - t_tot_s
+        time_tt_compute += time.time() - time_tt_compute_s
 
+    # print_io(mailbox)
+    print(f"sample: {time_tt_sample:.4f}s load:{time_tt_load:.4f}s compute:{time_tt_compute:.4f}s")
+    time_total_epoch += time.time() - time_total_epoch_s
+    time_total_other = time_total_epoch - time_total_prep - time_total_strategy - time_total_compute - time_total_update
+    print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
+    print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
+
+    ap, auc = eval('val')
     if e > 2 and ap > best_ap:
         best_e = e
         best_ap = ap
         torch.save(model.state_dict(), path_saver)
-    memory_gb = process.memory_info().rss / (1024 ** 3)
-    
     print('\ttrain loss:{:.4f}  val ap:{:4f}  val auc:{:4f}'.format(total_loss, ap, auc))
     print('\ttotal time:{:.2f}s sample time:{:.2f}s prep time:{:.2f}s'.format(time_tot, time_sample, time_prep))
-print(f"Epoch {e}, Memory: {memory_gb:.2f} GB, Time: {time.time()-start_time:.2f}s")
+
 print('Loading model at epoch {}...'.format(best_e))
-# model.load_state_dict(torch.load(path_saver))
+model.load_state_dict(torch.load(path_saver))
 model.eval()
 if sampler is not None:
     sampler.reset()

@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGAT-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/a-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -16,7 +16,6 @@ parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many ne
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-
 import torch
 import time
 import random
@@ -53,7 +52,7 @@ g, df = load_graph(args.data)
 
 # if (args.data == 'BITCOIN'):
 train_param['epoch'] = 1
-if (args.bs != -1):
+if (args.bs == -1):
     train_param['batch_size'] = args.bs
     print(f"batch size修改为 {args.bs}")
 batch_size = train_param['batch_size']

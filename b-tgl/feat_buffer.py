@@ -716,6 +716,7 @@ class Feat_buffer:
             # memory_info = (self.part_node_map, self.part_memory, self.part_memory_ts, self.part_mailbox, self.part_mailbox_ts)
             if (self.cur_block == 0):
                 # 初始化bucket cache
+                print(self.path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_node_feat_0.pt')
                 bucket_cache_node_feat = loadBin(self.path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_node_feat_0.pt').share_memory_()
                 bucket_cache_edge_feat = None
                 if (self.has_ef):
