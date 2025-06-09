@@ -1,0 +1,214 @@
+实际的block大小为: 60000
+训练配置: {'use_valid_edge': True, 'use_ayscn_prefetch': True, 'pre_sample_size': 60000, 'part_neg_sample': False, 'use_pin_memory': False, 'model_eval': False, 'cut_zombie': False, 'use_disk': True, 'reuse_neg_sample': 0.9}
+Sent: init_feats
+实际的block大小为: 60000
+训练配置: {'use_valid_edge': True, 'use_ayscn_prefetch': True, 'pre_sample_size': 60000, 'part_neg_sample': False, 'use_pin_memory': False, 'model_eval': False, 'cut_zombie': False, 'use_disk': True, 'reuse_neg_sample': 0.9}
+pre_fetch: 是否使用disk: True
+无法同时使用过期边淘汰和diskGNN！将过期边淘汰取消.
+Received: None
+重放负采样，重放比例为 0.9
+Epoch 0:
+IO load: 0.000s presample and analyze: 0.000s 预采样: 0.000s, 预采样负采样:0.000s
+第一个块的加载时间: 0.078s
+平均每个batch用时0.00000s, 预计epoch时间: 0.000s
+run batch0total time: 0.00s,presample: 0.00s, sample: 0.00s, prep time: 0.00s, gen block: 0.00s, feat input: 0.00s, model run: 0.00s,                    loss and opt: 0.00s, update mem: 0.00s update mailbox: 0.00s  mask_time: 0.0426s
+feat_buffer time: IO load: 0.034s 异步阻塞: 0.000s presample and analyze: 0.079s 预采样: 0.000s, 预采样负采样:0.059s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.08270s, 预计epoch时间: 5316.227s
+run batch1000total time: 82.70s,presample: 3.36s, sample: 8.17s, prep time: 28.82s, gen block: 1.42s, feat input: 2.00s, model run: 5.30s,                    loss and opt: 36.71s, update mem: 0.36s update mailbox: 0.50s  mask_time: 10.0877s
+feat_buffer time: IO load: 0.734s 异步阻塞: 0.001s presample and analyze: 2.623s 预采样: 0.000s, 预采样负采样:2.593s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.08850s, 预计epoch时间: 5688.926s
+run batch2000total time: 171.20s,presample: 8.38s, sample: 17.64s, prep time: 59.94s, gen block: 2.87s, feat input: 4.15s, model run: 9.43s,                    loss and opt: 75.12s, update mem: 0.74s update mailbox: 1.01s  mask_time: 22.9410s
+feat_buffer time: IO load: 1.676s 异步阻塞: 0.002s presample and analyze: 6.702s 预采样: 0.000s, 预采样负采样:6.661s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09118s, 预计epoch时间: 5860.875s
+run batch3000total time: 262.38s,presample: 14.41s, sample: 27.54s, prep time: 91.96s, gen block: 4.24s, feat input: 6.29s, model run: 13.28s,                    loss and opt: 114.16s, update mem: 1.10s update mailbox: 1.49s  mask_time: 37.3221s
+feat_buffer time: IO load: 2.742s 异步阻塞: 0.003s presample and analyze: 11.840s 预采样: 0.000s, 预采样负采样:11.788s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09310s, 预计epoch时间: 5984.927s
+run batch4000total time: 355.48s,presample: 21.11s, sample: 37.67s, prep time: 124.24s, gen block: 5.49s, feat input: 8.42s, model run: 16.88s,                    loss and opt: 154.25s, update mem: 1.41s update mailbox: 1.93s  mask_time: 52.4081s
+feat_buffer time: IO load: 3.719s 异步阻塞: 0.004s presample and analyze: 17.384s 预采样: 0.000s, 预采样负采样:17.323s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09497s, 预计epoch时间: 6104.648s
+run batch5000total time: 450.45s,presample: 28.25s, sample: 48.22s, prep time: 156.83s, gen block: 6.76s, feat input: 10.57s, model run: 20.53s,                    loss and opt: 194.98s, update mem: 1.74s update mailbox: 2.38s  mask_time: 68.4248s
+feat_buffer time: IO load: 4.785s 异步阻塞: 0.005s presample and analyze: 23.454s 预采样: 0.000s, 预采样负采样:23.383s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09628s, 预计epoch时间: 6188.779s
+run batch6000total time: 546.72s,presample: 35.85s, sample: 58.92s, prep time: 189.84s, gen block: 8.05s, feat input: 12.76s, model run: 24.21s,                    loss and opt: 235.96s, update mem: 2.08s update mailbox: 2.84s  mask_time: 85.1571s
+feat_buffer time: IO load: 5.959s 异步阻塞: 0.006s presample and analyze: 30.110s 预采样: 0.000s, 预采样负采样:30.030s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09789s, 预计epoch时间: 6292.334s
+run batch7000total time: 644.61s,presample: 44.11s, sample: 69.85s, prep time: 223.14s, gen block: 9.35s, feat input: 14.96s, model run: 27.96s,                    loss and opt: 277.30s, update mem: 2.41s update mailbox: 3.31s  mask_time: 102.3175s
+feat_buffer time: IO load: 7.129s 异步阻塞: 0.007s presample and analyze: 36.960s 预采样: 0.000s, 预采样负采样:36.870s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09873s, 预计epoch时间: 6346.195s
+run batch8000total time: 743.33s,presample: 52.49s, sample: 81.13s, prep time: 256.79s, gen block: 10.66s, feat input: 17.20s, model run: 31.72s,                    loss and opt: 318.63s, update mem: 2.76s update mailbox: 3.79s  mask_time: 120.1205s
+feat_buffer time: IO load: 8.351s 异步阻塞: 0.008s presample and analyze: 44.119s 预采样: 0.000s, 预采样负采样:44.020s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.09964s, 预计epoch时间: 6405.061s
+run batch9000total time: 842.97s,presample: 61.15s, sample: 92.56s, prep time: 290.64s, gen block: 11.96s, feat input: 19.44s, model run: 35.51s,                    loss and opt: 360.22s, update mem: 3.10s update mailbox: 4.25s  mask_time: 138.5508s
+feat_buffer time: IO load: 9.647s 异步阻塞: 0.009s presample and analyze: 51.745s 预采样: 0.000s, 预采样负采样:51.635s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10065s, 预计epoch时间: 6469.810s
+run batch10000total time: 943.62s,presample: 70.37s, sample: 104.00s, prep time: 324.78s, gen block: 13.25s, feat input: 21.68s, model run: 39.20s,                    loss and opt: 402.06s, update mem: 3.43s update mailbox: 4.71s  mask_time: 157.0568s
+feat_buffer time: IO load: 10.918s 异步阻塞: 0.010s presample and analyze: 59.424s 预采样: 0.000s, 预采样负采样:59.306s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10143s, 预计epoch时间: 6520.396s
+run batch11000total time: 1045.05s,presample: 79.62s, sample: 115.61s, prep time: 359.09s, gen block: 14.60s, feat input: 23.96s, model run: 43.03s,                    loss and opt: 444.16s, update mem: 3.78s update mailbox: 5.19s  mask_time: 175.9350s
+feat_buffer time: IO load: 12.241s 异步阻塞: 0.011s presample and analyze: 67.349s 预采样: 0.000s, 预采样负采样:67.219s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10140s, 预计epoch时间: 6518.054s
+run batch12000total time: 1146.45s,presample: 89.00s, sample: 127.24s, prep time: 393.64s, gen block: 15.90s, feat input: 26.22s, model run: 46.81s,                    loss and opt: 485.90s, update mem: 4.12s update mailbox: 5.66s  mask_time: 195.2506s
+feat_buffer time: IO load: 13.586s 异步阻塞: 0.012s presample and analyze: 75.668s 预采样: 0.000s, 预采样负采样:75.528s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10249s, 预计epoch时间: 6588.361s
+run batch13000total time: 1248.94s,presample: 98.89s, sample: 138.83s, prep time: 428.22s, gen block: 17.15s, feat input: 28.48s, model run: 50.36s,                    loss and opt: 528.48s, update mem: 4.44s update mailbox: 6.11s  mask_time: 214.5931s
+feat_buffer time: IO load: 14.846s 异步阻塞: 0.013s presample and analyze: 84.013s 预采样: 0.000s, 预采样负采样:83.865s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10207s, 预计epoch时间: 6561.446s
+run batch14000total time: 1351.02s,presample: 108.69s, sample: 150.68s, prep time: 462.95s, gen block: 18.48s, feat input: 30.76s, model run: 54.03s,                    loss and opt: 570.19s, update mem: 4.77s update mailbox: 6.55s  mask_time: 234.3159s
+feat_buffer time: IO load: 16.155s 异步阻塞: 0.014s presample and analyze: 92.498s 预采样: 0.000s, 预采样负采样:92.340s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10406s, 预计epoch时间: 6689.044s
+run batch15000total time: 1455.07s,presample: 118.83s, sample: 162.84s, prep time: 497.74s, gen block: 19.85s, feat input: 33.08s, model run: 57.98s,                    loss and opt: 612.86s, update mem: 5.15s update mailbox: 7.07s  mask_time: 254.7058s
+feat_buffer time: IO load: 17.678s 异步阻塞: 0.016s presample and analyze: 101.421s 预采样: 0.000s, 预采样负采样:101.251s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10445s, 预计epoch时间: 6714.008s
+run batch16000total time: 1559.52s,presample: 129.36s, sample: 174.93s, prep time: 532.53s, gen block: 21.12s, feat input: 35.38s, model run: 61.77s,                    loss and opt: 655.76s, update mem: 5.50s update mailbox: 7.54s  mask_time: 274.9487s
+feat_buffer time: IO load: 19.112s 异步阻塞: 0.017s presample and analyze: 110.209s 预采样: 0.000s, 预采样负采样:110.029s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10475s, 预计epoch时间: 6733.620s
+run batch17000total time: 1664.27s,presample: 139.79s, sample: 187.17s, prep time: 567.42s, gen block: 22.42s, feat input: 37.70s, model run: 65.54s,                    loss and opt: 698.85s, update mem: 5.87s update mailbox: 8.03s  mask_time: 295.5339s
+feat_buffer time: IO load: 20.540s 异步阻塞: 0.018s presample and analyze: 119.205s 预采样: 0.000s, 预采样负采样:119.014s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10516s, 预计epoch时间: 6760.159s
+run batch18000total time: 1769.44s,presample: 150.41s, sample: 199.42s, prep time: 602.56s, gen block: 23.70s, feat input: 40.01s, model run: 69.38s,                    loss and opt: 741.82s, update mem: 6.23s update mailbox: 8.51s  mask_time: 316.5813s
+feat_buffer time: IO load: 22.039s 异步阻塞: 0.019s presample and analyze: 128.654s 预采样: 0.000s, 预采样负采样:128.452s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10596s, 预计epoch时间: 6811.252s
+run batch19000total time: 1875.40s,presample: 161.54s, sample: 211.77s, prep time: 637.76s, gen block: 24.99s, feat input: 42.33s, model run: 73.16s,                    loss and opt: 785.00s, update mem: 6.59s update mailbox: 8.99s  mask_time: 337.6055s
+feat_buffer time: IO load: 23.512s 异步阻塞: 0.020s presample and analyze: 137.981s 预采样: 0.000s, 预采样负采样:137.769s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10659s, 预计epoch时间: 6851.939s
+run batch20000total time: 1981.99s,presample: 172.60s, sample: 224.39s, prep time: 673.15s, gen block: 26.32s, feat input: 44.68s, model run: 76.98s,                    loss and opt: 828.35s, update mem: 6.96s update mailbox: 9.49s  mask_time: 359.1278s
+feat_buffer time: IO load: 25.010s 异步阻塞: 0.021s presample and analyze: 147.543s 预采样: 0.000s, 预采样负采样:147.321s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10679s, 预计epoch时间: 6864.526s
+run batch21000total time: 2088.78s,presample: 183.86s, sample: 236.86s, prep time: 708.70s, gen block: 27.65s, feat input: 47.03s, model run: 80.85s,                    loss and opt: 871.65s, update mem: 7.33s update mailbox: 9.99s  mask_time: 380.9674s
+feat_buffer time: IO load: 26.568s 异步阻塞: 0.022s presample and analyze: 157.584s 预采样: 0.000s, 预采样负采样:157.351s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10772s, 预计epoch时间: 6924.195s
+run batch22000total time: 2196.49s,presample: 195.56s, sample: 249.65s, prep time: 744.39s, gen block: 28.94s, feat input: 49.38s, model run: 84.65s,                    loss and opt: 915.05s, update mem: 7.69s update mailbox: 10.48s  mask_time: 402.9540s
+feat_buffer time: IO load: 28.078s 异步阻塞: 0.023s presample and analyze: 167.426s 预采样: 0.000s, 预采样负采样:167.183s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10761s, 预计epoch时间: 6917.611s
+run batch23000total time: 2304.11s,presample: 206.99s, sample: 262.45s, prep time: 779.98s, gen block: 30.25s, feat input: 51.74s, model run: 88.55s,                    loss and opt: 958.59s, update mem: 8.07s update mailbox: 10.97s  mask_time: 424.9891s
+feat_buffer time: IO load: 29.605s 异步阻塞: 0.024s presample and analyze: 177.329s 预采样: 0.000s, 预采样负采样:177.075s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10825s, 预计epoch时间: 6958.553s
+run batch24000total time: 2412.36s,presample: 218.63s, sample: 275.41s, prep time: 815.77s, gen block: 31.62s, feat input: 54.13s, model run: 92.54s,                    loss and opt: 1002.10s, update mem: 8.45s update mailbox: 11.49s  mask_time: 447.5899s
+feat_buffer time: IO load: 31.300s 异步阻塞: 0.025s presample and analyze: 187.660s 预采样: 0.000s, 预采样负采样:187.395s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10853s, 预计epoch时间: 6976.699s
+run batch25000total time: 2520.89s,presample: 230.73s, sample: 288.13s, prep time: 851.59s, gen block: 32.95s, feat input: 56.50s, model run: 96.42s,                    loss and opt: 1045.76s, update mem: 8.82s update mailbox: 11.99s  mask_time: 469.7783s
+feat_buffer time: IO load: 32.867s 异步阻塞: 0.026s presample and analyze: 197.805s 预采样: 0.000s, 预采样负采样:197.529s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10785s, 预计epoch时间: 6932.776s
+run batch26000total time: 2628.74s,presample: 242.50s, sample: 300.48s, prep time: 887.51s, gen block: 34.27s, feat input: 58.87s, model run: 100.27s,                    loss and opt: 1089.37s, update mem: 9.19s update mailbox: 12.48s  mask_time: 491.6606s
+feat_buffer time: IO load: 34.445s 异步阻塞: 0.027s presample and analyze: 207.994s 预采样: 0.000s, 预采样负采样:207.707s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10843s, 预计epoch时间: 6969.952s
+run batch27000total time: 2737.17s,presample: 254.41s, sample: 313.18s, prep time: 923.55s, gen block: 35.56s, feat input: 61.23s, model run: 104.03s,                    loss and opt: 1133.07s, update mem: 9.55s update mailbox: 12.96s  mask_time: 514.3812s
+feat_buffer time: IO load: 36.031s 异步阻塞: 0.028s presample and analyze: 218.674s 预采样: 0.000s, 预采样负采样:218.377s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10899s, 预计epoch时间: 7005.779s
+run batch28000total time: 2846.15s,presample: 266.71s, sample: 326.05s, prep time: 959.60s, gen block: 36.81s, feat input: 63.59s, model run: 107.67s,                    loss and opt: 1176.86s, update mem: 9.91s update mailbox: 13.43s  mask_time: 537.0573s
+feat_buffer time: IO load: 37.526s 异步阻塞: 0.029s presample and analyze: 229.113s 预采样: 0.000s, 预采样负采样:228.805s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10909s, 预计epoch时间: 7012.212s
+run batch29000total time: 2955.24s,presample: 278.79s, sample: 339.06s, prep time: 995.70s, gen block: 38.13s, feat input: 65.98s, model run: 111.51s,                    loss and opt: 1220.57s, update mem: 10.28s update mailbox: 13.93s  mask_time: 559.9139s
+feat_buffer time: IO load: 39.095s 异步阻塞: 0.030s presample and analyze: 239.619s 预采样: 0.000s, 预采样负采样:239.301s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10952s, 预计epoch时间: 7040.414s
+run batch30000total time: 3064.76s,presample: 291.11s, sample: 352.10s, prep time: 1031.93s, gen block: 39.45s, feat input: 68.37s, model run: 115.44s,                    loss and opt: 1264.23s, update mem: 10.65s update mailbox: 14.43s  mask_time: 583.2971s
+feat_buffer time: IO load: 40.767s 异步阻塞: 0.032s presample and analyze: 250.639s 预采样: 0.000s, 预采样负采样:250.310s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10985s, 预计epoch时间: 7061.354s
+run batch31000total time: 3174.61s,presample: 303.78s, sample: 365.04s, prep time: 1068.18s, gen block: 40.80s, feat input: 70.77s, model run: 119.37s,                    loss and opt: 1307.93s, update mem: 11.03s update mailbox: 14.93s  mask_time: 606.1895s
+feat_buffer time: IO load: 42.442s 异步阻塞: 0.033s presample and analyze: 261.264s 预采样: 0.000s, 预采样负采样:260.924s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11046s, 预计epoch时间: 7100.217s
+run batch32000total time: 3285.06s,presample: 316.31s, sample: 378.20s, prep time: 1104.62s, gen block: 42.14s, feat input: 73.18s, model run: 123.30s,                    loss and opt: 1351.98s, update mem: 11.41s update mailbox: 15.44s  mask_time: 629.5415s
+feat_buffer time: IO load: 44.099s 异步阻塞: 0.034s presample and analyze: 272.137s 预采样: 0.000s, 预采样负采样:271.786s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11015s, 预计epoch时间: 7080.300s
+run batch33000total time: 3395.21s,presample: 328.83s, sample: 391.20s, prep time: 1141.13s, gen block: 43.42s, feat input: 75.57s, model run: 127.07s,                    loss and opt: 1395.98s, update mem: 11.77s update mailbox: 15.93s  mask_time: 653.1490s
+feat_buffer time: IO load: 45.737s 异步阻塞: 0.035s presample and analyze: 283.395s 预采样: 0.000s, 预采样负采样:283.034s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.10989s, 预计epoch时间: 7064.071s
+run batch34000total time: 3505.10s,presample: 341.73s, sample: 404.28s, prep time: 1177.49s, gen block: 44.68s, feat input: 77.96s, model run: 130.77s,                    loss and opt: 1439.51s, update mem: 12.13s update mailbox: 16.40s  mask_time: 676.5202s
+feat_buffer time: IO load: 47.308s 异步阻塞: 0.036s presample and analyze: 294.339s 预采样: 0.000s, 预采样负采样:293.969s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11110s, 预计epoch时间: 7141.686s
+run batch35000total time: 3616.20s,presample: 354.49s, sample: 417.66s, prep time: 1214.05s, gen block: 46.00s, feat input: 80.36s, model run: 134.57s,                    loss and opt: 1483.77s, update mem: 12.50s update mailbox: 16.89s  mask_time: 700.3669s
+feat_buffer time: IO load: 48.940s 异步阻塞: 0.037s presample and analyze: 305.459s 预采样: 0.000s, 预采样负采样:305.078s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11068s, 预计epoch时间: 7114.872s
+run batch36000total time: 3726.88s,presample: 367.17s, sample: 430.80s, prep time: 1250.65s, gen block: 47.25s, feat input: 82.75s, model run: 138.30s,                    loss and opt: 1527.97s, update mem: 12.85s update mailbox: 17.36s  mask_time: 724.2803s
+feat_buffer time: IO load: 50.582s 异步阻塞: 0.038s presample and analyze: 316.880s 预采样: 0.000s, 预采样负采样:316.489s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11180s, 预计epoch时间: 7186.799s
+run batch37000total time: 3838.68s,presample: 380.40s, sample: 444.22s, prep time: 1287.38s, gen block: 48.55s, feat input: 85.16s, model run: 142.11s,                    loss and opt: 1572.24s, update mem: 13.22s update mailbox: 17.85s  mask_time: 748.2748s
+feat_buffer time: IO load: 52.211s 异步阻塞: 0.039s presample and analyze: 328.100s 预采样: 0.000s, 预采样负采样:327.698s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11094s, 预计epoch时间: 7131.627s
+run batch38000total time: 3949.63s,presample: 393.33s, sample: 457.55s, prep time: 1323.97s, gen block: 49.90s, feat input: 87.59s, model run: 146.04s,                    loss and opt: 1616.04s, update mem: 13.60s update mailbox: 18.36s  mask_time: 772.1899s
+feat_buffer time: IO load: 53.876s 异步阻塞: 0.040s presample and analyze: 339.363s 预采样: 0.000s, 预采样负采样:338.951s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11230s, 预计epoch时间: 7219.109s
+run batch39000total time: 4061.93s,presample: 406.54s, sample: 471.05s, prep time: 1360.83s, gen block: 51.27s, feat input: 90.03s, model run: 150.00s,                    loss and opt: 1660.46s, update mem: 13.99s update mailbox: 18.88s  mask_time: 796.7932s
+feat_buffer time: IO load: 55.685s 异步阻塞: 0.041s presample and analyze: 351.159s 预采样: 0.000s, 预采样负采样:350.736s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11293s, 预计epoch时间: 7259.620s
+run batch40000total time: 4174.87s,presample: 420.23s, sample: 484.62s, prep time: 1397.85s, gen block: 52.62s, feat input: 92.47s, model run: 153.89s,                    loss and opt: 1704.88s, update mem: 14.37s update mailbox: 19.39s  mask_time: 821.2587s
+feat_buffer time: IO load: 57.396s 异步阻塞: 0.042s presample and analyze: 362.734s 预采样: 0.000s, 预采样负采样:362.300s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11208s, 预计epoch时间: 7204.750s
+run batch41000total time: 4286.95s,presample: 433.35s, sample: 498.23s, prep time: 1434.83s, gen block: 53.91s, feat input: 94.89s, model run: 157.63s,                    loss and opt: 1749.17s, update mem: 14.73s update mailbox: 19.87s  mask_time: 845.7180s
+feat_buffer time: IO load: 59.013s 异步阻塞: 0.043s presample and analyze: 374.234s 预采样: 0.000s, 预采样负采样:373.790s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11331s, 预计epoch时间: 7283.703s
+run batch42000total time: 4400.25s,presample: 446.81s, sample: 512.07s, prep time: 1471.92s, gen block: 55.26s, feat input: 97.35s, model run: 161.68s,                    loss and opt: 1793.68s, update mem: 15.11s update mailbox: 20.38s  mask_time: 870.9589s
+feat_buffer time: IO load: 60.792s 异步阻塞: 0.044s presample and analyze: 386.320s 预采样: 0.000s, 预采样负采样:385.865s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11384s, 预计epoch时间: 7317.992s
+run batch43000total time: 4514.10s,presample: 460.76s, sample: 525.91s, prep time: 1508.96s, gen block: 56.72s, feat input: 99.84s, model run: 165.83s,                    loss and opt: 1838.16s, update mem: 15.52s update mailbox: 20.93s  mask_time: 895.8305s
+feat_buffer time: IO load: 62.576s 异步阻塞: 0.045s presample and analyze: 398.078s 预采样: 0.000s, 预采样负采样:397.612s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11327s, 预计epoch时间: 7281.342s
+run batch44000total time: 4627.37s,presample: 474.26s, sample: 539.71s, prep time: 1546.30s, gen block: 58.18s, feat input: 102.28s, model run: 169.70s,                    loss and opt: 1882.57s, update mem: 15.90s update mailbox: 21.43s  mask_time: 920.7941s
+feat_buffer time: IO load: 64.233s 异步阻塞: 0.046s presample and analyze: 409.916s 预采样: 0.000s, 预采样负采样:409.439s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11381s, 预计epoch时间: 7316.038s
+run batch45000total time: 4741.18s,presample: 487.91s, sample: 553.84s, prep time: 1583.51s, gen block: 59.57s, feat input: 104.76s, model run: 173.66s,                    loss and opt: 1927.07s, update mem: 16.28s update mailbox: 21.95s  mask_time: 946.5113s
+feat_buffer time: IO load: 66.011s 异步阻塞: 0.047s presample and analyze: 422.202s 预采样: 0.000s, 预采样负采样:421.715s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11428s, 预计epoch时间: 7346.148s
+run batch46000total time: 4855.46s,presample: 502.01s, sample: 567.79s, prep time: 1620.87s, gen block: 60.98s, feat input: 107.24s, model run: 177.63s,                    loss and opt: 1971.60s, update mem: 16.67s update mailbox: 22.48s  mask_time: 971.7389s
+feat_buffer time: IO load: 67.716s 异步阻塞: 0.048s presample and analyze: 434.176s 预采样: 0.000s, 预采样负采样:433.678s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11444s, 预计epoch时间: 7356.106s
+run batch47000total time: 4969.90s,presample: 515.86s, sample: 581.89s, prep time: 1658.26s, gen block: 62.47s, feat input: 109.75s, model run: 181.80s,                    loss and opt: 2016.13s, update mem: 17.09s update mailbox: 23.04s  mask_time: 997.1022s
+feat_buffer time: IO load: 69.577s 异步阻塞: 0.050s presample and analyze: 446.166s 预采样: 0.000s, 预采样负采样:445.657s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11472s, 预计epoch时间: 7374.064s
+run batch48000total time: 5084.61s,presample: 529.84s, sample: 595.89s, prep time: 1695.69s, gen block: 63.95s, feat input: 112.27s, model run: 186.08s,                    loss and opt: 2060.76s, update mem: 17.51s update mailbox: 23.61s  mask_time: 1022.8299s
+feat_buffer time: IO load: 71.505s 异步阻塞: 0.051s presample and analyze: 458.628s 预采样: 0.000s, 预采样负采样:458.107s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11482s, 预计epoch时间: 7381.055s
+run batch49000total time: 5199.43s,presample: 544.19s, sample: 609.80s, prep time: 1733.16s, gen block: 65.42s, feat input: 114.77s, model run: 190.25s,                    loss and opt: 2105.30s, update mem: 17.93s update mailbox: 24.17s  mask_time: 1048.0793s
+feat_buffer time: IO load: 73.374s 异步阻塞: 0.052s presample and analyze: 470.697s 预采样: 0.000s, 预采样负采样:470.165s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11397s, 预计epoch时间: 7326.261s
+run batch50000total time: 5313.40s,presample: 558.06s, sample: 623.67s, prep time: 1770.58s, gen block: 66.78s, feat input: 117.24s, model run: 194.16s,                    loss and opt: 2149.85s, update mem: 18.30s update mailbox: 24.68s  mask_time: 1073.3332s
+feat_buffer time: IO load: 75.169s 异步阻塞: 0.053s presample and analyze: 482.770s 预采样: 0.000s, 预采样负采样:482.227s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11419s, 预计epoch时间: 7340.593s
+run batch51000total time: 5427.60s,presample: 572.05s, sample: 637.42s, prep time: 1808.05s, gen block: 68.20s, feat input: 119.73s, model run: 198.25s,                    loss and opt: 2194.37s, update mem: 18.70s update mailbox: 25.22s  mask_time: 1098.8951s
+feat_buffer time: IO load: 77.048s 异步阻塞: 0.054s presample and analyze: 495.297s 预采样: 0.000s, 预采样负采样:494.744s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11455s, 预计epoch时间: 7363.177s
+run batch52000total time: 5542.14s,presample: 586.46s, sample: 651.18s, prep time: 1845.48s, gen block: 69.56s, feat input: 122.20s, model run: 202.14s,                    loss and opt: 2239.06s, update mem: 19.08s update mailbox: 25.73s  mask_time: 1124.2282s
+feat_buffer time: IO load: 78.773s 异步阻塞: 0.055s presample and analyze: 507.556s 预采样: 0.000s, 预采样负采样:506.992s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11460s, 预计epoch时间: 7366.800s
+run batch53000total time: 5656.74s,presample: 600.55s, sample: 665.09s, prep time: 1883.16s, gen block: 70.90s, feat input: 124.66s, model run: 205.96s,                    loss and opt: 2283.82s, update mem: 19.46s update mailbox: 26.24s  mask_time: 1149.8308s
+feat_buffer time: IO load: 80.491s 异步阻塞: 0.056s presample and analyze: 519.924s 预采样: 0.000s, 预采样负采样:519.350s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11489s, 预计epoch时间: 7385.402s
+run batch54000total time: 5771.63s,presample: 614.78s, sample: 679.05s, prep time: 1920.75s, gen block: 72.25s, feat input: 127.13s, model run: 209.85s,                    loss and opt: 2328.68s, update mem: 19.84s update mailbox: 26.75s  mask_time: 1175.9141s
+feat_buffer time: IO load: 82.334s 异步阻塞: 0.057s presample and analyze: 532.739s 预采样: 0.000s, 预采样负采样:532.155s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11500s, 预计epoch时间: 7392.239s
+run batch55000total time: 5886.63s,presample: 629.34s, sample: 693.20s, prep time: 1958.49s, gen block: 73.55s, feat input: 129.59s, model run: 213.63s,                    loss and opt: 2373.11s, update mem: 20.19s update mailbox: 27.23s  mask_time: 1201.8154s
+feat_buffer time: IO load: 84.048s 异步阻塞: 0.058s presample and analyze: 545.150s 预采样: 0.000s, 预采样负采样:544.556s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11534s, 预计epoch时间: 7414.157s
+run batch56000total time: 6001.97s,presample: 643.66s, sample: 707.39s, prep time: 1996.20s, gen block: 74.92s, feat input: 132.07s, model run: 217.57s,                    loss and opt: 2417.92s, update mem: 20.58s update mailbox: 27.75s  mask_time: 1227.8216s
+feat_buffer time: IO load: 85.858s 异步阻塞: 0.059s presample and analyze: 557.662s 预采样: 0.000s, 预采样负采样:557.058s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11567s, 预计epoch时间: 7435.573s
+run batch57000total time: 6117.64s,presample: 658.01s, sample: 721.66s, prep time: 2033.84s, gen block: 76.37s, feat input: 134.59s, model run: 221.73s,                    loss and opt: 2462.79s, update mem: 20.99s update mailbox: 28.30s  mask_time: 1254.1878s
+feat_buffer time: IO load: 87.811s 异步阻塞: 0.060s presample and analyze: 570.489s 预采样: 0.000s, 预采样负采样:569.873s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11623s, 预计epoch时间: 7471.405s
+run batch58000total time: 6233.87s,presample: 672.87s, sample: 735.87s, prep time: 2071.50s, gen block: 77.73s, feat input: 137.08s, model run: 225.77s,                    loss and opt: 2507.90s, update mem: 21.37s update mailbox: 28.81s  mask_time: 1280.3011s
+feat_buffer time: IO load: 89.641s 异步阻塞: 0.061s presample and analyze: 583.079s 预采样: 0.000s, 预采样负采样:582.452s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11510s, 预计epoch时间: 7398.903s
+run batch59000total time: 6348.97s,presample: 687.13s, sample: 749.98s, prep time: 2109.23s, gen block: 78.99s, feat input: 139.53s, model run: 229.48s,                    loss and opt: 2552.85s, update mem: 21.72s update mailbox: 29.28s  mask_time: 1306.3305s
+feat_buffer time: IO load: 91.354s 异步阻塞: 0.062s presample and analyze: 595.633s 预采样: 0.000s, 预采样负采样:594.996s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11561s, 预计epoch时间: 7431.658s
+run batch60000total time: 6464.58s,presample: 701.60s, sample: 764.12s, prep time: 2146.94s, gen block: 80.25s, feat input: 141.98s, model run: 233.19s,                    loss and opt: 2598.11s, update mem: 22.08s update mailbox: 29.76s  mask_time: 1332.9487s
+feat_buffer time: IO load: 93.133s 异步阻塞: 0.063s presample and analyze: 608.754s 预采样: 0.000s, 预采样负采样:608.107s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11664s, 预计epoch时间: 7497.688s
+run batch61000total time: 6581.22s,presample: 716.71s, sample: 778.39s, prep time: 2184.75s, gen block: 81.60s, feat input: 144.48s, model run: 237.14s,                    loss and opt: 2643.26s, update mem: 22.46s update mailbox: 30.26s  mask_time: 1359.3715s
+feat_buffer time: IO load: 94.959s 异步阻塞: 0.064s presample and analyze: 621.593s 预采样: 0.000s, 预采样负采样:620.935s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11537s, 预计epoch时间: 7415.988s
+run batch62000total time: 6696.59s,presample: 731.25s, sample: 792.50s, prep time: 2222.62s, gen block: 82.86s, feat input: 146.93s, model run: 240.82s,                    loss and opt: 2688.09s, update mem: 22.81s update mailbox: 30.73s  mask_time: 1385.6618s
+feat_buffer time: IO load: 96.686s 异步阻塞: 0.065s presample and analyze: 634.406s 预采样: 0.000s, 预采样负采样:633.738s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11612s, 预计epoch时间: 7464.124s
+run batch63000total time: 6812.70s,presample: 745.91s, sample: 806.83s, prep time: 2260.55s, gen block: 84.15s, feat input: 149.40s, model run: 244.62s,                    loss and opt: 2733.15s, update mem: 23.18s update mailbox: 31.22s  mask_time: 1412.5976s
+feat_buffer time: IO load: 98.512s 异步阻塞: 0.066s presample and analyze: 647.683s 预采样: 0.000s, 预采样负采样:647.004s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+平均每个batch用时0.11660s, 预计epoch时间: 7494.927s
+run batch64000total time: 6929.30s,presample: 761.01s, sample: 821.23s, prep time: 2298.46s, gen block: 85.42s, feat input: 151.86s, model run: 248.36s,                    loss and opt: 2778.26s, update mem: 23.53s update mailbox: 31.70s  mask_time: 1439.2832s
+feat_buffer time: IO load: 100.252s 异步阻塞: 0.067s presample and analyze: 660.601s 预采样: 0.000s, 预采样负采样:659.912s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.019s
+total loop use time: 6962.2248
+run batch64282total time: 6961.33s,presample: 764.48s, sample: 825.28s, prep time: 2309.11s, gen block: 85.77s, feat input: 152.55s, model run: 249.40s,               loss and opt: 2790.99s, update mem: 23.63s update mailbox: 31.83s
+prep:1833.3836s strategy: 0.0000s compute: 3057.0265s update: 2070.8037s epoch: 6962.2581s other: 1.0442s
+prep:26.33% strategy: 0.00% compute: 43.91% update: 29.74% epoch: 100.00% other: 0.01%
+
+
+内存16GB

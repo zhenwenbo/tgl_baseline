@@ -1,0 +1,105 @@
+预设epoch为 2
+=================================================================epoch强制设置为1
+{'layer': 1, 'neighbor': [10], 'strategy': 'recent', 'prop_time': False, 'history': 1, 'duration': 0, 'num_thread': 32}
+{'epoch': 1, 'batch_size': 2000, 'lr': 0.0001, 'dropout': 0.2, 'att_dropout': 0.2, 'all_on_gpu': False}
+实际的block大小为: 60000
+训练配置: {'use_valid_edge': False, 'use_async_prefetch': True, 'pre_sample_size': 60000, 'part_neg_sample': False, 'use_pin_memory': False, 'model_eval': False, 'cut_zombie': False, 'use_disk': True, 'reuse_neg_sample': 0.9, 'data_incre': False, 'memory_disk': True, 'use_async_IO': False, 'node_cache': False, 'node_reorder': False, 'node_simple_cache': False, 'epoch': 2}
+======================================================================
+设置随机种子为42
+======================================================================
+Sent: init_feats
+Received: None
+====================================
+使用CPU采样? False
+初始化GPU sampler
+重放负采样，重放比例为 0
+Epoch 0:
+更新memory时寻找最后出现的用时0.0000s
+IO load: 0.000s presample and analyze: 0.000s 预采样: 0.000s, 预采样负采样:0.000s
+读取disk用时 0.0010s shape:torch.Size([1055, 128]) 524.81MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0001s shape:torch.Size([0]) 0.00MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+第一个块的加载时间: 0.023s
+平均每个batch用时0.00000s, 预计epoch时间: 0.000s
+run batch0total time: 0.00s,presample: 0.00s, sample: 0.00s, prep time: 0.00s, gen block: 0.00s, feat input: 0.00s, model run: 0.00s,                        loss and opt: 0.00s, update mem: 0.00s update mailbox: 0.00s  mask_time: 0.0010s
+feat_buffer time: IO load: 0.014s 异步阻塞: 0.000s presample and analyze: 0.011s 预采样: 0.000s, 预采样负采样:0.008s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.003s
+预设epoch为 2
+=================================================================epoch强制设置为1
+{'layer': 1, 'neighbor': [10], 'strategy': 'recent', 'prop_time': False, 'history': 1, 'duration': 0, 'num_thread': 32}
+{'epoch': 1, 'batch_size': 2000, 'lr': 0.0001, 'dropout': 0.2, 'att_dropout': 0.2, 'all_on_gpu': False}
+实际的block大小为: 60000
+训练配置: {'use_valid_edge': False, 'use_async_prefetch': True, 'pre_sample_size': 60000, 'part_neg_sample': False, 'use_pin_memory': False, 'model_eval': False, 'cut_zombie': False, 'use_disk': True, 'reuse_neg_sample': 0.9, 'data_incre': False, 'memory_disk': True, 'use_async_IO': False, 'node_cache': False, 'node_reorder': False, 'node_simple_cache': False, 'epoch': 2}
+======================================================================
+设置随机种子为42
+======================================================================
+pre_fetch: 是否使用disk: True
+读取disk用时 0.0203s shape:torch.Size([60000, 128]) 1444.61MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+读取disk用时 0.0005s shape:torch.Size([920, 128]) 940.20MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0011s shape:torch.Size([163, 128]) 73.90MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0151s shape:torch.Size([60000, 128]) 1944.15MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0299s shape:torch.Size([24, 430])
+读取disk用时 0.0005s shape:torch.Size([816, 128]) 822.83MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0018s shape:torch.Size([302, 128]) 81.87MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0003s shape:torch.Size([24, 430]) 138.76MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0109s shape:torch.Size([60000, 128]) 2684.79MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0230s shape:torch.Size([29, 430])
+读取disk用时 0.0004s shape:torch.Size([729, 128]) 912.59MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0012s shape:torch.Size([283, 128]) 114.54MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0002s shape:torch.Size([53, 430]) 359.25MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0092s shape:torch.Size([60000, 128]) 3187.22MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0317s shape:torch.Size([21, 430])
+读取disk用时 0.0006s shape:torch.Size([682, 128]) 601.26MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0025s shape:torch.Size([401, 128]) 77.71MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0004s shape:torch.Size([73, 430]) 323.61MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0125s shape:torch.Size([60000, 128]) 2342.13MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0214s shape:torch.Size([30, 430])
+读取disk用时 0.0005s shape:torch.Size([629, 128]) 631.78MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0032s shape:torch.Size([629, 128]) 94.82MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0004s shape:torch.Size([94, 430]) 395.55MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0147s shape:torch.Size([60000, 128]) 1997.63MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0342s shape:torch.Size([41, 430])
+读取disk用时 0.0005s shape:torch.Size([604, 128]) 637.62MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0041s shape:torch.Size([894, 128]) 105.63MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0004s shape:torch.Size([129, 430]) 535.30MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0102s shape:torch.Size([60000, 128]) 2863.00MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0333s shape:torch.Size([43, 430])
+读取disk用时 0.0005s shape:torch.Size([563, 128]) 599.91MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0041s shape:torch.Size([963, 128]) 115.48MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0004s shape:torch.Size([165, 430]) 667.76MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0162s shape:torch.Size([60000, 128]) 1805.81MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0243s shape:torch.Size([46, 430])
+读取disk用时 0.0007s shape:torch.Size([537, 128]) 396.74MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0073s shape:torch.Size([1239, 128]) 83.28MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0006s shape:torch.Size([201, 430]) 518.32MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0235s shape:torch.Size([60000, 128]) 1245.58MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0255s shape:torch.Size([50, 430])
+读取disk用时 0.0006s shape:torch.Size([504, 128]) 384.00MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0054s shape:torch.Size([1351, 128]) 122.97MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0005s shape:torch.Size([239, 430]) 835.95MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0141s shape:torch.Size([60000, 128]) 2083.21MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0368s shape:torch.Size([39, 430])
+读取disk用时 0.0006s shape:torch.Size([470, 128]) 355.06MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0076s shape:torch.Size([1407, 128]) 90.09MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0008s shape:torch.Size([265, 430]) 559.44MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0201s shape:torch.Size([60000, 128]) 1460.91MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0292s shape:torch.Size([46, 430])
+读取disk用时 0.0006s shape:torch.Size([452, 128]) 368.07MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0084s shape:torch.Size([1638, 128]) 95.43MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0007s shape:torch.Size([294, 430]) 662.97MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0120s shape:torch.Size([60000, 128]) 2447.86MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0270s shape:torch.Size([56, 430])
+读取disk用时 0.0004s shape:torch.Size([452, 128]) 540.39MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0070s shape:torch.Size([1859, 128]) 129.76MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0005s shape:torch.Size([327, 430]) 1078.50MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0201s shape:torch.Size([60000, 128]) 1456.13MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0258s shape:torch.Size([57, 430])
+读取disk用时 0.0006s shape:torch.Size([433, 128]) 358.01MB/s path: /raid/guorui/DG/dataset/LASTFM/node_features.bin
+读取disk用时 0.0099s shape:torch.Size([1937, 128]) 95.83MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features_reorder.bin
+读取disk用时 0.0007s shape:torch.Size([356, 430]) 811.29MB/s path: /raid/guorui/DG/dataset/LASTFM/total_memory.bin
+读取disk用时 0.0117s shape:torch.Size([60000, 128]) 2496.65MB/s path: /raid/guorui/DG/dataset/LASTFM/edge_features.bin
+写入记忆disk用时 0.0251s shape:torch.Size([45, 430])
+total loop use time: 10.3023
+run batch453total time: 10.29s,presample: 0.24s, sample: 0.38s, prep time: 2.05s, gen block: 0.59s, feat input: 0.53s, model run: 2.67s,                loss and opt: 4.77s, update mem: 0.30s update mailbox: 0.43s
+feat_buffer time: IO load: 0.156s 异步阻塞: 0.001s presample and analyze: 0.055s 预采样: 0.000s, 预采样负采样:0.044s              记忆刷入和更新:0.000s 纯刷入时间:0.000s 负采样分析: 0.003s
+prep:1.7785s strategy: 0.0000s compute: 7.5896s update: 0.9215s epoch: 10.3125s other: 0.0229s
+prep:17.25% strategy: 0.00% compute: 73.60% update: 8.94% epoch: 100.00% other: 0.22%
+训练完成，退出子进程
