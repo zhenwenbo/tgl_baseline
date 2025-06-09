@@ -1,0 +1,9 @@
+{
+    "/raid/guorui/workspace/dgnn/b-tgl/test/\u6d4b\u8bd5\u51c6\u786e\u7387/tgl-neg.bin": {
+        "dtype": "int32",
+        "device": "cpu",
+        "shape": [
+            200000
+        ]
+    }
+}
