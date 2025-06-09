@@ -11,4 +11,5 @@ build/
 __pycache__/
 *.log
 test_set/*
-test_model
+test_modela-tgl/mfgs
+b-tgl/mfgs
