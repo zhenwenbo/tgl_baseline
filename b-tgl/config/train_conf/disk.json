@@ -4,7 +4,7 @@
     "pre_sample_size": 60000,
     "part_neg_sample": false,
     "use_pin_memory": false,
-    "model_eval": false,
+    "model_eval": true,
     "cut_zombie": false,
     "use_disk": true,
     "reuse_neg_sample": 0.9,
@@ -14,7 +14,7 @@
     "node_cache": true,
     "node_reorder": true,
     "node_simple_cache": true,
-    "epoch": 2
+    "epoch": 10
     
 
 }

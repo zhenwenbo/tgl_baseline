@@ -17,7 +17,7 @@ from sampler.sampler_core import ParallelSampler, TemporalGraphBlock
 #TODO 在LASTFM下确实会影响时间, 但是在大数据集上的影响好像不大? 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='GDELT')#LASTFM可用 GDELT客用
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')#LASTFM可用 GDELT客用
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -73,14 +73,13 @@ if (args.data == 'BITCOIN'):
 if (config.epoch != -1):
     train_param['epoch'] = config.epoch
     print(f"预设epoch为 {config.epoch}")
-
+'''
 if (args.data in ['BITCOIN', 'STACK', 'GDELT'] and 'TGN' not in args.config):
     train_param['epoch'] = 1
     print(f"BITCOIN后面两个的disk只跑一个epoch")
-train_param['epoch'] = 2
+'''
 if (args.set_epoch != -1):
     train_param['epoch'] = args.set_epoch
-train_param['epoch'] = 2
 print(f"=================================================================epoch强制设置为1")
 print(sample_param)
 print(train_param)
@@ -149,7 +148,7 @@ def eval(mode='val'):
         emb_buffer.cur_mode = 'val'
     if (feat_buffer):
         feat_buffer.mode = 'val'
-
+    
     neg_samples = 1
     model.eval()
     aps = list()
@@ -167,6 +166,7 @@ def eval(mode='val'):
         eval_df_end = df_conf['train_edge_end']
     
     right = left
+    
     with torch.no_grad():
         total_loss = 0
         while True:
@@ -278,7 +278,7 @@ if __name__ == '__main__':
         batch_size = train_param['batch_size']
         global node_feats, edge_feats
         node_feats, edge_feats = None,None
-
+    
         import torch.multiprocessing as multiprocessing
         multiprocessing.set_start_method("spawn")
         from pre_fetch import *
@@ -365,7 +365,7 @@ if __name__ == '__main__':
         else:
             raise RuntimeError("have not this dataset config!")
         
-
+        print("sample配置",sample_param)
         combine_first = False
         if 'combine_neighs' in train_param and train_param['combine_neighs']:
             combine_first = True
@@ -582,7 +582,6 @@ if __name__ == '__main__':
 
                 root_nodes = np.concatenate([src, dst, neg_sample_nodes]).astype(np.int32)
                 ts = np.concatenate([times, times, times]).astype(np.float32)
-                
                 t_sample_s = time.time()
                 if (use_gpu_sample):
                     
@@ -722,12 +721,13 @@ if __name__ == '__main__':
             print(f"prep:{time_total_prep:.4f}s strategy: {time_total_strategy:.4f}s compute: {time_total_compute:.4f}s update: {time_total_update:.4f}s epoch: {time_total_epoch:.4f}s other: {time_total_other:.4f}s")
             print(f"prep:{time_total_prep/time_total_epoch*100:.2f}% strategy: {time_total_strategy/time_total_epoch*100:.2f}% compute: {time_total_compute/time_total_epoch*100:.2f}% update: {time_total_update/time_total_epoch*100:.2f}% epoch: {time_total_epoch/time_total_epoch*100:.2f}% other: {time_total_other/time_total_epoch*100:.2f}%")
 
-
+            
             if (not args.model_eval):
                 continue
+            
             eval_time_s = time.time()
             ap, auc = eval('val')
-            
+            print(e,train_param['epoch'])
             if e > 2 and ap > best_ap:
                 best_e = e
                 best_ap = ap
@@ -777,7 +777,11 @@ if __name__ == '__main__':
             else:
                 print('\ttest AP:{:4f}  test AUC:{:4f}'.format(ap, auc))
     except Exception as e:
+        import traceback
         print(e)
+        print(f"错误类型: {type(e).__name__}")
+        print(f"错误信息: {e}")
+        print(f"完整堆栈:\n{traceback.format_exc()}")
     finally:
         print(f"训练完成，退出子进程")
         # if (use_async_prefetch):

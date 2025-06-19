@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import sys
-# from sampler_core import ParallelSampler, TemporalGraphBlock
+#from sampler_core import ParallelSampler, TemporalGraphBlock#注释掉
 
 root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
 if root_dir not in sys.path:
@@ -79,7 +79,7 @@ class ReNegLinkSampler:
         self.pre_res = cur_res
         self.pre_ttl = cur_ttl
 
-        # print(f'相同的负采样节点个数: {sameNum} 占比: {sameNum / n * 100:.2f}%')
+        #print(f'相同的负采样节点个数: {sameNum} 占比: {sameNum / n * 100:.2f}%')
         return cur_res
     
         # print(f"结果为: {cur_res}")
@@ -162,8 +162,9 @@ if __name__ == '__main__':
                               sample_config['history'], float(sample_config['duration']))
 
     num_nodes = max(int(df['src'].max()), int(df['dst'].max()))
-    neg_link_sampler = NegLinkSampler(num_nodes)
-
+    num_edge = len(df)
+    neg_link_sampler = NegLinkSampler(num_nodes,num_edge)
+    
     tot_time = 0
     ptr_time = 0
     coo_time = 0
@@ -184,9 +185,8 @@ if __name__ == '__main__':
         sampler.sample(root_nodes, ts)
         ret = sampler.get_ret()
         print(f"第{_}次采样 batch_size: {args.batch_size} 时间{time.time() - start:.6f}")
-
         cur_ret = ret[0]
-        # print(root_nodes)
+        print(root_nodes)
         # np.savez(f'./ret{_}.npz', row = cur_ret.row(), col = cur_ret.col(), eid = cur_ret.eid(), ts = cur_ret.ts(),
         #           nodes = cur_ret.nodes(), dst = cur_ret.dts(), dim_in = cur_ret.dim_in(), dim_out = cur_ret.dim_out())
         

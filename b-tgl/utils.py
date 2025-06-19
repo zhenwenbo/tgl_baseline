@@ -684,7 +684,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                 i += 1
             else:
                 # srch = node_feats[b.srcdata['ID'].long()].float()
-                if (feat_buffer != None and (feat_buffer.mode == 'train' or feat_buffer.use_b_test)):
+                if (feat_buffer != None and (feat_buffer.mode == 'train')):
                     srch = feat_buffer.get_n_feat(b.srcdata['ID'])
                 else:
                     if (feat_buffer != None and feat_buffer.prefetch_conn != None):
@@ -706,7 +706,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                         b.edata['f'] = efeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
                         i += 1
                     else:
-                        if (feat_buffer != None and (feat_buffer.mode == 'train' or feat_buffer.use_b_test)):
+                        if (feat_buffer != None and (feat_buffer.mode == 'train' )):
                             srch = feat_buffer.get_e_feat(b.edata['ID'])
                         else:
                             if (feat_buffer != None and feat_buffer.prefetch_conn != None):

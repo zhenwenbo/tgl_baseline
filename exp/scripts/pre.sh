@@ -74,7 +74,7 @@ monitor_memory_usage() {
 
 
 
-ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
+#ds=("LASTFM" "TALK" "STACK" "BITCOIN" "GDELT")
 # ds=("BITCOIN" "GDELT")
 
 block_size=60000

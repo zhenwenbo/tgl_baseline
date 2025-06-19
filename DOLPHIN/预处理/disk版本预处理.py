@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -17,7 +17,7 @@ parser.add_argument('--dis_threshold', type=int, default=10, help='distance thre
 parser.add_argument('--fanout', type=int, default=-1)
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--substream_size', type=int, default=600000, help='substream size')
+parser.add_argument('--substream_size', type=int, default=60000, help='substream size')
 parser.add_argument('--cache_budget', type=int, default=10)
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
 parser.add_argument('--opt', action='store_true', default=False)
@@ -33,7 +33,7 @@ import numpy as np
 import sys
 import os
 total_start = time.time()
-root_dir = '/raid/guorui/workspace/dgnn/b-tgl'
+root_dir = '/home/zwb/tgl-baseline/DOLPHIN'
 if root_dir not in sys.path:
     sys.path.append(root_dir)
 
@@ -65,6 +65,7 @@ if __name__ == '__main__':
 
     if (not args.use_stream):
         g, df = load_graph(args.data)
+        print("g['indices'].shape[0]",g['indices'].shape[0])
         # train_edge_end = 0
         if (args.data in ['BITCOIN']):
             train_edge_end = 86063713
@@ -81,7 +82,7 @@ if __name__ == '__main__':
             train_edge_end = df_conf['train_edge_end']
             val_edge_end = df_conf['val_edge_end']
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-
+    sample_param['neighbor']=[50]
     if (args.fanout != -1):
         print(f"自定义fanout")
         sample_param['neighbor'] = [args.fanout]
@@ -133,12 +134,21 @@ if __name__ == '__main__':
     no_neg = 'no_neg' in sample_param and sample_param['no_neg']
     from emb_buffer import *
 
-
+    
     # no_neg = True
     sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], None)
 
     node_num = g['indptr'].shape[0] - 1
-    edge_num = g['indices'].shape[0]
+    edge_num = g['indices'].shape[0]#这里的问题是和g相关的
+    if (args.data == 'LASTFM'):#TODO 临时改法 还得再改
+        edge_num = 1293103
+    elif (args.data == 'TALK'):
+        edge_num = 157473
+    elif (args.data == 'STACK'):
+        edge_num = 63497048   
+    else:
+        raise RuntimeError("have not this dataset config!")
+    
     cur_train = {
         'node_feat_type': 'float32',
         'edge_feat_type': 'float32',
@@ -212,6 +222,7 @@ if __name__ == '__main__':
         #     feat_buffer.gen_part(mode = 'val')
         #     feat_buffer.gen_part(mode = 'test')
     else:
+        #这里的edge_num有问题
         feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.substream_size//train_param['batch_size'],sampler_gpu,neg_link_sampler, node_num = node_num, edge_num=edge_num, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge), substream_size=args.substream_size)
         feat_buffer.train_edge_end = train_edge_end
         if (not use_async_prefetch):
@@ -220,9 +231,11 @@ if __name__ == '__main__':
         if (args.data == 'MAG1' or args.data == 'MOOC1'):
             feat_buffer.gen_part_stream_bucket_cache()
         else:
+            
             feat_buffer.gen_part_stream(bucket_optimal=False, cache_budget=args.cache_budget * 1024 ** 3)
+            
 
     print_total()
-    # feat_buffer.gen_part_incre()
+    #feat_buffer.gen_part_incre()#
     flush_saveBin_conf()
     print(f"共用时{time.time() - total_start:.4f}s")

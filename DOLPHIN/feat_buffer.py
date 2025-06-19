@@ -36,7 +36,7 @@ class Feat_buffer:
         self.dataset = conf['dataset']
         self.node_num = conf['node_num']
         self.edge_num = conf['edge_num']
-
+        
         self.node_feat_dim, self.edge_feat_dim = feat_dim
         self.has_ef = self.edge_feat_dim > 0
         self.memory_param = memory_param
@@ -929,6 +929,7 @@ class Feat_buffer:
 
     
     def analyze_mem(self, nodes):
+        
         time_exec_mem_s = time.time()
         self.refresh_memory()
 
@@ -1176,8 +1177,9 @@ class Feat_buffer:
 
 
     def stream_extract(self, feat_path, save_paths, window_size, his, his_max, feat_len, np_type):
-
+    
         
+        # 初始化变量
         mask_time = 0
         ind_time = 0
         max_feat_len = max(his_max).item() + 1
@@ -1189,6 +1191,7 @@ class Feat_buffer:
             
 
         while True:
+            # 计算窗口的结束位置
             end += window_size
             # 读取start:end的特征
             end = min(end, max_feat_len)
@@ -1196,30 +1199,39 @@ class Feat_buffer:
             if (start >= end):
                 break
 
+            # 读取特征数据
             row_data = np.fromfile(feat_path, dtype=np_type, offset=start * feat_len, count=(end - start) * feat_len)
             row_data = row_data.reshape(-1, feat_len)
-
+            
+            # 遍历历史数据
             for i, tensor in enumerate(his):
+                
+                # 计算掩码
                 mask_s = time.time()  
                 mask = torch.bitwise_and(tensor >= start, tensor < end)
                 mask_time += time.time() - mask_s
 
+                # 计算索引
                 ind_s = time.time()
                 cur_ind = tensor[mask]
                 ind_time += time.time() - ind_s
 
+                # 提取当前数据
                 cur_data = torch.from_numpy(row_data[cur_ind - start].reshape(-1, feat_len))
                 cur_save_path = save_paths[i]
 
                     
+                # 如果不是第一个历史数据，则保存增量数据
                 if (i > 0):
                     cur_save_path = cur_save_path.replace('.bin', '_incre.bin')
                 saveBin(cur_data, cur_save_path, addSave=(start > 0))
 
+            # 删除特征数据，释放内存
             del row_data
             gc.collect()
             print(f"{start}:{end}抽取 mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
             start = end
+        # 刷新保存数据
         flush_saveBin_conf()
 
         print(f"总抽取, mask: {mask_time:.2f}s  ind: {ind_time:.2f}s")
@@ -1298,13 +1310,14 @@ class Feat_buffer:
         preThresholdNum = 0
         bucket_nid_count = torch.zeros(self.total_node_num, dtype = torch.int32, device = 'cuda:0')
         bucket_eid_count = torch.zeros(self.total_edge_num if self.has_ef else 0, dtype = torch.int32, device = 'cuda:0')
+        
         bucket_cache_start = [0] # 在start处更新cache
         bucket_cache_idx = [] # 读取idx
         bucket_cache_size = 0
         pre_bucket_nid_idx = None
         pre_bucket_eid_idx = None
 
-        while True:
+        while True:#TODO 
             cur_bucket_allo = 0
             start = time.time()
 
@@ -1313,7 +1326,7 @@ class Feat_buffer:
 
             # if (left >= right):
             #     break
-            first_flag = True
+            first_flag = True#这个first_flag的意思是是否进入了内层循环
             left_c = left
             while True:
                 right += batch_size
@@ -1325,7 +1338,7 @@ class Feat_buffer:
                 src = total_src[left: right]
                 dst = total_dst[left: right]
                 times = total_time[left: right]
-                eid = total_eid[left: right]
+                eid = total_eid[left: right]#
                 root_nodes = torch.cat((src, dst)).cuda()
                 root_ts = torch.cat((times, times)).cuda()
 
@@ -1337,7 +1350,6 @@ class Feat_buffer:
                 for ret in ret_list:
                     src,dst,outts,outeid,root_nodes,root_ts,dts = ret
                     eid = outeid[outeid > -1]
-
                     cur_eid = torch.unique(eid)
                     eid_uni = torch.cat((cur_eid, eid_uni))
                     eid_uni = torch.unique(eid_uni)
@@ -1395,13 +1407,13 @@ class Feat_buffer:
                 bucket_nid_count_sort,bucket_nid_count_sort_idx = torch.sort(bucket_nid_count, descending=True)
                 cache_nid = bucket_nid_count_sort_idx[:node_idx_budget]
                 cache_nid_incre = cache_nid
+
                 if (self.has_ef):
                     bucket_eid_count_sort,bucket_eid_count_sort_idx = torch.sort(bucket_eid_count, descending= True)
                     cache_eid = bucket_eid_count_sort_idx[:edge_idx_budget]
                     cache_eid_incre = cache_eid
-                
-                
-                
+                    
+                        
                 if (pre_bucket_nid_idx is not None):
                     # pre不在cur中的那些idx被废弃，作为incre_mask，被cur不在pre中的那些node_idx替代
                     # 替代过程为cur_notin_pre
@@ -1425,6 +1437,7 @@ class Feat_buffer:
                         saveBin(pre_notin_cur.cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_eid_incre_mask_{bucket_cache_start[-1]}.pt')
                         
                         cache_eid_incre = cache_eid[cur_notin_pre]
+                        print(cache_eid_incre)
                     else:
                         pre_bucket_eid_idx = cache_eid
 
@@ -1500,6 +1513,7 @@ class Feat_buffer:
                     pre_eid = cur_eid_uni
                     pre_nid = cur_nid_uni
                 if (self.has_ef):
+                    
                     edge_his.append(cache_eid_incre.cpu())
                     edge_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/cache_edge_feat_{bucket_cache_start[-1]}.pt')
                     edge_his_max.append(torch.max(cache_eid_incre).cpu() if cache_eid_incre.shape[0] > 0 else 0)
@@ -1548,8 +1562,8 @@ class Feat_buffer:
         if (self.has_ef):
             bucket_eid_count_sort,bucket_eid_count_sort_idx = torch.sort(bucket_eid_count, descending= True)
             cache_eid = bucket_eid_count_sort_idx[:edge_idx_budget]
-            cache_eid_incre = cache_eid
-        
+            print("edge_idx_budget",edge_idx_budget,bucket_eid_count_sort_idx)
+            cache_eid_incre = cache_eid #问题
         
         
         if (pre_bucket_nid_idx is not None):
@@ -1617,6 +1631,7 @@ class Feat_buffer:
                     # saveBin(torch.nonzero(torch.bitwise_and(notincache, ~notinpre)).reshape(-1).cpu(), path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_map_pre_incre_idx.pt')
 
                 if (self.edge_feat_dim > 0):
+                    
                     edge_his.append(cur_eid.cpu())
                     edge_save_paths.append(path + f'/part-{self.batch_size}-{self.sampler.fan_nums}/part{cur_batch_num}_edge_feat.bin')
                     # edge_save_paths.append()
@@ -1963,6 +1978,8 @@ class Feat_buffer:
         #     return
 
         df = self.df
+        if df is None:
+            print("DataFrame加载失败！")
         batch_size = self.batch_size
         # node_feats, edge_feats = load_feat(d)
         train_edge_end = self.train_edge_end

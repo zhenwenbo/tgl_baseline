@@ -51,9 +51,9 @@ class Sampler_GPU:
                                                     seed_num,self.fan_num,sample_param['cur_block'], sample_param['zombie_block'], out_src,out_dst,outts,outeid)
         
         mask_time_s = time.time()
-        mask = out_src > -1
+        mask = out_src > -1#这里由于dgl采样的特性 对于不存在的节点其out_src被赋为-1
         res = [out_src[mask], out_dst[mask], outts[mask], outeid[mask],
-                sampleIDs, curts, outdts[mask]]
+                sampleIDs, curts, outdts[mask]]#outdts采样得到的边的时间差
         self.mask_time += time.time() - mask_time_s
         return res
     

@@ -6,7 +6,7 @@ import pandas as pd
 import time
 from utils import *
 from sampler import *
-
+from utils import emptyCache
 
 d = 'WIKI'
 batch_size = 600
@@ -58,8 +58,8 @@ for _, rows in df[:train_edge_end].groupby(group_indexes):
 
     emptyCache()
     break
-
-srcr,dstr,outts,outeid,root_nodes,root_ts = ret_list[1]
+'''
+srcr,dstr,outts,outeid,root_nodes,root_ts,dts = ret_list[1]
 mask = srcr > -1
 src = srcr[mask]
 dst = dstr[mask]
@@ -76,11 +76,8 @@ eid_g = eid
 dis = torch.nonzero(eid_g != eid_t[:eid_g.shape[0]]).reshape(-1)
 
 print(f"\ntgl sample边个数: {len(src_t)}, gpu sample边个数: {src.shape}, 不同边个数{dis}")
+'''
 
-
-
-b = mfgs[2][0]
-b1 = mfgs[1][0]
 
 seed_num = root_nodes.shape[0]
 fan_num = 10

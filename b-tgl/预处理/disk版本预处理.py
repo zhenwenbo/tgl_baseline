@@ -1,9 +1,10 @@
-import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='MAG')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='BITCOIN')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-2.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='TALK')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -11,16 +12,12 @@ parser.add_argument('--no_emb_buffer', action='store_true', default=True)
 
 parser.add_argument('--only_gen_part', action='store_true', default=False)
 parser.add_argument('--use_async_prefetch', action='store_true', default=False)
-parser.add_argument('--use_stream', action='store_true', default=True)
-parser.add_argument('--use_disk', action='store_true', default=True)
+parser.add_argument('--use_stream', action='store_true', default=False)
 parser.add_argument('--dis_threshold', type=int, default=10, help='distance threshold')
-parser.add_argument('--fanout', type=int, default=-1)
 parser.add_argument('--rand_edge_features', type=int, default=128, help='use random edge featrues')
 parser.add_argument('--rand_node_features', type=int, default=128, help='use random node featrues')
-parser.add_argument('--substream_size', type=int, default=600000, help='substream size')
-parser.add_argument('--cache_budget', type=int, default=10)
+parser.add_argument('--pre_sample_size', type=int, default=60000, help='pre sample size')
 parser.add_argument('--eval_neg_samples', type=int, default=1, help='how many negative samples to use at inference. Note: this will change the metric of test set to AP+AUC to AP+MRR!')
-parser.add_argument('--opt', action='store_true', default=False)
 args=parser.parse_args()
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
@@ -60,9 +57,9 @@ def set_seed(seed):
 if __name__ == '__main__':
 
     node_feats, edge_feats = None,None
-    if (not args.use_stream and not args.use_disk):
+    if (not args.use_stream):
         node_feats, edge_feats = load_feat(args.data)
-
+    
     if (not args.use_stream):
         g, df = load_graph(args.data)
         # train_edge_end = 0
@@ -82,10 +79,6 @@ if __name__ == '__main__':
             val_edge_end = df_conf['val_edge_end']
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
 
-    if (args.fanout != -1):
-        print(f"自定义fanout")
-        sample_param['neighbor'] = [args.fanout]
-        
     if (args.data == 'GDELT' and sample_param['layer'] == 2):
         sample_param['neighbor'] = [8, 8]
         train_param['epoch'] = 1
@@ -112,14 +105,11 @@ if __name__ == '__main__':
     elif (args.data == 'MAG'):
         gnn_dim_edge = 0
         gnn_dim_node = 768
-    elif (args.data == 'MOOC'):
+    elif (args.data == 'WIKI'):
         gnn_dim_edge = 0
-        gnn_dim_node = 172
+        gnn_dim_node = 0
     else:
         raise RuntimeError("have not this dataset config!")
-    
-
-
     
 
     combine_first = False
@@ -136,22 +126,7 @@ if __name__ == '__main__':
 
     # no_neg = True
     sampler_gpu = Sampler_GPU(g, sample_param['neighbor'], sample_param['layer'], None)
-
-    node_num = g['indptr'].shape[0] - 1
-    edge_num = g['indices'].shape[0]
-    cur_train = {
-        'node_feat_type': 'float32',
-        'edge_feat_type': 'float32',
-        'dataset': args.data,
-        'node_feat_dim': gnn_dim_node,
-        'edge_feat_dim': gnn_dim_edge,
-        'node_num': node_num,
-        'edge_num': edge_num
-    }
-    if (args.data == 'MAG'):
-        cur_train['node_feat_type'] = 'float16'
-    with open('/raid/guorui/workspace/dgnn/b-tgl/cur_train.json', mode = 'w') as f:
-        json.dump(cur_train, f)
+ 
     import torch.multiprocessing as multiprocessing
     multiprocessing.set_start_method("spawn")
     from pre_fetch import *
@@ -190,8 +165,7 @@ if __name__ == '__main__':
 
 
 
-
-
+ 
     from feat_buffer import *
     # gpu_sampler = Sampler_GPU(g, 10)
 
@@ -199,12 +173,12 @@ if __name__ == '__main__':
     use_val_test = True
 
     if (not args.use_stream):
-        feat_buffer = Feat_buffer(args.data, df, None, train_param, memory_param, train_edge_end, args.substream_size,\
+        feat_buffer = Feat_buffer(args.data, df, None, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],\
                                 sampler_gpu,neg_link_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
         feat_buffer.init_feat(node_feats, edge_feats)
         print(f"非流式预处理")
         # print(f"只做train的预处理")
-        feat_buffer.gen_part(incre = True, mode = '', save_feat= False)
+        feat_buffer.gen_part(incre = True, mode = '')
         feat_buffer.val_edge_end = val_edge_end
         feat_buffer.test_edge_end = len(df)
         # if (use_val_test):
@@ -212,17 +186,12 @@ if __name__ == '__main__':
         #     feat_buffer.gen_part(mode = 'val')
         #     feat_buffer.gen_part(mode = 'test')
     else:
-        feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.substream_size//train_param['batch_size'],sampler_gpu,neg_link_sampler, node_num = node_num, edge_num=edge_num, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge), substream_size=args.substream_size)
+        feat_buffer = Feat_buffer(args.data, None, datas, train_param, memory_param, train_edge_end, args.pre_sample_size//train_param['batch_size'],sampler_gpu,neg_link_sampler, prefetch_conn=(prefetch_conn, prefetch_only_conn), feat_dim = (gnn_dim_node, gnn_dim_edge))
         feat_buffer.train_edge_end = train_edge_end
         if (not use_async_prefetch):
             feat_buffer.init_feat(node_feats, edge_feats)
-        
-        if (args.data == 'MAG1' or args.data == 'MOOC1'):
-            feat_buffer.gen_part_stream_bucket_cache()
-        else:
-            feat_buffer.gen_part_stream(bucket_optimal=False, cache_budget=args.cache_budget * 1024 ** 3)
+        feat_buffer.gen_part_stream()
 
-    print_total()
     # feat_buffer.gen_part_incre()
     flush_saveBin_conf()
     print(f"共用时{time.time() - total_start:.4f}s")

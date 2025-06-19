@@ -5,8 +5,8 @@ import json
 
 class GlobalConfig:
 
-    conf_path = '/raid/guorui/workspace/dgnn/b-tgl/config/train_conf'
-
+    #conf_path = '/raid/guorui/workspace/dgnn/b-tgl/config/train_conf'
+    conf_path ='/home/zwb/tgl-baseline/b-tgl/config/train_conf'
     
 
     def __init__(self):

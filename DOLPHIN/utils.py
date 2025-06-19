@@ -425,7 +425,7 @@ def loadBinDisk(path, ind, use_slice = False):
     time_use = time.time() - read_disk_s
     read_IO += res.numel() * 4 / 1024 ** 3
     read_IO_time += time_use
-    print(f"读取disk用时 {time_use:.4f}s shape:{res.shape} {res.numel() * 4 / 1024 ** 2 / time_use:.2f}MB/s path: {path}")
+    #print(f"读取disk用时 {time_use:.4f}s shape:{res.shape} {res.numel() * 4 / 1024 ** 2 / time_use:.2f}MB/s path: {path}")
     return res
 
 def updateBinDisk(path, values, ind, use_slice = False):
@@ -452,7 +452,7 @@ def updateBinDisk(path, values, ind, use_slice = False):
     update_data_to_file(file_path=path, values=values, indices=ind, shape=tuple(cur_conf['shape']), dtype=getattr(np, cur_conf['dtype']), use_slice = use_slice)
     write_IO += values.numel() * 4 / 1024 ** 3
     write_IO_time += (time.time() - update_disk_s)
-    print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
+    #print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
 
 def stream_rand_save(path, num, len, budget, dtype):
     if (num <= 0):
@@ -561,7 +561,7 @@ def load_graph(d):
 
     # datas = {}
     # base_path = f'/raid/guorui/DG/dataset/{d}'
-    # datas['src'] = loadBin(f'{base_path}/df-src.bin')
+    # datas['src'] = loadBin(f'{base_path}')
     # datas['dst'] = loadBin(f'{base_path}/df-dst.bin')
     # datas['time'] = loadBin(f'{base_path}/df-time.bin')
     # datas['eid'] = loadBin(f'{base_path}/df-eid.bin')
@@ -684,7 +684,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                 i += 1
             else:
                 # srch = node_feats[b.srcdata['ID'].long()].float()
-                if (feat_buffer != None and (feat_buffer.mode == 'train' or feat_buffer.use_b_test)):
+                if (feat_buffer != None and (feat_buffer.mode == 'train')):
                     srch = feat_buffer.get_n_feat(b.srcdata['ID'])
                 else:
                     if (feat_buffer != None and feat_buffer.prefetch_conn != None):
@@ -706,7 +706,7 @@ def prepare_input(mfgs, node_feats = None, edge_feats = None, feat_buffer = None
                         b.edata['f'] = efeat_buffs[i][:idx.shape[0]].cuda(non_blocking=True)
                         i += 1
                     else:
-                        if (feat_buffer != None and (feat_buffer.mode == 'train' or feat_buffer.use_b_test)):
+                        if (feat_buffer != None and (feat_buffer.mode == 'train')):
                             srch = feat_buffer.get_e_feat(b.edata['ID'])
                         else:
                             if (feat_buffer != None and feat_buffer.prefetch_conn != None):

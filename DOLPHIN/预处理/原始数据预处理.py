@@ -8,7 +8,7 @@ import argparse
 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default = "BITCOIN")
+parser.add_argument('--data', type=str, help='dataset name', default = "LASTFM")
 parser.add_argument('--txt', type=str, help='txt file path', default = "/home/guorui/data_tmp/BITCOIN/soc-bitcoin.edges")
 args=parser.parse_args()
 
