@@ -9,7 +9,7 @@ import argparse
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default = "LASTFM")
-parser.add_argument('--txt', type=str, help='txt file path', default = "/home/guorui/data_tmp/BITCOIN/soc-bitcoin.edges")
+#parser.add_argument('--txt', type=str, help='txt file path', default = "/home/guorui/data_tmp/BITCOIN/soc-bitcoin.edges")
 args=parser.parse_args()
 
 
@@ -50,11 +50,11 @@ values[int(0.85*len(df)):] = 2
 df['ext_roll'] = values
 
 print('save csv...')
-df.to_csv('/home/guorui/workspace/data_tmp/{}/edges.csv'.format(args.data))
+df.to_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(args.data))
 
 print('generate graph...')
 #gen_graph
-df = pd.read_csv('/home/guorui/workspace/data_tmp/{}/edges.csv'.format(args.data))
+df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(args.data))
 
 num_nodes = max(int(df['src'].max()), int(df['dst'].max())) + 1
 print('num_nodes: ', num_nodes)
@@ -104,4 +104,4 @@ for i in tqdm(range(int_train_indptr.shape[0] - 1)):
 
 print('saving...')
 
-np.savez('/home/guorui/workspace/data_tmp/{}/ext_full.npz'.format(args.data), indptr=ext_full_indptr, indices=ext_full_indices, ts=ext_full_ts, eid=ext_full_eid)
+np.savez('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(args.data), indptr=ext_full_indptr, indices=ext_full_indices, ts=ext_full_ts, eid=ext_full_eid)

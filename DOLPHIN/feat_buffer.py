@@ -1201,6 +1201,9 @@ class Feat_buffer:
 
             # 读取特征数据
             row_data = np.fromfile(feat_path, dtype=np_type, offset=start * feat_len, count=(end - start) * feat_len)
+            print(f"读取的数据总长度: {len(row_data)}")
+            print(f"尝试重塑的特征维度: {feat_len}")
+            print(f"特征维度是否匹配: {len(row_data) % feat_len == 0}")
             row_data = row_data.reshape(-1, feat_len)
             
             # 遍历历史数据
@@ -1683,7 +1686,7 @@ class Feat_buffer:
 
             
 
-        self.stream_extract(node_feat_path, node_save_paths,node_window_size,node_his,node_his_max,self.node_feat_dim,np.float32)
+        self.stream_extract(node_feat_path, node_save_paths,node_window_size,node_his,node_his_max,self.node_feat_dim,np.float16)
         if (edge_window_size > 0 and self.has_ef):
             self.stream_extract(edge_feat_path, edge_save_paths,edge_window_size,edge_his,edge_his_max,self.edge_feat_dim,np.float32)
 

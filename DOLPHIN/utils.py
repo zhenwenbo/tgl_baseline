@@ -174,7 +174,7 @@ def saveBin(tensor,savePath,addSave=False, use_pt = False):
         flush_saveBin_conf()
     
     total_time = time.time() - total_s
-    # print(f"saveBin {savePath} {tensor.nbytes * 4 / 1024 ** 2:.2f}MB total_t:{total_time:.4f}s save_t:{save_time:.4f}s")
+    #print(f"saveBin {savePath} {tensor.nbytes * 4 / 1024 ** 2:.2f}MB total_t:{total_time:.4f}s save_t:{save_time:.4f}s")
 
 from concurrent.futures import ThreadPoolExecutor
 executor = ThreadPoolExecutor(max_workers=1)
@@ -209,7 +209,7 @@ def loadBin(path, device = None):
     if not (path in confs[directory]):
         return None
     cur_conf = confs[directory][path]
-
+    
     
     if (device is None):
         device = cur_conf['device']
@@ -455,6 +455,7 @@ def updateBinDisk(path, values, ind, use_slice = False):
     #print(f"写入记忆disk用时 {time.time() - update_disk_s:.4f}s shape:{values.shape}")
 
 def stream_rand_save(path, num, len, budget, dtype):
+
     if (num <= 0):
         return
     once_num = int(budget / len / 4 )
@@ -473,6 +474,7 @@ def stream_rand_save(path, num, len, budget, dtype):
 
 def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     path = f'/raid/guorui/DG/dataset/{d}'
+    print(d)
     node_feats = None
     edge_feats = None
 
@@ -499,7 +501,14 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
         ef_len = 172
     elif d == 'MAG':
         ef_num = 0
-
+    elif d == 'LASTFM_interval':    
+        edge_feats = torch.randn(1293103, 128)
+    elif d == 'TALK_interval':
+        ef_num = 7833139
+        ef_len = 172
+        edge_feats = torch.randn(7833139, 172)
+    else:
+        raise NotImplementedError("不在可用范围")
     if d == 'LASTFM':
         node_feats = torch.randn(1980, 128)
     elif d == 'MOOC':
@@ -519,9 +528,16 @@ def gen_feat(d, rand_de=0, rand_dn=0, use_pt = False, budget = None):
     elif d == 'MAG':
         nf_num = 121751665
         nf_len = 768
-    
+    elif d == 'LASTFM_interval':    
+        node_feats = torch.randn(1980, 128)
+    elif d == 'TALK_interval':
+        nf_num = 1140149
+        nf_len = 172
+        node_feats = torch.randn(1140149, 172)
+    else:
+        raise NotImplementedError("不在可用范围")
     if (budget is not None):
-        # stream_rand_save(path + '/edge_features.pt', ef_num, ef_len, budget, torch.float32)
+        stream_rand_save(path + '/edge_features.pt', ef_num, ef_len, budget, torch.float32)
         stream_rand_save(path + '/node_features.pt', nf_num, nf_len, budget, torch.float16)
     else:
         if (edge_feats != None):

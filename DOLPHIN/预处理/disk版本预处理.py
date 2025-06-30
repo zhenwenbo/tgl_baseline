@@ -2,7 +2,7 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM_interval')
 parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
@@ -82,7 +82,6 @@ if __name__ == '__main__':
             train_edge_end = df_conf['train_edge_end']
             val_edge_end = df_conf['val_edge_end']
     sample_param, memory_param, gnn_param, train_param = parse_config(args.config)
-    sample_param['neighbor']=[50]
     if (args.fanout != -1):
         print(f"自定义fanout")
         sample_param['neighbor'] = [args.fanout]
@@ -116,6 +115,9 @@ if __name__ == '__main__':
     elif (args.data == 'MOOC'):
         gnn_dim_edge = 0
         gnn_dim_node = 172
+    elif (args.data == 'LASTFM_interval'):
+        gnn_dim_edge = 128
+        gnn_dim_node = 128
     else:
         raise RuntimeError("have not this dataset config!")
     
@@ -145,7 +147,9 @@ if __name__ == '__main__':
     elif (args.data == 'TALK'):
         edge_num = 157473
     elif (args.data == 'STACK'):
-        edge_num = 63497048   
+        edge_num = 63497048  
+    elif (args.data == 'LASTFM_interval'):
+        edge_num = 1293103      
     else:
         raise RuntimeError("have not this dataset config!")
     
