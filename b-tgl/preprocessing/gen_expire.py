@@ -1,4 +1,3 @@
-
 import torch
 import dgl
 import numpy as np
@@ -19,7 +18,6 @@ from sampler import *
 
 from sampler.sampler_gpu import *
 
-
 def get_max_edge_num(indptr):
     dif = torch.diff(indptr)
     ind = torch.nonzero(dif > 10).reshape(-1)
@@ -28,22 +26,18 @@ def get_max_edge_num(indptr):
     return torch.sum(dif)
 
 def gen_expire(args):
-
     d = args.data
     zombie_block = args.zombie_block
     batch_size = args.bs
-
     # d = 'LASTFM'
     # batch_size = 600000
     # df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(d))
     # g = np.load('/raid/guorui/DG/dataset/{}/ext_full.npz'.format(d))
     g, datas, df_conf = load_graph_bin(args.data)
 
-
     fan_nums = [10]
     layers = len(fan_nums)
     sampler_gpu = Sampler_GPU(g, fan_nums, layers)
-
 
     expired = torch.zeros_like(sampler_gpu.indices).cuda()
 
@@ -77,7 +71,6 @@ def gen_expire(args):
         os.mkdir(part_path)
 
     unexpire_ind = torch.empty(0, dtype = torch.int32, device = 'cuda:0')
-
 
     left, right = 0, 0
     batch_num = 0
@@ -158,8 +151,7 @@ def gen_expire(args):
                         unexpire_ind = torch.empty(0, dtype = torch.int32, device='cuda:0')
 
                     replace_idx[unalloc_ptr:] = torch.arange(end_ptr, end_ptr + (replace_idx.shape[0] - unalloc_ptr), dtype = torch.int32, device = 'cuda:0')
-                
-                
+                                
                 replace_idx = replace_idx.to(torch.int64)
 
                 if (unalloc_ptr is None):
@@ -189,8 +181,6 @@ def gen_expire(args):
         expired_cur = expired ^ expired_clone
 
         # emptyCache()
-
-        
         ind = torch.nonzero(expired_cur).reshape(-1)
         exp_eids = totaleid[ind]
 
@@ -211,7 +201,6 @@ def gen_expire(args):
         cal_edge_num -= exp_eids.shape[0]
         # if (_ == 100):
         #     break
-
         left = right
         batch_num += 1
     return end_ptr
@@ -238,8 +227,6 @@ def gen_expire(args):
     #     uni = uni[counts > 1]
 
     # print(f"丢弃边数{uni.shape}")
-
-
 
 import argparse
 import os

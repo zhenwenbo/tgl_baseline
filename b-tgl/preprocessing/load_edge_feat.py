@@ -12,5 +12,4 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--data', type=str, help='dataset name', default='LASTFM')
 args=parser.parse_args()
 
-
 edge_feats = loadBin(f'/raid/guorui/DG/dataset/{args.data}/edge_features.bin')

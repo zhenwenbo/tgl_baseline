@@ -1,12 +1,5 @@
-
-
-
 # 测试sample结果
 # GPU采样与TGL采样
-
-
-
-
 import torch
 import dgl
 import numpy as np
@@ -14,7 +7,6 @@ import pandas as pd
 import time
 from utils import *
 from sampler import *
-
 
 d = 'WIKI'
 batch_size = 600
@@ -28,8 +20,6 @@ from sampler_gpu import *
 fan_nums = [10, 10]
 layers = len(fan_nums)
 sampler_gpu = Sampler_GPU(g, fan_nums, layers)
-
-
 class NegLinkSampler:
 
     def __init__(self, num_nodes):
@@ -45,7 +35,6 @@ for _, rows in df[:train_edge_end].groupby(group_indexes):
     root_nodes = torch.from_numpy(np.concatenate([rows.src.values, rows.dst.values, neg_link_sampler.sample(len(rows))]).astype(np.int32)).cuda()
     root_ts = torch.from_numpy(np.concatenate([rows.time.values, rows.time.values, rows.time.values]).astype(np.float32)).cuda()
 
-
     start = time.time()
     ret_list = sampler_gpu.sample_layer(root_nodes, root_ts)
     
@@ -55,5 +44,3 @@ for _, rows in df[:train_edge_end].groupby(group_indexes):
 
     emptyCache()
     break
-
-

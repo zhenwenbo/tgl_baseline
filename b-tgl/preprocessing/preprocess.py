@@ -87,9 +87,6 @@ json_path = f'{base_path}/df-conf.json'
 with open(json_path, 'w') as f:
     json.dump(dataset_conf, f, indent=4)
 
-
-
-
 eid = torch.from_numpy(g['eid']).cuda()
 print(f'eid shape: {eid.shape} unique shape: {torch.unique(eid).shape}')
 

@@ -2,7 +2,22 @@
 
 ## Overview
 
-This repo is the open-sourced code for our work *TGL: A General Framework for Temporal Graph Training on Billion-Scale Graphs*.
+This repo is the open-sourced code for our work *SWIFT*.
+
+## File Structure
+
+The repository is organized as follows:
+
+- `config/`: Example configuration files for different temporal GNN methods and training setups.
+- `preprocess/`: 
+- `sampler/`: 
+- `test/`: 
+- `预处理/`: 
+- `setup.py`: 
+- `train.py`: Model training script.
+
+This structure helps organize code, configuration, and data for efficient development and experimentation.
+
 
 ## Requirements
 - python >= 3.6.13

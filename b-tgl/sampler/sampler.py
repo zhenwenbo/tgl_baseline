@@ -126,8 +126,6 @@ class TrainNegLinkSampler:
 
         self.ptr = 0
 
-        
-
     def sample(self, n, i = 0, cur_batch = 0):
         part_len = len(self.part)
         # res = np.random.randint(self.num_nodes, size=n)

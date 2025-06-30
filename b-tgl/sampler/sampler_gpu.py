@@ -1,4 +1,3 @@
-
 import dgl
 import torch
 import numpy as np
@@ -99,7 +98,6 @@ class Sampler_GPU:
                 outeid = outeid[noncut_mask]
                 dts = dts[noncut_mask]
 
-
             # print(f"layer: {i} 不采样的节点:{torch.sum(sample_mask) if sample_mask != None else 0}, 采样边数{torch.sum(outeid > -1)}")
             sample_list.append([out_src, out_dst, outts, outeid, root_nodes, curts, dts])
 
@@ -109,16 +107,8 @@ class Sampler_GPU:
                 if (self.emb_buffer and self.emb_buffer.use_buffer and self.emb_buffer.cur_mode == 'train' and i == 0):
                     res = self.emb_buffer.gen_his_indices(root_nodes)
                     sample_mask = (res > -1).to(torch.int32)
-                    
-               
-            
-
         return sample_list
             
-
-
-
-
     def gen_table(self, seed_num):
         fan_num = self.fan_num
         start = time.time()
@@ -146,7 +136,6 @@ class Sampler_GPU:
 
         # src[mask]中，每个值都是独立的节点编号，因此直接从200开始arange即可， 而节点id就直接拿src[mask]
         src_table = src
-
 
         src_node = torch.arange(src_table.shape[0], dtype = torch.int32, device = 'cuda:0') + seed_num
 
@@ -226,10 +215,8 @@ class Sampler_GPU:
             self.fan_num = self.fan_nums[i]
             b = self.gen_block(sample_ret, reverse)
             # TODO 多层采样 及 块批采样
-            
             mfgs.append(b.to('cuda:0'))
         # print(f"gen all block: {time.time() - start:.5f}s")
-
         mfgs = list(map(list, zip(*[iter(mfgs)] * 1)))
         mfgs.reverse()
         return mfgs
