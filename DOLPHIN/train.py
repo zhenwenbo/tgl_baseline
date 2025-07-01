@@ -194,8 +194,15 @@ def eval(mode='val'):
     
     right = left
     
+    # 计算总批次数用于进度条
+    total_batches = (eval_df_end - left + batch_size - 1) // batch_size
+    
     with torch.no_grad():
         total_loss = 0
+        # 创建进度条
+        progress_bar = tqdm(total=total_batches, desc=f'Evaluating {mode}', 
+                           bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]')
+        
         while True:
             right += batch_size
             right = min(right, eval_df_end)
@@ -257,6 +264,11 @@ def eval(mode='val'):
                 mailbox.update_memory(model.memory_updater.last_updated_nid, model.memory_updater.last_updated_memory, root_nodes, model.memory_updater.last_updated_ts, neg_samples=neg_samples)
             
             left = right
+            # 更新进度条
+            progress_bar.update(1)
+        
+        # 关闭进度条
+        progress_bar.close()
 
         if mode == 'val':
             val_losses.append(float(total_loss))

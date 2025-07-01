@@ -491,7 +491,8 @@ if __name__ == '__main__':
         #     feat_buffer.init_feat(node_feats, edge_feats)
         # feat_buffer.gen_part()
 
-        test_ap, val_ap = [], []
+
+
         for e in range(train_param['epoch']):
             print('Epoch {:d}:'.format(e))
             time_sample = 0
