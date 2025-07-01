@@ -8,10 +8,9 @@ import argparse
 
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default = "LASTFM")
-#parser.add_argument('--txt', type=str, help='txt file path', default = "/home/guorui/data_tmp/BITCOIN/soc-bitcoin.edges")
+parser.add_argument('--data', type=str, help='dataset name', default = "LASTFM1")
+parser.add_argument('--txt', type=str, help='txt file path', default = "/home/zwb/tgl-baseline/DOLPHIN/预处理/预处理.txt")
 args=parser.parse_args()
-
 
 print('open txt file...')
 with open(args.txt, "r") as f:
@@ -20,9 +19,9 @@ for i in range(len(data)):
     data[i] = data[i].split()
 
 print('to DataFrame...')
-df = pd.DataFrame(data[1:])
-df.columns = ['src','dst','time']
-
+df = pd.read_csv('/raid/guorui/DG/dataset/{}/edges.csv'.format(args.data))
+num_nodes = max(int(df['src'].max()), int(df['dst'].max())) + 1
+print('num_nodes: ', num_nodes)
 print('reindex...')
 #reindex src & dst
 src = df.src.astype(int)

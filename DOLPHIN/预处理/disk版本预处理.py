@@ -2,8 +2,8 @@ import argparse
 import os
 
 parser=argparse.ArgumentParser()
-parser.add_argument('--data', type=str, help='dataset name', default='LASTFM_interval')
-parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGAT-1.yml')
+parser.add_argument('--data', type=str, help='dataset name', default='LASTFM1')
+parser.add_argument('--config', type=str, help='path to config file', default='/raid/guorui/workspace/dgnn/b-tgl/config/TGN-1.yml')
 parser.add_argument('--gpu', type=str, default='0', help='which GPU to use')
 parser.add_argument('--model_name', type=str, default='', help='name of stored model')
 parser.add_argument('--use_inductive', action='store_true')
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     if (args.data == 'LASTFM'):#TODO 临时改法 还得再改
         edge_num = 1293103
     elif (args.data == 'TALK'):
-        edge_num = 157473
+        edge_num = 7833140
     elif (args.data == 'STACK'):
         edge_num = 63497048  
     elif (args.data == 'LASTFM_interval'):

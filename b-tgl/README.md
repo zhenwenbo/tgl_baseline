@@ -8,7 +8,7 @@ This repo is the open-sourced code for our work *SWIFT*.
 
 The repository is organized as follows:
 
-- `config/`: Example configuration files for different temporal GNN methods and training setups.
+- `config/`: 其他文件（可删除）DOLPHIN里是由于我感觉训练配置改起来比较方便改了一次
 - `preprocess/`: 
 - `sampler/`: 
 - `test/`: 

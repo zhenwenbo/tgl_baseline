@@ -31,7 +31,7 @@ def saveBin(tensor,savePath,addSave=False):
         tensor.cpu().numpy().tofile(savePath)
     elif isinstance(tensor, np.ndarray):
         tensor.tofile(savePath)
-data = 'MAG'
+data = 'LASTFM1'
 
 
 import sys
