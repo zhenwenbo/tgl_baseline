@@ -89,14 +89,14 @@ def df2bin():
         json.dump(dataset_conf, f, indent=4)
 
 
-# df2bin()
+df2bin()
 
-# eid = torch.from_numpy(g['eid']).cuda()
-# print(f'eid shape: {eid.shape} unique shape: {torch.unique(eid).shape}')
+eid = torch.from_numpy(g['eid']).cuda()
+print(f'eid shape: {eid.shape} unique shape: {torch.unique(eid).shape}')
 
-# ef = loadBin(f'/raid/guorui/DG/dataset/{data}/edge_features.bin')
+ef = loadBin(f'/raid/guorui/DG/dataset/{data}/edge_features.bin')
 
-# ef = ef[eid]
+ef = ef[eid]
 
 def reorder_edge():
     print(f"reorder edge")
@@ -108,10 +108,8 @@ def reorder_edge():
     res = torch.zeros(max_val + 1, dtype=torch.long).cuda()
     res.scatter_(0, eid, torch.arange(len(eid)).cuda())
 
-    print(res)
 
     # 保存后，例如需要寻找eid = 100的边特征，那么需要edge_feat_reorder[map[eid]]即可
-    # saveBin(ef.cpu(), f'/raid/guorui/DG/dataset/{data}/edge_features_reorder.bin')
-    saveBin(res.cpu().to(torch.int32), f'/raid/guorui/DG/dataset/{data}/edge_reorder_map.bin')
+    saveBin(ef.cpu(), f'/raid/guorui/DG/dataset/{data}/edge_features_reorder.bin')
 
-# reorder_edge()
+reorder_edge()
